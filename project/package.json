@@ -1,14 +1,16 @@
-{
+﻿{
   "name": "aviation-weather-collector",
   "version": "1.0.0",
-  "description": "KMA 항공기상 데이터 수집 시스템",
-  "main": "main.js",
+  "description": "KMA aviation weather data collection service",
+  "main": "backend/src/index.js",
   "scripts": {
-    "start": "node main.js",
-    "test": "node test.js"
+    "start": "node backend/src/index.js",
+    "test": "node backend/test/run-once.js all",
+    "dashboard": "node frontend/server.js"
   },
   "dependencies": {
-    "node-cron": "^3.0.3",
-    "fast-xml-parser": "^4.3.0"
+    "dotenv": "^16.0.0",
+    "fast-xml-parser": "^4.3.0",
+    "node-cron": "^3.0.3"
   }
 }

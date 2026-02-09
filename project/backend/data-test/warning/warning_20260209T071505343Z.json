@@ -1,0 +1,9 @@
+{
+  "type": "AIRPORT_WARNINGS",
+  "fetched_at": "2026-02-09T07:15:05.343Z",
+  "airports": {
+    "RKSI": {
+      "seq": 6
+    }
+  }
+}
