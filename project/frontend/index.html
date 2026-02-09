@@ -39,6 +39,30 @@
       </article>
     </section>
 
+    <section class="panel" id="status-panel">
+      <h3>Data Collection Status</h3>
+      <div class="status-grid">
+        <div class="status-item">
+          <span class="status-label">METAR</span>
+          <span class="status-value" id="status-metar-time">-</span>
+          <span class="status-sub" id="status-metar-files">-</span>
+        </div>
+        <div class="status-item">
+          <span class="status-label">TAF</span>
+          <span class="status-value" id="status-taf-time">-</span>
+          <span class="status-sub" id="status-taf-files">-</span>
+        </div>
+        <div class="status-item">
+          <span class="status-label">WARNING</span>
+          <span class="status-value" id="status-warning-time">-</span>
+          <span class="status-sub" id="status-warning-files">-</span>
+        </div>
+      </div>
+      <p class="status-note">
+        <strong>Schedule:</strong> METAR every 10 min • TAF every 30 min • WARNING every 5 min
+      </p>
+    </section>
+
     <section class="panel controls">
       <label for="airport-select">Airport</label>
       <select id="airport-select"></select>

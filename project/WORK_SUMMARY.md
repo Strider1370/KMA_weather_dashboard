@@ -54,3 +54,66 @@
 ## 5) 현재 참고 사항
 - KMA API는 간헐적으로 `APPLICATION_ERROR`/인증 응답 이슈가 발생할 수 있음.
 - 이 경우 캐시 복구(`_stale`) 경로로 데이터 공백을 완화하도록 구현되어 있음.
+
+---
+
+# 추가 작업 (2026-02-09 후반)
+
+## 6) 환경 설정 및 초기 실행
+- `.env` 파일 생성 및 KMA API 키 설정
+- `npm install`로 의존성 패키지 설치
+- `npm test`로 초기 데이터 수집 성공 (METAR 8개, TAF 8개, WARNING 1개)
+
+## 7) CAVOK 표시 개선
+- **문제**: CAVOK 상태일 때 시정/구름이 "CAVOK"으로 표시되어 구체적인 값 확인 불가
+- **수정**: 내부적으로는 `cavok_flag` 유지, 표시는 실제 값으로 변경
+  - `backend/src/parsers/metar-parser.js`: `buildDisplay()` 함수 수정
+    - `visibility`: 항상 실제 값(9999 등) 표시
+    - `clouds`: CAVOK 또는 NSC일 때 "NSC" 표시
+  - `backend/src/parsers/taf-parser.js`: `formatDisplay()` 함수 동일하게 수정
+  - `weather_icon`은 CAVOK 유지 (아이콘 선택용)
+
+## 8) 데이터 수집 현황 표시 기능 추가
+- **백엔드** (`frontend/server.js`)
+  - `/api/status` 엔드포인트 신규 추가
+  - `getDataStatus()` 함수: 각 데이터 타입별 상태 정보 제공
+    - 마지막 업데이트 시간 (`fetched_at`)
+    - 캐시된 파일 개수
+    - 최신 파일 이름
+- **프론트엔드**
+  - `frontend/index.html`: "Data Collection Status" 섹션 추가
+    - 3개 데이터 타입(METAR, TAF, WARNING)별 현황 표시
+    - 스케줄 정보 안내 (METAR 10분, TAF 30분, WARNING 5분)
+  - `frontend/app.js`:
+    - `state.status` 추가
+    - `renderStatus()` 함수 구현
+    - `loadAll()`에서 `/api/status` 호출 및 렌더링
+  - `frontend/styles.css`: 상태 표시 스타일 추가
+    - `.status-grid`, `.status-item`, `.status-label`, `.status-value`, `.status-sub`
+    - 모바일 반응형 레이아웃 적용
+
+## 9) 스케줄러 자동 실행 통합
+- **문제**: 대시보드 서버와 스케줄러를 별도로 실행해야 함
+- **수정**: `frontend/server.js`에서 서버 시작 시 자동으로 백엔드 스케줄러 실행
+  - `npm run dashboard` 하나로 통합 실행
+  - 프론트엔드 서버 + 백엔드 스케줄러 동시 작동
+  - 자동 데이터 수집 (METAR 10분, TAF 30분, WARNING 5분 간격)
+
+## 10) 실행 방법 정리
+```bash
+# 통합 서버 실행 (대시보드 + 스케줄러)
+npm run dashboard
+
+# 수동 데이터 수집 (테스트용)
+npm test
+
+# 스케줄러만 실행 (필요시)
+npm start
+```
+
+## 11) 최종 기능 요약
+- ✅ 환경 설정 및 초기 데이터 수집
+- ✅ CAVOK 상태 표시 개선 (9999m, NSC로 표시)
+- ✅ 실시간 데이터 수집 현황 모니터링
+- ✅ 서버 시작 시 스케줄러 자동 실행
+- ✅ 깔끔한 통합 실행 환경

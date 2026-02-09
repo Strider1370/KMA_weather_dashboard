@@ -3,7 +3,8 @@
   taf: null,
   warning: null,
   airports: [],
-  warningTypes: {}
+  warningTypes: {},
+  status: null
 };
 
 const airportSelect = document.getElementById("airport-select");
@@ -88,6 +89,24 @@ function renderSummary() {
     .pop();
 
   setText("last-updated", updated ? `Last Updated: ${formatUtc(updated)}` : "Last Updated: -");
+}
+
+function renderStatus() {
+  if (!state.status) return;
+
+  const types = ["metar", "taf", "warning"];
+  for (const type of types) {
+    const data = state.status[type];
+    if (!data || !data.exists) {
+      setText(`status-${type}-time`, "Not collected yet");
+      setText(`status-${type}-files`, "0 files cached");
+      continue;
+    }
+
+    const time = data.last_updated ? formatUtc(data.last_updated) : "Unknown";
+    setText(`status-${type}-time`, time);
+    setText(`status-${type}-files`, `${data.file_count} file${data.file_count !== 1 ? 's' : ''} cached`);
+  }
 }
 
 function renderMetar(icao) {
@@ -190,12 +209,13 @@ function renderAirport(icao) {
 
 async function loadAll() {
   try {
-    const [metar, taf, warning, airports, warningTypes] = await Promise.all([
+    const [metar, taf, warning, airports, warningTypes, status] = await Promise.all([
       fetchJson("/api/metar"),
       fetchJson("/api/taf"),
       fetchJson("/api/warning"),
       fetchJson("/api/airports"),
-      fetchJson("/api/warning-types")
+      fetchJson("/api/warning-types"),
+      fetchJson("/api/status")
     ]);
 
     state.metar = metar;
@@ -203,9 +223,11 @@ async function loadAll() {
     state.warning = warning;
     state.airports = airports;
     state.warningTypes = warningTypes || {};
+    state.status = status;
 
     fillAirportSelect();
     renderSummary();
+    renderStatus();
 
     const selected = airportSelect.value || Object.keys(metar.airports || {})[0];
     if (selected) {

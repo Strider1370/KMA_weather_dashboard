@@ -24,6 +24,40 @@ function readLatest(category) {
   return JSON.parse(raw);
 }
 
+function getDataStatus(category) {
+  try {
+    const dir = path.join(DATA_ROOT, category);
+    if (!fs.existsSync(dir)) {
+      return { exists: false, last_updated: null, file_count: 0 };
+    }
+
+    const files = fs.readdirSync(dir)
+      .filter(name => name.endsWith(".json") && name !== "latest.json")
+      .map(name => {
+        const fullPath = path.join(dir, name);
+        const stats = fs.statSync(fullPath);
+        return { name, mtime: stats.mtime };
+      })
+      .sort((a, b) => b.mtime - a.mtime);
+
+    let lastUpdated = null;
+    const latestFile = path.join(dir, "latest.json");
+    if (fs.existsSync(latestFile)) {
+      const data = JSON.parse(fs.readFileSync(latestFile, "utf8"));
+      lastUpdated = data.fetched_at || null;
+    }
+
+    return {
+      exists: true,
+      last_updated: lastUpdated,
+      file_count: files.length,
+      latest_file: files[0]?.name || null
+    };
+  } catch (error) {
+    return { exists: false, last_updated: null, file_count: 0, error: error.message };
+  }
+}
+
 function contentTypeFor(filePath) {
   if (filePath.endsWith(".html")) return "text/html; charset=utf-8";
   if (filePath.endsWith(".css")) return "text/css; charset=utf-8";
@@ -77,6 +111,15 @@ const server = http.createServer((req, res) => {
       return sendJson(res, 200, warningTypes);
     }
 
+    if (req.url === "/api/status") {
+      const status = {
+        metar: getDataStatus("metar"),
+        taf: getDataStatus("taf"),
+        warning: getDataStatus("warning")
+      };
+      return sendJson(res, 200, status);
+    }
+
     return serveStatic(req, res);
   } catch (error) {
     return sendJson(res, 500, { error: error.message });
@@ -85,4 +128,10 @@ const server = http.createServer((req, res) => {
 
 server.listen(PORT, () => {
   console.log(`Dashboard server started: http://localhost:${PORT}`);
+
+  // Start backend scheduler automatically
+  const scheduler = require("../backend/src/index");
+  scheduler.main().catch(err => {
+    console.error("Scheduler failed to start:", err);
+  });
 });

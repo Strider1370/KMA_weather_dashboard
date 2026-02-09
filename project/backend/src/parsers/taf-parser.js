@@ -257,9 +257,9 @@ function formatDisplay(state) {
   const weatherList = state.wx || [];
   return {
     wind: state.wind?.raw || null,
-    visibility: state.cavok_flag ? "CAVOK" : String(state.vis ?? "//"),
+    visibility: String(state.vis ?? "//"),
     weather: state.cavok_flag ? "" : (weatherList.map((w) => w.raw).join(" ")),
-    clouds: state.cavok_flag ? "CAVOK" : (state.nsc_flag ? "NSC" : ((state.clouds || []).map((c) => c.raw).join(" "))),
+    clouds: (state.cavok_flag || state.nsc_flag) ? "NSC" : ((state.clouds || []).map((c) => c.raw).join(" ")),
     weather_icon: state.cavok_flag ? "CAVOK" : pickPrimaryWeatherIcon(weatherList),
     weather_intensity: weatherList[0]?.intensity || null
   };

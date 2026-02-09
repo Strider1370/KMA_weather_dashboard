@@ -65,9 +65,9 @@ function parseWindShear(obs) {
 function buildDisplay(observation, flags) {
   return {
     wind: observation.wind.raw,
-    visibility: flags.cavok ? "CAVOK" : String(observation.visibility.value ?? "//"),
+    visibility: String(observation.visibility.value ?? "//"),
     weather: observation.weather.map((w) => w.raw).join(" "),
-    clouds: flags.cavok ? "CAVOK" : (flags.nsc ? "NSC" : observation.clouds.map((c) => c.raw).join(" ")),
+    clouds: (flags.cavok || flags.nsc) ? "NSC" : observation.clouds.map((c) => c.raw).join(" "),
     temperature:
       observation.temperature.air != null && observation.temperature.dewpoint != null
         ? `${toMetarTempToken(observation.temperature.air)}/${toMetarTempToken(observation.temperature.dewpoint)}`
