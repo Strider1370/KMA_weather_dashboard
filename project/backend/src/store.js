@@ -164,6 +164,14 @@ function save(type, data) {
 
   const decision = shouldSave(type, data);
   if (!decision.changed) {
+    // 데이터 동일해도 latest.json의 fetched_at만 갱신
+    const latestPath = path.join(dir, "latest.json");
+    if (fs.existsSync(latestPath)) {
+      const latest = JSON.parse(fs.readFileSync(latestPath, "utf8"));
+      latest.fetched_at = data.fetched_at || new Date().toISOString();
+      writeJson(latestPath, latest);
+    }
+    updateCache(type, data, decision.hash);
     return { saved: false, reason: "unchanged" };
   }
 

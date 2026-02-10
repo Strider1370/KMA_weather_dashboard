@@ -177,3 +177,37 @@ npm run dashboard
 # 프론트엔드 빌드
 cd frontend && npm run build
 ```
+
+---
+
+## 15) 알림 시스템 Phase 5 — 백엔드 로직 (CP-12~CP-17)
+- `shared/alert-defaults.js` — 서버 기본 알림 설정 (트리거 7종, 디스패처 3종, 전역 설정)
+- `frontend/src/utils/alerts/alert-triggers.js` — 7개 트리거 정의 (경보 발표/해제, 저시정, 강풍, 기상현상, 저운고, TAF 악기상)
+- `frontend/src/utils/alerts/alert-engine.js` — 트리거 평가 엔진
+- `frontend/src/utils/alerts/alert-state.js` — 중복 방지 (고유 키 생성, 쿨다운 체크, 이력 관리)
+- `frontend/src/utils/alerts/alert-dispatcher.js` — 콘솔 로그 + React 콜백 기반 디스패치
+- `frontend/src/utils/alerts/alert-settings.js` — 2계층 설정 병합 (서버 기본값 + localStorage 개인설정)
+- `frontend/src/utils/alerts/index.js` — barrel export
+- `frontend/server.js` — `/api/alert-defaults` 엔드포인트 추가
+- `frontend/src/utils/api.js` — `loadAlertDefaults()` 추가
+- `App.jsx` — 알림 평가 effect, 자동 폴링 (30초 간격)
+
+## 16) 알림 시스템 Phase 6 — UI 컴포넌트 (CP-18~CP-21)
+- `frontend/src/components/alerts/AlertPopup.jsx` — 우상단 토스트 팝업 (severity별 색상, 자동 dismiss, 최대 5개)
+- `frontend/src/components/alerts/AlertSound.jsx` — Web Audio API 비프음 (critical 3회 반복)
+- `frontend/src/components/alerts/AlertMarquee.jsx` — 하단 스크롤 바 (warning 이상 severity)
+- `frontend/src/components/alerts/AlertSettings.jsx` — 설정 모달 (트리거 on/off, 임계값, 쿨다운, 조용시간, 디스패처별 on/off)
+- `Header.jsx` — 설정 버튼(기어 아이콘) 추가
+- `App.css` — 팝업, 마퀴, 설정 모달 스타일 추가
+- `App.jsx` — 전체 알림 컴포넌트 통합 (activeAlerts 상태, 콜백 등록, 설정 모달)
+
+## 17) 백엔드 버그 수정 및 개선
+- `backend/src/config.js` — `numOfRows` 500→10 수정 (KMA API 에러 원인)
+- `backend/src/store.js` — 데이터 unchanged 시에도 `latest.json`의 `fetched_at` 갱신
+- `frontend/server.js` — `/api/refresh` POST 엔드포인트 추가 (수동 KMA API 호출)
+- `frontend/server.js` — async handler 전환, 에러 로깅 추가
+
+## 18) 알림 설정 접근 방법
+- 대시보드 헤더 우상단 기어(⚙) 버튼 클릭 → 설정 모달
+- 트리거별 활성화/비활성화, 임계값 조정, 쿨다운, 조용시간, 팝업/사운드/마퀴 개별 제어
+- 설정은 localStorage에 저장, 초기화 버튼으로 서버 기본값 복원

@@ -1,5 +1,16 @@
-import { useState, useEffect, useCallback } from "react";
-import { loadAllData } from "./utils/api";
+import { useState, useEffect, useCallback, useRef } from "react";
+import { loadAllData, loadAlertDefaults, triggerRefresh } from "./utils/api";
+import {
+  evaluate,
+  buildAlertKey,
+  isInCooldown,
+  recordAlert,
+  clearResolvedAlerts,
+  dispatch,
+  isQuietHours,
+  resolveSettings,
+  setAlertCallback,
+} from "./utils/alerts";
 import Header from "./components/Header";
 import SummaryGrid from "./components/SummaryGrid";
 import StatusPanel from "./components/StatusPanel";
@@ -7,6 +18,10 @@ import Controls from "./components/Controls";
 import MetarCard from "./components/MetarCard";
 import WarningList from "./components/WarningList";
 import TafTimeline from "./components/TafTimeline";
+import AlertPopup from "./components/alerts/AlertPopup";
+import AlertSound from "./components/alerts/AlertSound";
+import AlertMarquee from "./components/alerts/AlertMarquee";
+import AlertSettings from "./components/alerts/AlertSettings";
 import "./App.css";
 
 export default function App() {
@@ -14,13 +29,31 @@ export default function App() {
   const [selectedAirport, setSelectedAirport] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [alertDefaults, setAlertDefaults] = useState(null);
+  const [activeAlerts, setActiveAlerts] = useState([]);
+  const [showSettings, setShowSettings] = useState(false);
+
+  const prevDataRef = useRef(null);
+  const pollingRef = useRef(null);
+
+  // 디스패처 콜백 등록
+  useEffect(() => {
+    setAlertCallback((alertObj) => {
+      setActiveAlerts((prev) => [alertObj, ...prev].slice(0, 20));
+    });
+    return () => setAlertCallback(null);
+  }, []);
 
   const loadAll = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const result = await loadAllData();
+      const [result, defaults] = await Promise.all([
+        loadAllData(),
+        alertDefaults ? Promise.resolve(alertDefaults) : loadAlertDefaults(),
+      ]);
       setData(result);
+      if (!alertDefaults) setAlertDefaults(defaults);
 
       setSelectedAirport((prev) => {
         const metarAirports = Object.keys(result.metar?.airports || {});
@@ -32,11 +65,91 @@ export default function App() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [alertDefaults]);
 
   useEffect(() => {
     loadAll();
   }, [loadAll]);
+
+  // Alert evaluation
+  useEffect(() => {
+    if (!data.metar || !selectedAirport || !alertDefaults) return;
+
+    const settings = resolveSettings(alertDefaults);
+    if (!settings.global.alerts_enabled) return;
+    if (isQuietHours(settings.global.quiet_hours)) return;
+
+    const currentData = {
+      metar: data.metar?.airports?.[selectedAirport] || null,
+      taf: data.taf?.airports?.[selectedAirport] || null,
+      warning: data.warning?.airports?.[selectedAirport] || null,
+    };
+
+    const prev = prevDataRef.current;
+    const previousData = prev
+      ? {
+          metar: prev.metar?.airports?.[selectedAirport] || null,
+          taf: prev.taf?.airports?.[selectedAirport] || null,
+          warning: prev.warning?.airports?.[selectedAirport] || null,
+        }
+      : null;
+
+    const results = evaluate(currentData, previousData, settings);
+    const firedKeys = new Set();
+
+    for (const result of results) {
+      const key = buildAlertKey(result, selectedAirport);
+      firedKeys.add(key);
+
+      if (isInCooldown(key, settings.global.cooldown_seconds)) continue;
+
+      recordAlert(key);
+      dispatch(result, settings.dispatchers, selectedAirport);
+    }
+
+    clearResolvedAlerts(firedKeys);
+    prevDataRef.current = data;
+  }, [data, selectedAirport, alertDefaults]);
+
+  // Auto-polling
+  useEffect(() => {
+    if (!alertDefaults) return;
+
+    const settings = resolveSettings(alertDefaults);
+    const intervalSec = settings.global.poll_interval_seconds || 30;
+
+    if (pollingRef.current) clearInterval(pollingRef.current);
+
+    pollingRef.current = setInterval(() => {
+      loadAll();
+    }, intervalSec * 1000);
+
+    return () => {
+      if (pollingRef.current) clearInterval(pollingRef.current);
+    };
+  }, [alertDefaults, loadAll]);
+
+  async function handleRefresh() {
+    setLoading(true);
+    try {
+      await triggerRefresh();
+      await loadAll();
+    } catch (err) {
+      setError(err.message);
+      setLoading(false);
+    }
+  }
+
+  function handleDismissAlert(id) {
+    setActiveAlerts((prev) => prev.filter((a) => a.id !== id));
+  }
+
+  function handleSettingsChange() {
+    // 설정 변경 시 alertDefaults를 다시 로드하여 resolveSettings가 새 값을 반영
+    loadAlertDefaults().then((defaults) => setAlertDefaults({ ...defaults }));
+  }
+
+  const settings = alertDefaults ? resolveSettings(alertDefaults) : null;
 
   const airportList = Object.keys(data.metar?.airports || {});
   if (airportList.length === 0 && data.airports) {
@@ -53,8 +166,30 @@ export default function App() {
       <div className="bg-shape shape-a" />
       <div className="bg-shape shape-b" />
 
+      {/* Alert UI components */}
+      {settings && (
+        <>
+          <AlertPopup
+            alerts={activeAlerts}
+            onDismiss={handleDismissAlert}
+            settings={settings.dispatchers.popup}
+          />
+          <AlertSound
+            alerts={activeAlerts}
+            settings={settings.dispatchers.sound}
+          />
+          <AlertMarquee
+            alerts={activeAlerts}
+            settings={settings.dispatchers.marquee}
+          />
+        </>
+      )}
+
       <main className="container">
-        <Header lastUpdated={lastUpdated} />
+        <Header
+          lastUpdated={lastUpdated}
+          onSettingsClick={() => setShowSettings(true)}
+        />
 
         {loading && !data.metar && (
           <p className="loading-message">Loading data...</p>
@@ -72,7 +207,7 @@ export default function App() {
               airports={airportList}
               selectedAirport={selectedAirport}
               onAirportChange={setSelectedAirport}
-              onRefresh={loadAll}
+              onRefresh={handleRefresh}
             />
             <section className="split">
               <MetarCard metarData={data.metar} icao={selectedAirport} />
@@ -86,6 +221,14 @@ export default function App() {
           </>
         )}
       </main>
+
+      {showSettings && alertDefaults && (
+        <AlertSettings
+          defaults={alertDefaults}
+          onClose={() => setShowSettings(false)}
+          onSettingsChange={handleSettingsChange}
+        />
+      )}
     </>
   );
 }

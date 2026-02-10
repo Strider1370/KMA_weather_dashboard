@@ -13,7 +13,7 @@ module.exports = {
       warning: "/AmmService/getWarning"
     },
     auth_key: process.env.API_AUTH_KEY || "",
-    default_params: { pageNo: 1, numOfRows: 500, dataType: "XML" },
+    default_params: { pageNo: 1, numOfRows: 10, dataType: "XML" },
     timeout_ms: 10000,
     max_retries: 3
   },

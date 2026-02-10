@@ -7,6 +7,7 @@ const ROOT = path.join(__dirname, "dist");
 const DATA_ROOT = path.resolve(__dirname, "../backend/data");
 const SHARED_AIRPORTS = path.resolve(__dirname, "../shared/airports.js");
 const SHARED_WARNING_TYPES = path.resolve(__dirname, "../shared/warning-types.js");
+const SHARED_ALERT_DEFAULTS = path.resolve(__dirname, "../shared/alert-defaults.js");
 
 function sendJson(res, status, payload) {
   res.writeHead(status, { "Content-Type": "application/json; charset=utf-8" });
@@ -85,7 +86,7 @@ function serveStatic(req, res) {
   res.end(body);
 }
 
-const server = http.createServer((req, res) => {
+const server = http.createServer(async (req, res) => {
   try {
     if (req.url === "/api/metar") {
       return sendJson(res, 200, readLatest("metar"));
@@ -111,6 +112,38 @@ const server = http.createServer((req, res) => {
       return sendJson(res, 200, warningTypes);
     }
 
+    if (req.url === "/api/alert-defaults") {
+      delete require.cache[SHARED_ALERT_DEFAULTS];
+      const alertDefaults = require(SHARED_ALERT_DEFAULTS);
+      return sendJson(res, 200, alertDefaults);
+    }
+
+    if (req.url === "/api/refresh" && req.method === "POST") {
+      console.log("[REFRESH] Manual refresh triggered");
+      const metarProcessor = require("../backend/src/processors/metar-processor");
+      const tafProcessor = require("../backend/src/processors/taf-processor");
+      const warningProcessor = require("../backend/src/processors/warning-processor");
+
+      try {
+        const results = await Promise.allSettled([
+          metarProcessor.processAll(),
+          tafProcessor.processAll(),
+          warningProcessor.process(),
+        ]);
+
+        const summary = {
+          metar: results[0].status === "fulfilled" ? results[0].value : { error: results[0].reason?.message },
+          taf: results[1].status === "fulfilled" ? results[1].value : { error: results[1].reason?.message },
+          warning: results[2].status === "fulfilled" ? results[2].value : { error: results[2].reason?.message },
+        };
+        console.log("[REFRESH] Results:", JSON.stringify(summary, null, 2));
+        return sendJson(res, 200, summary);
+      } catch (refreshErr) {
+        console.error("[REFRESH] Error:", refreshErr.message);
+        return sendJson(res, 500, { error: refreshErr.message });
+      }
+    }
+
     if (req.url === "/api/status") {
       const status = {
         metar: getDataStatus("metar"),
@@ -122,6 +155,7 @@ const server = http.createServer((req, res) => {
 
     return serveStatic(req, res);
   } catch (error) {
+    console.error("[SERVER] Request error:", req.url, error.message);
     return sendJson(res, 500, { error: error.message });
   }
 });

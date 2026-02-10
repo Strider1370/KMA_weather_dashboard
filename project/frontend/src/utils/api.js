@@ -17,3 +17,15 @@ export async function loadAllData() {
   ]);
   return { metar, taf, warning, airports, warningTypes, status };
 }
+
+export async function loadAlertDefaults() {
+  return fetchJson("/api/alert-defaults");
+}
+
+export async function triggerRefresh() {
+  const response = await fetch("/api/refresh", { method: "POST" });
+  if (!response.ok) {
+    throw new Error(`/api/refresh -> HTTP ${response.status}`);
+  }
+  return response.json();
+}
