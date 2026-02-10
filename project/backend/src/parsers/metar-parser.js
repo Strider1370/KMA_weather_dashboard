@@ -173,7 +173,7 @@ function parse(xmlString) {
 
   observation.display = buildDisplay(observation, { cavok, nsc: nscFlag });
 
-  return {
+  const parsed = {
     header: {
       icao:
         text(item.icaoCode) ||
@@ -192,6 +192,13 @@ function parse(xmlString) {
     cavok_flag: cavok,
     nsc_flag: nscFlag
   };
+
+  // Guard: reject empty/placeholder payloads that would poison latest.json cache.
+  if (!parsed.header.icao) {
+    return null;
+  }
+
+  return parsed;
 }
 
 module.exports = { parse };

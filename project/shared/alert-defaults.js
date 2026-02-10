@@ -1,7 +1,7 @@
 module.exports = {
   global: {
     alerts_enabled: true,
-    poll_interval_seconds: 30,
+    poll_interval_seconds: 300,
     cooldown_seconds: 300,
     quiet_hours: null,
   },

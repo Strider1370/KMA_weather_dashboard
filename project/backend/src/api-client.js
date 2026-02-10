@@ -50,6 +50,15 @@ function parseApiHeader(xmlText) {
   };
 }
 
+function isSuccessByType(type, resultCode, resultMsg) {
+  if (resultCode == null) return false;
+  if (resultCode === "00") return true;
+  if (type === "warning" && resultCode === "03" && /NO_DATA/i.test(resultMsg || "")) {
+    return true;
+  }
+  return false;
+}
+
 async function fetchApi(type, icao = null) {
   const url = buildUrl(type, icao);
 
@@ -70,9 +79,9 @@ async function fetchApi(type, icao = null) {
       }
 
       const { resultCode, resultMsg } = parseApiHeader(body);
-      if (resultCode && resultCode !== "00") {
+      if (!isSuccessByType(type, resultCode, resultMsg)) {
         const error = new Error(`API ${resultCode}: ${resultMsg || "UNKNOWN_ERROR"}`);
-        if (resultCode === "03" || /유효한 인증키/i.test(resultMsg || "")) {
+        if (/유효한 인증키/i.test(resultMsg || "")) {
           error.nonRetryable = true;
         }
         throw error;

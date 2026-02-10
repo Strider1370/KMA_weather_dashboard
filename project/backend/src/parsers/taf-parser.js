@@ -370,7 +370,7 @@ function parse(xmlString) {
     });
   }
 
-  return {
+  const parsed = {
     header: {
       icao:
         text(item.icaoCode) ||
@@ -388,6 +388,13 @@ function parse(xmlString) {
     },
     timeline
   };
+
+  // Guard: reject empty/placeholder payloads that would poison latest.json cache.
+  if (!parsed.header.icao || !parsed.header.valid_start || !parsed.header.valid_end) {
+    return null;
+  }
+
+  return parsed;
 }
 
 module.exports = { parse };

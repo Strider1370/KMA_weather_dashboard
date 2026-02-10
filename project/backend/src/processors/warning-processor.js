@@ -1,4 +1,4 @@
-﻿const apiClient = require("../api-client");
+const apiClient = require("../api-client");
 const store = require("../store");
 const warningParser = require("../parsers/warning-parser");
 

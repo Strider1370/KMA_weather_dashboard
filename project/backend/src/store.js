@@ -126,9 +126,10 @@ function mergeWithPrevious(result, type, failedAirports) {
   }
 
   for (const icao of failedAirports) {
-    if (prev.airports[icao]) {
+    const prevAirport = prev.airports[icao];
+    if (prevAirport && prevAirport.header?.icao) {
       result.airports[icao] = {
-        ...prev.airports[icao],
+        ...prevAirport,
         _stale: true
       };
     }

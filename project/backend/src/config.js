@@ -1,6 +1,12 @@
 ﻿const path = require("path");
 const dotenv = require("dotenv");
-const airports = require("../../shared/airports");
+const allAirports = require("../../shared/airports");
+
+// Exclude mock/non-ICAO entries from backend KMA collection targets.
+const airports = allAirports.filter((airport) => {
+  const icao = String(airport.icao || "");
+  return /^[A-Z]{4}$/.test(icao) && !airport.mock_only;
+});
 
 dotenv.config({ path: path.resolve(__dirname, "../../.env") });
 
