@@ -80,16 +80,29 @@ aviation-weather/
 ├── shared/
 │   ├── airports.js                   ← 공항 목록 + 좌표
 │   ├── warning-types.js              ← 경보 유형 + 색상 + 소리
-│   └── weather-icons.js              ← 기상현상 → 아이콘 키
+│   ├── weather-icons.js              ← 기상현상 → 아이콘 키
+│   └── alert-defaults.js             ← 알림 시스템 기본 설정
 │
-├── frontend/                         ← (추후) React 표출 사이트
-├── docs/                             ← 설계문서 5개 + 이 문서
+├── frontend/
+│   ├── ...                           ← 기존 프론트엔드 파일
+│   └── src/alerts/                   ← 알림 시스템 모듈
+│       ├── alert-triggers.js         ← 트리거 목록 (T-01 ~ T-07)
+│       ├── alert-engine.js           ← 트리거 평가
+│       ├── alert-state.js            ← 중복 방지 + 이력
+│       ├── alert-dispatcher.js       ← 알림 형태별 실행
+│       ├── alert-settings.js         ← 설정 병합 + localStorage
+│       └── dispatchers/
+│           ├── popup-alert.js        ← 팝업 알림
+│           ├── sound-alert.js        ← 소리 알림
+│           └── marquee-alert.js      ← 마퀴 알림
+│
+├── docs/                             ← 설계문서 6개 + 이 문서
 ├── assets/                           ← (추후) 아이콘, Wind Barb SVG
 ├── .gitignore
 └── README.md
 ```
 
-**src 12개 + shared 3개 = 총 15개 파일**
+**백엔드 src 12개 + shared 4개 + 알림 모듈 8개 = 총 24개 파일**
 
 ### 데이터 흐름
 
@@ -822,21 +835,201 @@ node_modules/
 
 ---
 
+### Phase 5: 알림 로직 (트리거 + 중복방지 + 설정)
+
+> **참조**: `Alert_System_Design.md` 전체
+
+목표: 트리거 평가, 중복 방지, 설정 병합이 정상 동작하는지 확인.
+UI는 console.log + 브라우저 기본 alert() + 간단한 div로만 확인.
+
+**CP-12: shared/alert-defaults.js + 기반**
+```
+작업:
+  - shared/alert-defaults.js 생성 (Alert_System_Design.md 5.2절 기본값)
+    - global: alerts_enabled, poll_interval_seconds, cooldown_seconds, quiet_hours
+    - dispatchers: popup, sound, marquee 설정
+    - triggers: T-01 ~ T-07 기본 파라미터
+  - 프론트엔드에 alerts/ 폴더 생성
+
+검증:
+  ✅ node -e "console.log(require('./shared/alert-defaults'))" → 설정 출력
+  ✅ global, dispatchers, triggers 3개 섹션 존재
+```
+
+**CP-13: alert-triggers.js + alert-engine.js (핵심 로직)**
+```
+작업:
+  - frontend/src/alerts/alert-triggers.js: 트리거 정의 (Alert_System_Design.md 3절)
+    - T-01: warning_issued (경보 발령, severity: critical)
+    - T-02: warning_cleared (경보 해제, severity: info)
+    - T-03: low_visibility (저시정, severity: warning/critical)
+    - T-04: high_wind (강풍, severity: warning/critical)
+    - T-05: weather_phenomenon (기상현상, severity: warning/critical)
+    - T-06: low_ceiling (운저고도, severity: warning/critical)
+    - T-07: taf_adverse_weather (악기상 예보, severity: warning/critical)
+  - frontend/src/alerts/alert-engine.js: 트리거 목록 순회 → evaluate 호출
+
+검증 (실제 data/latest.json으로 테스트):
+  ✅ engine.evaluate(metarData, null, settings) 호출
+  ✅ 바람 25kt 이상 공항 → high_wind 트리거 발동
+  ✅ 경보 존재 시 → warning_issued 트리거 발동
+  ✅ 조건 미충족 시 → null 반환
+  ✅ console.log로 발동된 트리거 목록 출력
+```
+
+**CP-14: alert-state.js (중복 방지)**
+```
+작업:
+  - frontend/src/alerts/alert-state.js
+    - alertHistory 관리 (Alert_System_Design.md 6절)
+    - 고유 키 생성: "triggerId:icao:고유식별값"
+    - 쿨다운 판단 (cooldown_seconds)
+    - 조건 해소 시 이력 삭제
+
+검증:
+  ✅ 같은 트리거 2회 연속 → 두 번째는 쿨다운으로 무시
+  ✅ cooldown_seconds 경과 후 → 재알림
+  ✅ 조건 해소 → 이력 삭제 → 다음 발동 시 새 알림
+```
+
+**CP-15: alert-dispatcher.js (테스트용 최소 출력)**
+```
+작업:
+  - frontend/src/alerts/alert-dispatcher.js
+    - 테스트용: console.log + 브라우저 alert()만 구현
+    - severity별 다른 메시지 포맷
+    - 설정의 enabled 플래그 반영
+
+검증:
+  ✅ critical 트리거 → console에 "[CRITICAL] 경보 발령: 뇌우경보" 출력
+  ✅ dispatcher.popup.enabled = false → 팝업 안 뜸
+  ✅ 브라우저에서 실제 alert() 팝업으로 트리거 내용 확인
+```
+
+**CP-16: alert-settings.js (설정 병합)**
+```
+작업:
+  - frontend/src/alerts/alert-settings.js
+    - resolveSettings(): 서버 기본값 + localStorage deepMerge (개인 우선)
+    - 간단한 테스트 UI: 임계값 변경 input + 저장 버튼
+
+검증:
+  ✅ 기본값으로 동작 확인
+  ✅ localStorage에 개인 설정 저장 → 변경된 임계값으로 트리거 평가
+  ✅ localStorage 삭제 → 기본값으로 복원
+```
+
+**CP-17: 통합 테스트 (폴링 + 트리거 + 중복방지 + 출력)**
+```
+작업:
+  - DataPoller: latest.json을 poll_interval_seconds마다 fetch
+  - 이전 데이터 비교 → 변경 시 engine 호출 → state 확인 → dispatch
+  - 현재 선택된 공항 기준으로만 트리거 평가
+
+검증:
+  ✅ 프론트엔드 실행 상태에서 backend가 새 데이터 저장
+  ✅ 폴링이 변경 감지 → 트리거 평가 → console에 알림 출력
+  ✅ 동일 조건 유지 시 → 쿨다운 내 재알림 없음
+  ✅ 공항 전환 시 → 새 공항 기준으로 트리거 재평가
+```
+
+---
+
+### Phase 6: 알림 UI 본 구현
+
+Phase 5의 로직은 그대로 유지하고, dispatcher만 교체한다.
+
+**CP-18: 팝업 알림 컴포넌트**
+```
+작업:
+  - frontend/src/alerts/dispatchers/popup-alert.js
+    - 테스트용 alert() → 팝업 컴포넌트로 교체
+    - severity별 색상: critical=#FF4444, warning=#FF8800, info=#2196F3
+    - 자동 닫힘 (기본 10초, critical은 수동만)
+    - 최대 동시 표시 5개 (초과 시 큐잉)
+    - 우상단 표시 (위치 설정 가능)
+
+검증:
+  ✅ critical 알림 → 빨간 팝업, 수동 닫기만
+  ✅ warning 알림 → 주황 팝업, 10초 후 자동 닫힘
+  ✅ 6개 동시 발동 → 5개 표시 + 1개 큐잉
+```
+
+**CP-19: 소리 알림**
+```
+작업:
+  - frontend/src/alerts/dispatchers/sound-alert.js
+    - 오디오 파일: alert-critical.mp3, alert-warning.mp3, alert-info.mp3
+    - Web Audio API 재생
+    - 볼륨 설정 (기본 70%)
+    - 반복 횟수: critical=3회, warning/info=1회
+
+검증:
+  ✅ critical → 긴급 알람 3회 반복
+  ✅ warning → 경고음 1회
+  ✅ 볼륨 변경 반영
+  ✅ sound.enabled = false → 소리 안 남
+```
+
+**CP-20: 마퀴 알림**
+```
+작업:
+  - frontend/src/alerts/dispatchers/marquee-alert.js
+    - 화면 상단 가로 스크롤 문구 (뉴스 티커 방식)
+    - severity 필터 (기본: warning 이상만)
+    - 배경색: severity별
+    - 속도, 표시 시간 설정 가능
+    - 여러 알림 큐잉 → 순차 스크롤
+
+검증:
+  ✅ warning 이상 트리거 → 상단에 스크롤 문구 표시
+  ✅ info 트리거 → 마퀴 미표시 (min_severity 필터)
+  ✅ 복수 알림 → 순차 스크롤
+```
+
+**CP-21: 설정 UI**
+```
+작업:
+  - 알림 설정 화면 구현 (Alert_System_Design.md 10절 레이아웃)
+    - 전역: 알림 사용, 야간 모드, 재알림 간격
+    - 알림 방식: 팝업/소리/마퀴 개별 on/off + 세부 설정
+    - 감시 조건: T-01~T-07 개별 on/off + 파라미터 조정
+    - 기본값 복원 버튼
+  - localStorage 저장/불러오기
+
+검증:
+  ✅ 설정 변경 → localStorage 저장 → 즉시 반영 (핫 리로드)
+  ✅ 기본값 복원 → 모든 설정 초기화
+  ✅ 페이지 새로고침 → 개인 설정 유지
+```
+
+---
+
 ### 체크포인트 요약
 
-| CP | 작업 | 핵심 검증 |
-|----|------|----------|
-| 1 | 프로젝트 초기화 | npm install 성공 |
-| 2 | shared 상수 | require로 import 성공 |
-| 3 | config + api-client | API 1회 호출 → XML 반환 |
-| 4 | store | save/해시비교/순환 동작 |
-| 5 | parse-utils | 단위 테스트 통과 |
-| 6 | warning 파서+프로세서 | 경보 JSON 생성 |
-| 7 | metar 파서+프로세서 | METAR JSON 생성 (8개 공항) |
-| 8 | taf 파서+프로세서 | TAF timeline JSON 생성 |
-| 9 | index.js 스케줄러 | cron 동작 확인 |
-| 10 | run-once 테스트 | all 실행 성공 |
-| 11 | 부분 실패/캐시 | 복구 + 순환 동작 |
+| CP | Phase | 작업 | 핵심 검증 |
+|----|-------|------|----------|
+| 1 | 1 | 프로젝트 초기화 | npm install 성공 |
+| 2 | 1 | shared 상수 | require로 import 성공 |
+| 3 | 1 | config + api-client | API 1회 호출 → XML 반환 |
+| 4 | 1 | store | save/해시비교/순환 동작 |
+| 5 | 2 | parse-utils | 단위 테스트 통과 |
+| 6 | 2 | warning 파서+프로세서 | 경보 JSON 생성 |
+| 7 | 2 | metar 파서+프로세서 | METAR JSON 생성 (8개 공항) |
+| 8 | 2 | taf 파서+프로세서 | TAF timeline JSON 생성 |
+| 9 | 3 | index.js 스케줄러 | cron 동작 확인 |
+| 10 | 4 | run-once 테스트 | all 실행 성공 |
+| 11 | 4 | 부분 실패/캐시 | 복구 + 순환 동작 |
+| 12 | 5 | alert-defaults 상수 | 설정 구조 출력 |
+| 13 | 5 | 트리거 + 엔진 | 트리거 발동/미발동 확인 |
+| 14 | 5 | 중복 방지 (state) | 쿨다운 + 이력 삭제 |
+| 15 | 5 | dispatcher (테스트용) | console.log 출력 |
+| 16 | 5 | 설정 병합 | localStorage 우선 병합 |
+| 17 | 5 | 통합 테스트 | 폴링→트리거→출력 전체 흐름 |
+| 18 | 6 | 팝업 알림 UI | severity별 색상/닫힘 |
+| 19 | 6 | 소리 알림 | 재생/볼륨/반복 |
+| 20 | 6 | 마퀴 알림 | 스크롤 문구/큐잉 |
+| 21 | 6 | 설정 UI | 설정 화면 + 저장/복원 |
 
 ---
 
@@ -872,6 +1065,21 @@ node_modules/
 | 19 | latest.json 순환 제외 | 삭제 안 됨 |
 | 20 | 파일 11개 시 순환 | 가장 오래된 1개 삭제 |
 
+### 알림 시스템
+
+| # | 테스트 | 확인 |
+|---|-------|------|
+| 21 | 트리거 발동 (조건 충족) | evaluate → 결과 객체 반환 |
+| 22 | 트리거 미발동 (조건 미충족) | evaluate → null 반환 |
+| 23 | severity 자동 승격 | 시정 < 500m → critical, TS → critical |
+| 24 | 쿨다운 내 중복 방지 | 동일 키 재발동 → 무시 |
+| 25 | 쿨다운 경과 후 재알림 | cooldown_seconds 후 → 재알림 |
+| 26 | 조건 해소 시 이력 삭제 | 시정 회복 → alertHistory에서 삭제 |
+| 27 | 설정 병합 (기본값 + 개인) | localStorage 우선 적용 |
+| 28 | 트리거 enabled=false | 해당 트리거 평가 스킵 |
+| 29 | quiet_hours 내 알림 억제 | 야간 모드 시 알림 안 함 |
+| 30 | 공항 전환 시 재평가 | 선택 공항 변경 → 새 공항 기준 트리거 |
+
 ---
 
 ## 10. 주의사항
@@ -881,3 +1089,6 @@ node_modules/
 3. **빈 응답**: 소규모 공항은 TAF/METAR 없을 수 있음. items 비어있으면 graceful 처리
 4. **IWXXM 버전**: `http://icao.int/iwxxm/2023-1` 기준
 5. **taf-parser.js가 가장 복잡**: `TAF_Hourly_Resolution_Algorithm.md`의 2절(모델), 3절(정규화), 5절(partial_merge + touched), 6절(메인 알고리즘), 부록 C(XML 매핑) 반드시 정독
+6. **알림 시스템**: `Alert_System_Design.md` 참조. 트리거는 플러그인 방식(배열 추가/제거), 알림 형태는 독립적(popup/sound/marquee 개별 on/off)
+7. **브라우저 오디오**: Web Audio API는 사용자 최초 상호작용 후에만 활성화됨. 자동 재생 차단 대응 필요
+8. **설정 2계층**: shared/alert-defaults.js(서버 기본값) + localStorage(개인 설정). 개인 설정이 우선, deepMerge로 병합
