@@ -14,6 +14,7 @@ const TRIGGER_LABELS = {
   weather_phenomenon: "기상현상 (TS/SN 등)",
   low_ceiling: "저운고",
   taf_adverse_weather: "TAF 악기상 예보",
+  lightning_detected: "낙뢰 감지",
 };
 
 export default function AlertSettings({ defaults, onClose, onSettingsChange }) {

@@ -29,7 +29,7 @@ body {
 .eyebrow { margin: 0; color: var(--accent); font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; font-size: 0.76rem; }
 .sub { margin: 6px 0 0; color: var(--muted); }
 
-.summary-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+.summary-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; }
 .tile, .panel { background: var(--paper); border: 1px solid var(--line); border-radius: 14px; box-shadow: var(--shadow); }
 .tile { padding: 14px; }
 .tile h2 { margin: 0; font-size: 0.92rem; color: var(--muted); }
@@ -41,6 +41,8 @@ select, button { border-radius: 10px; border: 1px solid var(--line); background:
 button { background: var(--ink); color: #fff; border-color: var(--ink); cursor: pointer; }
 
 .split { display: grid; grid-template-columns: 1.1fr 0.9fr; gap: 12px; }
+.dashboard-layout { display: grid; grid-template-columns: 1.25fr 0.75fr; gap: 12px; align-items: start; }
+.primary-column { display: grid; gap: 12px; }
 .panel { padding: 14px; }
 .panel h3 { margin: 0 0 10px; font-size: 1rem; font-family: "Space Grotesk", sans-serif; }
 
@@ -81,6 +83,19 @@ tr.row-danger td { background: #ffe9e7; }
 
 .loading-message { text-align: center; padding: 40px; color: var(--muted); font-size: 1.1rem; }
 .error-message { text-align: center; padding: 40px; color: #cc3d3d; font-size: 1rem; }
+.lightning-panel { display: grid; gap: 10px; }
+.lightning-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.time-range { display: flex; gap: 6px; flex-wrap: wrap; }
+.range-btn { background: #ffffff; color: var(--ink); border: 1px solid var(--line); padding: 6px 9px; font-size: 0.78rem; border-radius: 8px; }
+.range-btn.active { background: #131a24; color: #ffffff; border-color: #131a24; }
+.lightning-summary { display: grid; gap: 2px; font-size: 0.86rem; color: var(--muted); }
+.lightning-summary p { margin: 0; }
+.lightning-map { width: 100%; height: auto; border-radius: 14px; border: 1px solid var(--line); }
+.lightning-legend { display: flex; gap: 8px; flex-wrap: wrap; }
+.zone-tag { font-size: 0.78rem; font-weight: 700; border-radius: 999px; padding: 4px 8px; }
+.zone-tag.alert { background: #ffe4e4; color: #bf2323; }
+.zone-tag.danger { background: #fff0de; color: #b75c05; }
+.zone-tag.caution { background: #fff9dd; color: #8f6f00; }
 
 /* ── Alert Settings Button ── */
 .alert-settings-btn {
@@ -329,6 +344,7 @@ tr.row-danger td { background: #ffe9e7; }
 
 @media (max-width: 900px) {
   .summary-grid { grid-template-columns: repeat(2, 1fr); }
+  .dashboard-layout { grid-template-columns: 1fr; }
   .split { grid-template-columns: 1fr; }
   .status-grid { grid-template-columns: 1fr; }
   .alert-popup-container { max-width: 300px; }

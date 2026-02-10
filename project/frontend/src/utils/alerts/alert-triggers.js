@@ -1,5 +1,9 @@
 import { formatUtc } from "../helpers";
 
+function strikeKey(s) {
+  return `${s.time}:${s.lon}:${s.lat}:${s.type}`;
+}
+
 function findNewWarnings(current, previous) {
   if (!current?.warnings) return [];
   if (!previous?.warnings) return current.warnings;
@@ -205,6 +209,61 @@ const tafAdverseWeather = {
   },
 };
 
+// T-08: 낙뢰 감지
+const lightningDetected = {
+  id: "lightning_detected",
+  name: "낙뢰 감지",
+  category: "lightning",
+  severity: "warning",
+  evaluate(current, previous, params) {
+    const strikes = current?.strikes || [];
+    if (strikes.length === 0) return null;
+
+    const allowedTypes = params?.types || ["G", "C"];
+    const allowedZones = params?.zones || ["alert", "danger", "caution"];
+    const minCount = Number(params?.min_count ?? 1);
+
+    const filtered = strikes.filter(
+      (s) => allowedTypes.includes(s.type) && allowedZones.includes(s.zone)
+    );
+    if (filtered.length < minCount) return null;
+
+    const prevKeys = new Set((previous?.strikes || []).map(strikeKey));
+    const fresh = filtered.filter((s) => !prevKeys.has(strikeKey(s)));
+    if (fresh.length === 0) return null;
+
+    const byZone = { alert: 0, danger: 0, caution: 0 };
+    for (const s of fresh) {
+      if (byZone[s.zone] != null) byZone[s.zone] += 1;
+    }
+
+    const severity = byZone.alert > 0 ? "critical" : byZone.danger > 0 ? "warning" : "info";
+    const nearest = Math.min(...fresh.map((s) => Number(s.distance_km || 999)));
+    const latest = fresh[0]?.time || null;
+
+    return {
+      triggerId: "lightning_detected",
+      severity,
+      title:
+        byZone.alert > 0
+          ? `낙뢰 경보: 8km 이내 ${byZone.alert}건`
+          : byZone.danger > 0
+          ? `낙뢰 위험: 16km 이내 ${byZone.danger}건`
+          : `낙뢰 주의: 32km 이내 ${byZone.caution}건`,
+      message: [
+        Number.isFinite(nearest) ? `최근접 ${nearest.toFixed(1)}km` : null,
+        byZone.alert > 0 ? `경보 ${byZone.alert}건` : null,
+        byZone.danger > 0 ? `위험 ${byZone.danger}건` : null,
+        byZone.caution > 0 ? `주의 ${byZone.caution}건` : null,
+        latest ? `최신 ${formatUtc(latest)}` : null,
+      ]
+        .filter(Boolean)
+        .join(" | "),
+      data: { byZone, nearest, newStrikes: fresh },
+    };
+  },
+};
+
 const triggers = [
   warningIssued,
   warningCleared,
@@ -213,6 +272,7 @@ const triggers = [
   weatherPhenomenon,
   lowCeiling,
   tafAdverseWeather,
+  lightningDetected,
 ];
 
 export default triggers;

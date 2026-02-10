@@ -211,3 +211,66 @@ cd frontend && npm run build
 - 대시보드 헤더 우상단 기어(⚙) 버튼 클릭 → 설정 모달
 - 트리거별 활성화/비활성화, 임계값 조정, 쿨다운, 조용시간, 팝업/사운드/마퀴 개별 제어
 - 설정은 localStorage에 저장, 초기화 버튼으로 서버 기본값 복원
+
+---
+
+# 추가 작업 (2026-02-10 후반: Lightning 통합/안정화)
+
+## 19) 실행 이슈 해결 (Node 22 + Vite)
+- `frontend/package.json`의 ESM 환경(`type: "module"`)과 `frontend/server.js`의 CommonJS(`require`) 충돌 해결.
+- `frontend/server.cjs` 추가 후 루트 스크립트 변경:
+  - `project/package.json`의 `dev`, `dashboard`가 `node frontend/server.cjs`를 사용하도록 수정.
+- Vite/PostCSS JSON 파싱 오류 해결:
+  - `project/package.json` BOM 제거.
+
+## 20) 낙뢰 지도 UI 추가
+- `frontend/src/components/LightningMap.jsx` 신규 추가:
+  - ARP 중심 동심원(8/16/32km)
+  - 낙뢰 `+` 마커 표시
+  - 시간 필터 버튼 (`10m`, `30m`, `1h`, `2h`)
+  - 요약/범례 표시
+- `frontend/src/App.jsx` 레이아웃 업데이트:
+  - 좌측: 기존 METAR/WARNING/TAF
+  - 우측: Lightning 패널
+- `frontend/src/components/SummaryGrid.jsx`:
+  - `Total Lightning` 메트릭 타일 추가.
+- `frontend/src/App.css`:
+  - 2단 레이아웃 및 모바일 스택 반응형 스타일 반영.
+  - 사이트 배경은 기존 그라데이션 유지, 지도 배경은 어두운 톤 유지.
+
+## 21) Lightning mock API/테스트 공항 추가
+- `frontend/server.cjs`:
+  - `GET /api/lightning` 엔드포인트 추가.
+  - `LIGHTNING_MOCK` 플래그 지원 (기본 ON, `LIGHTNING_MOCK=0`이면 OFF).
+  - `backend/data/lightning/mock/TST1.json`을 `airports.TST1`로 병합.
+  - mock strikes 시간은 현재 시각 기준으로 재분포(10/30/60분 필터 테스트 가능).
+- `shared/airports.js`:
+  - 테스트 공항 `TST1` 추가.
+- `backend/data/lightning/mock/TST1.json`:
+  - 15건 mock 데이터 구성.
+
+## 22) 공항 선택/데이터 로딩 보강
+- `frontend/src/utils/api.js`:
+  - `/api/lightning` optional 로딩(`fetchJsonOptional`) 추가.
+- `frontend/src/App.jsx`:
+  - 공항 목록을 METAR/TAF/WARNING/LIGHTNING + airports 합집합으로 생성.
+  - 폴링 중 선택 공항 유지 로직 개선 (`TST1`이 `RKSI`로 돌아가던 문제 해결).
+- `TST1.json` BOM 제거로 JSON 파싱 실패 해결.
+
+## 23) 낙뢰 알림(T-08) 연결
+- `frontend/src/utils/alerts/alert-triggers.js`:
+  - `lightning_detected` 트리거 추가.
+- `frontend/src/utils/alerts/alert-engine.js`:
+  - `lightning` 카테고리 평가 경로 추가.
+- `frontend/src/utils/alerts/alert-state.js`:
+  - 낙뢰 알림 키 생성 규칙 추가.
+- `shared/alert-defaults.js`, `AlertSettings.jsx`:
+  - 낙뢰 트리거 기본값/설정 라벨 추가.
+
+## 24) 낙뢰 설계 문서 정리
+- `project/docs/Lightning_Data_Design.md` 업데이트:
+  - 알림 기준을 단순화하여 명시:
+    - **최근 5분 이내 + 8km 이내 탐지 시 critical 알림**
+
+## 25) 검증
+- 반복적으로 `npm run build --prefix frontend` 수행하여 빌드 성공 확인.

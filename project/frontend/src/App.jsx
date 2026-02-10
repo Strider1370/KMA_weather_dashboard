@@ -18,6 +18,7 @@ import Controls from "./components/Controls";
 import MetarCard from "./components/MetarCard";
 import WarningList from "./components/WarningList";
 import TafTimeline from "./components/TafTimeline";
+import LightningMap from "./components/LightningMap";
 import AlertPopup from "./components/alerts/AlertPopup";
 import AlertSound from "./components/alerts/AlertSound";
 import AlertMarquee from "./components/alerts/AlertMarquee";
@@ -56,9 +57,15 @@ export default function App() {
       if (!alertDefaults) setAlertDefaults(defaults);
 
       setSelectedAirport((prev) => {
-        const metarAirports = Object.keys(result.metar?.airports || {});
-        if (prev && metarAirports.includes(prev)) return prev;
-        return metarAirports[0] || null;
+        const available = new Set([
+          ...Object.keys(result.metar?.airports || {}),
+          ...Object.keys(result.taf?.airports || {}),
+          ...Object.keys(result.warning?.airports || {}),
+          ...Object.keys(result.lightning?.airports || {}),
+          ...(result.airports || []).map((a) => a.icao),
+        ]);
+        if (prev && available.has(prev)) return prev;
+        return Array.from(available).sort()[0] || null;
       });
     } catch (err) {
       setError(err.message);
@@ -73,7 +80,7 @@ export default function App() {
 
   // Alert evaluation
   useEffect(() => {
-    if (!data.metar || !selectedAirport || !alertDefaults) return;
+    if (!selectedAirport || !alertDefaults) return;
 
     const settings = resolveSettings(alertDefaults);
     if (!settings.global.alerts_enabled) return;
@@ -83,6 +90,7 @@ export default function App() {
       metar: data.metar?.airports?.[selectedAirport] || null,
       taf: data.taf?.airports?.[selectedAirport] || null,
       warning: data.warning?.airports?.[selectedAirport] || null,
+      lightning: data.lightning?.airports?.[selectedAirport] || null,
     };
 
     const prev = prevDataRef.current;
@@ -91,6 +99,7 @@ export default function App() {
           metar: prev.metar?.airports?.[selectedAirport] || null,
           taf: prev.taf?.airports?.[selectedAirport] || null,
           warning: prev.warning?.airports?.[selectedAirport] || null,
+          lightning: prev.lightning?.airports?.[selectedAirport] || null,
         }
       : null;
 
@@ -151,12 +160,16 @@ export default function App() {
 
   const settings = alertDefaults ? resolveSettings(alertDefaults) : null;
 
-  const airportList = Object.keys(data.metar?.airports || {});
-  if (airportList.length === 0 && data.airports) {
-    airportList.push(...data.airports.map((a) => a.icao));
+  const airportSet = new Set([
+    ...Object.keys(data.metar?.airports || {}),
+    ...Object.keys(data.lightning?.airports || {}),
+  ]);
+  if (data.airports) {
+    data.airports.forEach((a) => airportSet.add(a.icao));
   }
+  const airportList = Array.from(airportSet).sort();
 
-  const lastUpdated = [data.metar?.fetched_at, data.taf?.fetched_at, data.warning?.fetched_at]
+  const lastUpdated = [data.metar?.fetched_at, data.taf?.fetched_at, data.warning?.fetched_at, data.lightning?.fetched_at]
     .filter(Boolean)
     .sort()
     .pop() || null;
@@ -201,7 +214,12 @@ export default function App() {
 
         {data.metar && (
           <>
-            <SummaryGrid metar={data.metar} taf={data.taf} warning={data.warning} />
+            <SummaryGrid
+              metar={data.metar}
+              taf={data.taf}
+              warning={data.warning}
+              lightning={data.lightning}
+            />
             <StatusPanel status={data.status} />
             <Controls
               airports={airportList}
@@ -209,15 +227,23 @@ export default function App() {
               onAirportChange={setSelectedAirport}
               onRefresh={handleRefresh}
             />
-            <section className="split">
-              <MetarCard metarData={data.metar} icao={selectedAirport} />
-              <WarningList
-                warningData={data.warning}
-                icao={selectedAirport}
-                warningTypes={data.warningTypes}
+            <section className="dashboard-layout">
+              <div className="primary-column">
+                <section className="split">
+                  <MetarCard metarData={data.metar} icao={selectedAirport} />
+                  <WarningList
+                    warningData={data.warning}
+                    icao={selectedAirport}
+                    warningTypes={data.warningTypes}
+                  />
+                </section>
+                <TafTimeline tafData={data.taf} icao={selectedAirport} />
+              </div>
+              <LightningMap
+                lightningData={data.lightning}
+                selectedAirport={selectedAirport}
               />
             </section>
-            <TafTimeline tafData={data.taf} icao={selectedAirport} />
           </>
         )}
       </main>

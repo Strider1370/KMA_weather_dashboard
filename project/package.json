@@ -6,8 +6,8 @@
   "scripts": {
     "start": "node backend/src/index.js",
     "test": "node backend/test/run-once.js all",
-    "dashboard": "node frontend/server.js",
-    "dev": "concurrently -n API,VITE -c blue,green \"node frontend/server.js\" \"npm run dev --prefix frontend\""
+    "dashboard": "node frontend/server.cjs",
+    "dev": "concurrently -n API,VITE -c blue,green \"node frontend/server.cjs\" \"npm run dev --prefix frontend\""
   },
   "dependencies": {
     "dotenv": "^16.0.0",
@@ -18,3 +18,4 @@
     "concurrently": "^9.2.1"
   }
 }
+

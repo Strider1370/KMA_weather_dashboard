@@ -59,5 +59,13 @@ module.exports = {
         phenomena: ["TS", "SN", "FZRA"],
       },
     },
+    lightning_detected: {
+      enabled: true,
+      params: {
+        min_count: 1,
+        types: ["G", "C"],
+        zones: ["alert", "danger", "caution"],
+      },
+    },
   },
 };

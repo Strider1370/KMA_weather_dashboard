@@ -33,6 +33,11 @@ export function buildAlertKey(result, icao) {
     return `${triggerId}:${icao}`;
   }
 
+  if (triggerId === "lightning_detected") {
+    const newest = data?.newStrikes?.[0]?.time || "";
+    return `${triggerId}:${icao}:${newest}`;
+  }
+
   return `${triggerId}:${icao}`;
 }
 

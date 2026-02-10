@@ -6,5 +6,6 @@
   { icao: "RKJB", name: "Muan International Airport", lat: 34.9914, lon: 126.3828 },
   { icao: "RKNY", name: "Yangyang International Airport", lat: 38.0613, lon: 128.6692 },
   { icao: "RKPU", name: "Ulsan Airport", lat: 35.5935, lon: 129.3518 },
-  { icao: "RKJY", name: "Yeosu Airport", lat: 34.8424, lon: 127.6162 }
+  { icao: "RKJY", name: "Yeosu Airport", lat: 34.8424, lon: 127.6162 },
+  { icao: "TST1", name: "Test Lightning Airport", lat: 37.5000, lon: 127.0000 }
 ];
