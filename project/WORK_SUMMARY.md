@@ -117,3 +117,63 @@ npm start
 - ✅ 실시간 데이터 수집 현황 모니터링
 - ✅ 서버 시작 시 스케줄러 자동 실행
 - ✅ 깔끔한 통합 실행 환경
+
+---
+
+# 추가 작업 (2026-02-10)
+
+## 12) 알림 시스템 설계문서 추가 및 구현 계획 확장
+- `project/docs/Alert_System_Design.md` 신규 작성
+  - 트리거 시스템 (T-01~T-07): 경보 발령/해제, 저시정, 강풍, 기상현상, 운저고도, 악기상 예보
+  - 알림 형태 3종: 팝업, 소리, 마퀴 (독립적 on/off)
+  - 중복 방지: 고유 키 + 쿨다운(기본 5분)
+  - 설정 2계층: 서버 기본값(shared/alert-defaults.js) + 브라우저 개인설정(localStorage)
+- `project/IMPLEMENTATION_PLAN.md` 업데이트
+  - Phase 5 (CP-12~17): 알림 로직 (트리거, 엔진, 중복방지, 설정 병합)
+  - Phase 6 (CP-18~21): 알림 UI (팝업, 소리, 마퀴, 설정 화면)
+  - 체크포인트 11개 → 21개로 확장
+  - 검증 체크리스트에 알림 항목 10개 추가 (#21~#30)
+
+## 13) 프론트엔드 React 마이그레이션
+- **기술 스택**: Vite + React 18
+- **기존 파일 백업**: `frontend/legacy/`로 이동 (app.js, index.html, styles.css)
+- **새 구조**:
+  ```
+  frontend/
+  ├── src/
+  │   ├── components/
+  │   │   ├── Header.jsx        — 타이틀 + 마지막 업데이트 시각
+  │   │   ├── SummaryGrid.jsx   — 4개 메트릭 타일
+  │   │   ├── StatusPanel.jsx   — 데이터 수집 상태
+  │   │   ├── Controls.jsx      — 공항 선택 + 새로고침
+  │   │   ├── MetarCard.jsx     — METAR 표시 (severity 색상)
+  │   │   ├── WarningList.jsx   — 경보 목록
+  │   │   └── TafTimeline.jsx   — TAF 시간별 테이블
+  │   ├── utils/
+  │   │   ├── api.js            — fetchJson, loadAllData
+  │   │   └── helpers.js        — safe, formatUtc, getSeverityLevel 등
+  │   ├── App.jsx               — 루트 컴포넌트 (상태 관리)
+  │   ├── App.css               — 기존 styles.css 마이그레이션
+  │   └── main.jsx              — React 엔트리포인트
+  ├── index.html                — Vite 엔트리 HTML
+  ├── vite.config.js            — dev proxy (/api → localhost:5173)
+  ├── package.json              — React/Vite 의존성
+  └── server.js                 — API 서버 (dist/ 서빙으로 수정)
+  ```
+- **개발 환경**: `concurrently`로 API 서버 + Vite dev 서버 동시 실행
+- **기존 기능 100% 유지**: 요약 그리드, 상태 패널, 공항 선택, METAR/경보/TAF 표시, severity 색상, 반응형
+- BOM 문자 이슈 수정 (project/package.json)
+
+## 14) 실행 방법 (업데이트)
+```bash
+# 개발 모드 (HMR 지원, 추천)
+npm run dev
+# → API 서버 http://localhost:5173 + Vite dev http://localhost:5174
+
+# 프로덕션 모드
+npm run dashboard
+# → http://localhost:5173 (빌드된 React 앱 서빙)
+
+# 프론트엔드 빌드
+cd frontend && npm run build
+```

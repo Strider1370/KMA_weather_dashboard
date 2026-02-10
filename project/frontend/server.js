@@ -3,7 +3,7 @@ const path = require("path");
 const http = require("http");
 
 const PORT = Number(process.env.PORT || 5173);
-const ROOT = __dirname;
+const ROOT = path.join(__dirname, "dist");
 const DATA_ROOT = path.resolve(__dirname, "../backend/data");
 const SHARED_AIRPORTS = path.resolve(__dirname, "../shared/airports.js");
 const SHARED_WARNING_TYPES = path.resolve(__dirname, "../shared/warning-types.js");
