@@ -5,6 +5,7 @@
 ## 📋 목차
 - [프로젝트 개요](#프로젝트-개요)
 - [최근 변경사항 (2026-02-10)](#최근-변경사항-2026-02-10)
+- [최근 변경사항 (2026-02-11)](#최근-변경사항-2026-02-11)
 - [기술 스택](#기술-스택)
 - [디렉토리 구조](#디렉토리-구조)
 - [데이터 플로우](#데이터-플로우)
@@ -60,6 +61,44 @@
 - `frontend/src/utils/alerts/alert-engine.js`에 `lightning` 카테고리 평가 경로 추가.
 - `frontend/src/utils/alerts/alert-state.js`에 낙뢰 전용 alert key 처리 추가.
 - `shared/alert-defaults.js`와 `AlertSettings.jsx`에 낙뢰 트리거 설정/라벨 추가.
+
+---
+
+## 최근 변경사항 (2026-02-11)
+
+### 1. 레이더 수집/표출 파이프라인 추가
+- 백엔드에 레이더 수집기 추가: `backend/src/processors/radar-processor.js`
+- 5분 주기 스케줄 등록: `backend/src/index.js`, `backend/src/config.js`
+- 저장 구조: `backend/data/radar/RDR_*.png` + `backend/data/radar/latest.json`
+- 프론트 표출 추가: `frontend/src/components/RadarPanel.jsx`
+- 대시보드 우측 컬럼에 `LightningMap` 아래 `RadarPanel` 배치: `frontend/src/App.jsx`
+- `/api/radar` 및 `/data/*` 정적 파일 서빙 추가: `frontend/server.cjs`
+- Vite dev 프록시에 `/data` 추가: `frontend/vite.config.js`
+
+### 2. Lightning 실제 수집 복원
+- 설계문서 기준으로 Lightning 파서/프로세서 추가:
+  - `backend/src/parsers/lightning-parser.js`
+  - `backend/src/processors/lightning-processor.js`
+- 3분 주기 스케줄 등록: `backend/src/config.js`, `backend/src/index.js`
+- 저장 타입 확장: `backend/src/store.js` (`lightning` 추가)
+- 수동 새로고침(`/api/refresh`)에 lightning 작업 포함: `frontend/server.cjs`
+
+### 3. TST1 테스트 채널을 수집과 분리
+- 기존 shared mock 방식 제거, 파일 기반 오버레이로 전환.
+- `backend/data/TST1/{metar,taf,warning,lightning}.json`을 API 응답에서 `airports.TST1`에 병합:
+  - `frontend/server.cjs`의 `mergeTst1()`
+- 운영 공항 수집 데이터와 테스트 공항(TST1) 데이터를 완전히 분리 운용.
+- BOM(UTF-8 시그니처) 제거 후 JSON 파싱 처리 추가.
+
+### 4. 헤더 UX 개편
+- `Data Metrics`, `Data Collection Status`를 제목 옆 토글 버튼(`>`, `v`)로 일괄 표시/숨김.
+- 기본 상태는 숨김.
+- 공항 선택 + 새로고침(아이콘 `↻`) + 알림 설정(톱니)을 대시보드 제목과 같은 라인으로 이동.
+
+### 5. 경로 안정성 개선
+- `DATA_PATH`를 실행 위치와 무관하게 프로젝트 루트 기준 절대경로로 해석:
+  - `backend/src/config.js`의 `resolveDataPath()`
+- 잘못 생성되던 `frontend/backend/data` 경로 문제 해소.
 
 ---
 
@@ -840,5 +879,5 @@ node backend/test/run-once.js warning
 
 ---
 
-**최종 업데이트**: 2026-02-10
+**최종 업데이트**: 2026-02-11
 **작성자**: Claude Sonnet 4.5

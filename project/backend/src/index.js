@@ -4,8 +4,10 @@ const store = require("./store");
 const metarProcessor = require("./processors/metar-processor");
 const tafProcessor = require("./processors/taf-processor");
 const warningProcessor = require("./processors/warning-processor");
+const lightningProcessor = require("./processors/lightning-processor");
+const radarProcessor = require("./processors/radar-processor");
 
-const locks = { metar: false, taf: false, warning: false };
+const locks = { metar: false, taf: false, warning: false, lightning: false, radar: false };
 
 async function runWithLock(type, job) {
   if (locks[type]) {
@@ -33,6 +35,8 @@ async function main() {
   cron.schedule(config.schedule.metar_interval, () => runWithLock("metar", metarProcessor.processAll));
   cron.schedule(config.schedule.taf_interval, () => runWithLock("taf", tafProcessor.processAll));
   cron.schedule(config.schedule.warning_interval, () => runWithLock("warning", warningProcessor.process));
+  cron.schedule(config.schedule.lightning_interval, () => runWithLock("lightning", lightningProcessor.process));
+  cron.schedule(config.schedule.radar_interval, () => runWithLock("radar", radarProcessor.process));
 }
 
 if (require.main === module) {

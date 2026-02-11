@@ -14,11 +14,11 @@ import {
 import Header from "./components/Header";
 import SummaryGrid from "./components/SummaryGrid";
 import StatusPanel from "./components/StatusPanel";
-import Controls from "./components/Controls";
 import MetarCard from "./components/MetarCard";
 import WarningList from "./components/WarningList";
 import TafTimeline from "./components/TafTimeline";
 import LightningMap from "./components/LightningMap";
+import RadarPanel from "./components/RadarPanel";
 import AlertPopup from "./components/alerts/AlertPopup";
 import AlertSound from "./components/alerts/AlertSound";
 import AlertMarquee from "./components/alerts/AlertMarquee";
@@ -30,6 +30,7 @@ export default function App() {
   const [selectedAirport, setSelectedAirport] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [detailsOpen, setDetailsOpen] = useState(false);
   const [alertDefaults, setAlertDefaults] = useState(null);
   const [activeAlerts, setActiveAlerts] = useState([]);
   const [showSettings, setShowSettings] = useState(false);
@@ -169,7 +170,7 @@ export default function App() {
   }
   const airportList = Array.from(airportSet).sort();
 
-  const lastUpdated = [data.metar?.fetched_at, data.taf?.fetched_at, data.warning?.fetched_at, data.lightning?.fetched_at]
+  const lastUpdated = [data.metar?.fetched_at, data.taf?.fetched_at, data.warning?.fetched_at, data.lightning?.fetched_at, data.radar?.updated_at]
     .filter(Boolean)
     .sort()
     .pop() || null;
@@ -202,6 +203,12 @@ export default function App() {
         <Header
           lastUpdated={lastUpdated}
           onSettingsClick={() => setShowSettings(true)}
+          detailsOpen={detailsOpen}
+          onToggleDetails={() => setDetailsOpen((prev) => !prev)}
+          airports={airportList}
+          selectedAirport={selectedAirport}
+          onAirportChange={setSelectedAirport}
+          onRefresh={handleRefresh}
         />
 
         {loading && !data.metar && (
@@ -214,19 +221,17 @@ export default function App() {
 
         {data.metar && (
           <>
-            <SummaryGrid
-              metar={data.metar}
-              taf={data.taf}
-              warning={data.warning}
-              lightning={data.lightning}
-            />
-            <StatusPanel status={data.status} />
-            <Controls
-              airports={airportList}
-              selectedAirport={selectedAirport}
-              onAirportChange={setSelectedAirport}
-              onRefresh={handleRefresh}
-            />
+            {detailsOpen && (
+              <>
+              <SummaryGrid
+                metar={data.metar}
+                taf={data.taf}
+                warning={data.warning}
+                lightning={data.lightning}
+              />
+              <StatusPanel status={data.status} />
+              </>
+            )}
             <section className="dashboard-layout">
               <div className="primary-column">
                 <section className="split">
@@ -239,10 +244,16 @@ export default function App() {
                 </section>
                 <TafTimeline tafData={data.taf} icao={selectedAirport} />
               </div>
-              <LightningMap
-                lightningData={data.lightning}
-                selectedAirport={selectedAirport}
-              />
+              <div className="secondary-column">
+                <LightningMap
+                  lightningData={data.lightning}
+                  selectedAirport={selectedAirport}
+                />
+                <RadarPanel
+                  radarData={data.radar}
+                  selectedAirport={selectedAirport}
+                />
+              </div>
             </section>
           </>
         )}

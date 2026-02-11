@@ -274,3 +274,82 @@ cd frontend && npm run build
 
 ## 25) 검증
 - 반복적으로 `npm run build --prefix frontend` 수행하여 빌드 성공 확인.
+
+---
+
+# 추가 작업 (2026-02-11)
+
+## 26) 레이더 수집/표출 end-to-end 추가
+- `backend/src/processors/radar-processor.js` 추가:
+  - KMA 레이더 이미지 수집
+  - 36장 순환 관리
+  - `backend/data/radar/latest.json` 갱신
+- `backend/src/config.js`, `backend/src/index.js`:
+  - 레이더 설정/스케줄(`*/5 * * * *`) 추가
+- `frontend/server.cjs`:
+  - `GET /api/radar` 추가
+  - `/data/*` 정적 파일 서빙 추가
+  - `status.radar` 추가
+- `frontend/src/components/RadarPanel.jsx`:
+  - 프레임 순환 재생
+  - 공항 마커 오버레이(최종: 빨간 `+`)
+- `frontend/src/App.jsx`, `frontend/src/App.css`:
+  - 우측 컬럼에 `LightningMap` 아래 `RadarPanel` 배치
+- `frontend/vite.config.js`:
+  - dev 프록시에 `/data` 추가
+
+## 27) Lightning 실제 수집 로직 복원
+- 문서(`docs/Lightning_Data_Design.md`) 기준으로 수집 파이프라인 추가:
+  - `backend/src/parsers/lightning-parser.js`
+  - `backend/src/processors/lightning-processor.js`
+- `backend/src/store.js`:
+  - 저장 타입에 `lightning` 추가
+- `backend/src/config.js`, `backend/src/index.js`:
+  - `lightning_url`, `lightning` 설정, 3분 주기 스케줄 추가
+- `backend/test/run-once.js`:
+  - `lightning` 타깃 지원
+- `frontend/server.cjs`:
+  - `/api/refresh`에 lightning 작업 포함
+
+## 28) TST1 테스트 데이터 체계 전환 (수집과 완전 분리)
+- 요구사항 반영:
+  - 테스트 공항 `TST1`은 자동 수집과 별개로 운용
+  - 실제 공항 데이터는 수집 결과 유지
+- 구현:
+  - `frontend/server.cjs`에 `mergeTst1(payload, category)` 추가
+  - `backend/data/TST1/{metar,taf,warning,lightning}.json` 파일이 있으면 `airports.TST1`만 오버레이
+  - BOM 제거 파싱(`^\uFEFF`) 처리
+- 샘플 파일 생성:
+  - `backend/data/TST1/metar.json`
+  - `backend/data/TST1/taf.json`
+  - `backend/data/TST1/warning.json`
+  - `backend/data/TST1/lightning.json`
+- 기존 shared mock 제거:
+  - `shared/lightning-mock/` 삭제
+  - `frontend/server.cjs`의 구 mock 함수 정리
+
+## 29) 데이터 경로 안정화
+- `backend/src/config.js`:
+  - `resolveDataPath()` 추가
+  - `DATA_PATH`를 프로젝트 루트 기준 절대경로로 해석
+- 효과:
+  - 실행 위치에 따라 `frontend/backend/data`가 생성되던 문제 제거
+  - 항상 `project/backend/data` 사용
+
+## 30) 대시보드 헤더 UX 개편
+- 요구사항 반영:
+  - 요약 숫자 영역 + 수집 상태 영역을 기본 숨김
+  - 제목 옆 화살표 버튼 하나로 동시 토글
+  - 공항 선택/새로고침/톱니 버튼을 제목과 같은 라인 배치
+- 변경:
+  - `frontend/src/components/Header.jsx`
+  - `frontend/src/App.jsx`
+  - `frontend/src/App.css`
+- 새로고침 버튼을 아이콘형(`↻`)으로 변경
+
+## 31) 검증
+- `npm -C project run test` (metar/taf/warning/lightning/radar) 실행 성공
+- `node backend/test/run-once.js radar`:
+  - `backend/data/radar` 생성 및 36장 백필 확인
+- `npm -C project/frontend run build`:
+  - React/Vite 빌드 성공

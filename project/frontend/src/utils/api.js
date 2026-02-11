@@ -15,7 +15,7 @@ export async function fetchJsonOptional(url) {
 }
 
 export async function loadAllData() {
-  const [metar, taf, warning, airports, warningTypes, status, lightning] = await Promise.all([
+  const [metar, taf, warning, airports, warningTypes, status, lightning, radar] = await Promise.all([
     fetchJson("/api/metar"),
     fetchJson("/api/taf"),
     fetchJson("/api/warning"),
@@ -23,8 +23,9 @@ export async function loadAllData() {
     fetchJson("/api/warning-types"),
     fetchJson("/api/status"),
     fetchJsonOptional("/api/lightning"),
+    fetchJsonOptional("/api/radar"),
   ]);
-  return { metar, taf, warning, airports, warningTypes, status, lightning };
+  return { metar, taf, warning, airports, warningTypes, status, lightning, radar };
 }
 
 export async function loadAlertDefaults() {
