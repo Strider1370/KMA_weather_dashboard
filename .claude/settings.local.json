@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm install:*)",
+      "Bash(git add:*)",
+      "Bash(git commit -m \"$\\(cat <<''EOF''\nImprove CAVOK display, add status monitoring, and integrate scheduler\n\n- CAVOK conditions now display as 9999m visibility and NSC clouds\n- Add /api/status endpoint for data collection monitoring\n- Add Data Collection Status section to dashboard UI\n- Integrate scheduler auto-start with dashboard server\n- Update WORK_SUMMARY.md with latest changes\n\nCo-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
+      "Bash(git fetch:*)",
+      "Bash(git pull:*)",
+      "Bash(dir:*)",
+      "Bash(findstr:*)"
+    ]
+  }
+}

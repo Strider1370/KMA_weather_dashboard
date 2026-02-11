@@ -72,7 +72,7 @@ function buildRadarUrl(tm) {
     tm,
     data: "img",
     cmp: config.radar.cmp,
-    authKey: config.api.radar_auth_key
+    authKey: config.api.auth_key
   });
   return `${config.api.radar_url}?${params.toString()}`;
 }
@@ -182,8 +182,8 @@ async function backfillIfEmpty(radarDir) {
 }
 
 async function process() {
-  if (!config.api.radar_auth_key) {
-    throw new Error("Radar auth key missing (set KMA_AUTH_KEY or API_AUTH_KEY)");
+  if (!config.api.auth_key) {
+    throw new Error("Radar auth key missing (set API_AUTH_KEY)");
   }
 
   const radarDir = ensureRadarDir();

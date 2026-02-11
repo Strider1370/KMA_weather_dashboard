@@ -82,7 +82,7 @@ API의 시간 필드는 `YYYYMMDDHHmm` 형식(예: `202602081137`)이다.
 ### 3.3 경보 유형 변환
 
 ```
-함수 resolve_wrng_type(code):
+함수 resolveWarningType(code):
     매핑 테이블 조회 (2.1절)
     
     return {
@@ -93,7 +93,7 @@ API의 시간 필드는 `YYYYMMDDHHmm` 형식(예: `202602081137`)이다.
     
     매핑 테이블에 없는 코드:
         wrng_type_key: "UNKNOWN"
-        wrng_type_name: "미분류경보"
+        wrng_type_name: "Unknown Warning"
 ```
 
 ---
@@ -129,9 +129,9 @@ API의 시간 필드는 `YYYYMMDDHHmm` 형식(예: `202602081137`)이다.
 ### 5.1 파일명 규칙
 
 ```
-WARNINGS_{fetched_at}.json
+WARNINGS_{YYYYMMDDTHHMMSSmmmZ}.json
 
-예시: WARNINGS_20260208T1200Z.json
+예시: WARNINGS_20260210T135500880Z.json
       (조회 시점 기준, 다른 데이터와 동일한 타임스탬프 형식)
 ```
 
@@ -218,7 +218,7 @@ WARNINGS_{fetched_at}.json
 | 필드 | 타입 | 설명 |
 |------|------|------|
 | `airport_name` | String | 공항명 (한글) |
-| `warnings` | Array | 해당 공항의 경보 목록 (발표 시각 내림차순) |
+| `warnings` | Array | 해당 공항의 경보 목록 (발표 시각 오름차순) |
 
 #### 개별 경보
 
@@ -240,36 +240,25 @@ WARNINGS_{fetched_at}.json
 
 ```
 project/
-  ├ config.js
-  ├ main.js              ← 스케줄러, 실행 락, 부분 실패 복구
-  ├ taf_parser.js
-  ├ metar_parser.js
-  ├ warning_parser.js    ← 신규: 공항경보 파싱 + JSON 출력
-  ├ cache_manager.js     ← canonical hash, 변경 감지
-  └ file_manager.js      ← 파일 저장, latest.json, 순환
+  ├ backend/src/parsers/warning-parser.js
+  ├ backend/src/processors/warning-processor.js
+  ├ backend/src/store.js
+  └ backend/src/index.js
 ```
 
-### 6.1 main 통합 파이프라인
+### 6.1 warning 처리 파이프라인
 
 스케줄러 설계문서(Scheduler_Cache_Design.md)에 전체 실행 흐름이 정의되어 있다. 경보 관련 부분만 발췌:
 
 ```
-함수 process_warnings():
-    xml = api_call_warnings()
-    if xml == null: return
-
-    warnings = warning_parser.process(xml)
-    if warnings == null: return
-
-    new_hash = canonical_hash(warnings)     // fetched_at 제외
-    if new_hash == cache.warning.hash:
-        return                               // 변경 없음
-
-    save_and_update_latest("data/warning/", "WARNINGS_{timestamp}.json", warnings)
-    cache.warning = { hash: new_hash, prev_data: warnings }
+함수 warningProcessor.process():
+    xml = apiClient.fetch("warning")
+    parsed = warningParser.parse(xml)
+    saveResult = store.save("warning", parsed)
+    return { saved, filePath, airports }
 ```
 
-TAF/METAR 처리도 동일한 패턴(전체 공항 통합, canonical hash, 부분 실패 복구)으로 수행된다. 상세는 스케줄러 설계문서 6절을 참조한다.
+경보는 단일 API 응답을 파싱해 바로 저장하며, 변경 감지(canonical hash)와 latest.json 갱신/순환 관리는 `store.save`가 담당한다.
 
 ---
 
@@ -294,9 +283,9 @@ TAF/METAR 처리도 동일한 패턴(전체 공항 통합, canonical hash, 부�
 | 1 | 샘플 XML 전체 파싱 | 5건 모두 정상 추출 |
 | 2 | wrngType "00" | WIND_SHEAR / 급변풍경보 매핑 |
 | 3 | wrngType "2" | STRONG_WIND / 강풍경보 매핑 |
-| 4 | 미등록 wrngType | UNKNOWN / 미분류경보 |
+| 4 | 미등록 wrngType | UNKNOWN / Unknown Warning |
 | 5 | 시간 변환 | "202602081137" → "2026-02-08T11:37:00Z" |
 | 6 | 공항별 그룹핑 | RKPC 2건, RKNY 3건 분리 |
-| 7 | 경보 정렬 | 같은 공항 내 발표 시각 내림차순 |
+| 7 | 경보 정렬 | 같은 공항 내 발표 시각 오름차순 |
 | 8 | 빈 응답 (경보 없음) | airports: {}, total_count: 0 |
 | 9 | wrngMsg 원문 보존 | 특수문자(=, /) 포함 정상 저장 |

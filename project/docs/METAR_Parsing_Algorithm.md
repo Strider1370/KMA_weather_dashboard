@@ -148,7 +148,7 @@ response
         ├ icaoCode          (비어있을 수 있음)
         ├ airportName       (비어있을 수 있음)
         └ metarMsg
-          └ iwxxm:METAR     ← 실제 파싱 대상
+          └ iwxxm:METAR 또는 iwxxm:SPECI     ← 실제 파싱 대상
 ```
 
 ### 3.2 네임스페이스
@@ -170,7 +170,7 @@ xlink  = "http://www.w3.org/1999/xlink"
 | airport_name | 같은 경로 > `aixm:name` | 텍스트 |
 | issue_time | `iwxxm:issueTime > gml:TimeInstant > gml:timePosition` | ISO 8601 |
 | observation_time | `iwxxm:observationTime > gml:TimeInstant > gml:timePosition` | ISO 8601 |
-| auto | `iwxxm:METAR` 속성 `automatedStation` | "true"/"false" → Boolean |
+| auto | `iwxxm:METAR` 또는 `iwxxm:SPECI` 속성 `automatedStation` | "true"/"false" → Boolean |
 
 ### 3.4 관측 블록 매핑
 
@@ -322,7 +322,7 @@ XML 경로: iwxxm:AerodromeWindShear
 
 | 요소 | TAF XML 경로 | METAR XML 경로 |
 |------|-------------|---------------|
-| 루트 | `iwxxm:TAF` | `iwxxm:METAR` |
+| 루트 | `iwxxm:TAF` | `iwxxm:METAR` 또는 `iwxxm:SPECI` |
 | 래퍼 | `tafMsg` | `metarMsg` |
 | 관측/예보 블록 | `iwxxm:baseForecast > MeteorologicalAerodromeForecast` | `iwxxm:observation > MeteorologicalAerodromeObservation` |
 | 바람 노드 | `AerodromeSurfaceWindForecast` | `AerodromeSurfaceWind` |
@@ -346,7 +346,7 @@ METAR는 상태 기계가 불필요하므로 파이프라인이 단순하다.
 │ 1. API 응답 XML 수신                             │
 │                                                  │
 │ 2. response > body > items > item > metarMsg     │
-│    > iwxxm:METAR 노드 탐색                       │
+│    > iwxxm:METAR/SPECI 노드 탐색                 │
 │                                                  │
 │ 3. 헤더 추출 (3.3절)                             │
 │    - icao, airport_name, issue_time,             │
@@ -379,9 +379,9 @@ METAR는 상태 기계가 불필요하므로 파이프라인이 단순하다.
 ### 5.1 파일명 규칙
 
 ```
-METAR_{fetched_at}.json
+METAR_{YYYYMMDDTHHMMSSmmmZ}.json
 
-예시: METAR_20260208T1010Z.json
+예시: METAR_20260211T103953906Z.json
       (전체 공항 통합, 조회 시점 기준)
 ```
 
@@ -464,11 +464,13 @@ METAR_{fetched_at}.json
 ```
 display = {
     wind:        wind.raw 그대로
-    visibility:  CAVOK 시 "CAVOK", 그 외 value 문자열
+    visibility:  value 문자열 (CAVOK여도 "9999")
     weather:     각 wx의 raw를 공백 구분 나열, 없으면 ""
-    clouds:      CAVOK 시 "CAVOK", NSC 시 "NSC", 그 외 각 layer의 raw 공백 구분
+    clouds:      CAVOK 또는 NSC 시 "NSC", 그 외 각 layer의 raw 공백 구분
     temperature: "TT/TdTd" 형식 (2자리, 영하 시 M 접두어)
     qnh:         "Q{value}" 형식
+    weather_icon: 대표 기상 아이콘 키 (CAVOK면 "CAVOK")
+    weather_intensity: 첫 번째 기상현상의 intensity 또는 null
 }
 ```
 
@@ -496,38 +498,37 @@ display = {
 
 ```
 project/
-  ├ taf_parser       ← TAF 전체: XML 파싱, 정규화, 시간별 분해, JSON 출력
-  ├ metar_parser     ← METAR 전체: XML 파싱, 정규화, JSON 출력
-  └ main             ← API 호출, 공항 반복, 파일 저장
+  ├ backend/src/parsers/metar-parser.js
+  ├ backend/src/processors/metar-processor.js
+  ├ backend/src/store.js
+  └ backend/src/index.js
 ```
 
-- 2 parser 파일로 시작. 공통 로직(wind/weather/cloud 파싱 등)은 각 파일 내에 동일하게 작성한다.
-- 추후 공통 함수가 많아지거나 불일치가 발생하면 shared 파일로 분리한다.
+- 구현은 parser / processor / store / scheduler로 역할을 분리한다.
+- 공통 로직(wind/weather/cloud 파싱 등)은 `backend/src/parsers/parse-utils.js`에 공유한다.
 
 ### 6.2 각 파일의 책임
 
-**taf_parser**:
-- KMA API XML → TAF 객체 파싱
-- CAVOK/NSW/NSC 정규화
-- 기상현상 구조화 파싱 (URL 코드 추출 → WeatherPhenomenon)
-- 바람/시정/구름 변환
-- 시간별 분해 (resolve_hourly, partial_merge)
-- NSW 후처리 (BR 자동 부여)
-- JSON 출력
-
-**metar_parser**:
+**backend/src/parsers/metar-parser.js**:
 - KMA API XML → METAR 객체 파싱
+- `iwxxm:METAR`/`iwxxm:SPECI` 루트 정규화
 - CAVOK/NSC 정규화
 - 기상현상 구조화 파싱 (URL 코드 추출 → WeatherPhenomenon)
 - 바람/시정/구름 변환
 - 기온/이슬점/QNH/윈드시어 추출
-- JSON 출력
+- `header.icao` 누락 시 `null` 반환(가드)
 
-**main**:
+**backend/src/processors/metar-processor.js**:
 - 공항 목록 관리
 - API 호출 (1공항 1호출)
-- taf_parser / metar_parser 호출
-- 파일 저장
+- `metar-parser.parse()` 호출 후 결과 집계
+- 예외 공항은 `failedAirports`로 수집하여 이전값 병합(`store.mergeWithPrevious`)
+- 저장은 `store.save("metar", result)` 사용
+
+**backend/src/store.js / backend/src/index.js**:
+- canonical hash 기반 변경 감지
+- `latest.json` 갱신 및 순환 보관(카테고리별 최대 10개)
+- 스케줄러에서 10분 주기로 `metar-processor.processAll` 실행
 
 ### 6.3 공통 로직 목록 (양쪽에 동일하게 존재)
 
@@ -586,8 +587,8 @@ project/
   1. 전체 공항 순회 → 통합 result 객체 구성
   2. 실패 공항 → 이전 캐시(prev_data)에서 복구, _stale 표시
   3. canonical_hash(result) 비교 → 변경 없으면 스킵
-  4. 변경 있으면 save_and_update_latest() → 타임스탬프 파일 + latest.json
+  4. 변경 있으면 store.save("metar", result) → 타임스탬프 파일 + latest.json
   5. 파일 순환 (최신 10개 유지)
 ```
 
-각 parser의 `process` 함수는 XML 수신 → 파싱 → 정규화 → (TAF만: 시간별 분해)까지만 담당한다. 저장, 캐시, 순환은 main/cache_manager/file_manager가 처리한다.
+현재 구현에서 parser는 `parse` 함수만 제공하고, 수집/저장 오케스트레이션은 processor와 store가 담당한다.

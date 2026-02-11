@@ -1066,9 +1066,9 @@ CAVOK(cloudAndVisibilityOK="true") 시:
 ### D.1 파일명 규칙
 
 ```
-TAF_{fetched_at}.json
+TAF_{YYYYMMDDTHHMMSSmmmZ}.json
 
-예시: TAF_20260208T1030Z.json
+예시: TAF_20260211T102641791Z.json
       (전체 공항 통합, 조회 시점 기준)
 ```
 
@@ -1248,18 +1248,19 @@ TAF_{fetched_at}.json
 
 ```
 project/
-  ├ taf_parser       ← TAF 전체: XML 파싱, 정규화, 시간별 분해, JSON 출력
-  ├ metar_parser     ← METAR 전체: XML 파싱, 정규화, JSON 출력
-  └ main             ← API 호출, 공항 반복, 파일 저장
+  ├ backend/src/parsers/taf-parser.js
+  ├ backend/src/processors/taf-processor.js
+  ├ backend/src/store.js
+  └ backend/src/index.js
 ```
 
-- 2 parser 파일로 시작. 공통 로직(wind/weather/cloud 파싱 등)은 각 파일 내에 동일하게 작성한다.
-- 추후 공통 함수가 많아지거나 불일치가 발생하면 shared 파일로 분리한다.
+- 구현은 parser / processor / store / scheduler로 역할을 분리한다.
+- 공통 로직(wind/weather/cloud 파싱 등)은 `backend/src/parsers/parse-utils.js`에 공유한다.
 - 상세 모듈 설계는 METAR 설계문서 6절을 참조한다.
 
 ### E.2 파이프라인
 
-taf_parser 내부 처리 흐름:
+backend/src/parsers/taf-parser.js 내부 처리 흐름:
 
 ```
 ┌──────────────┐     ┌──────────────┐     ┌──────────────┐     ┌──────────────┐
@@ -1274,11 +1275,11 @@ taf_parser 내부 처리 흐름:
                      └──────────┘          └──────────┘
 ```
 
-taf_parser.process(xml)은 파싱/정규화/시간별 분해까지만 담당하고 객체를 반환한다. 전체 공항 통합, 저장, 캐시, 순환은 스케줄러 설계문서(Scheduler_Cache_Design.md) 6절에 정의된 main이 처리한다.
+현재 구현에서 parser는 `parse(xml)`만 담당한다. 전체 공항 통합, 실패 공항 복구(`mergeWithPrevious`), 저장(`store.save("taf", result)`), 스케줄링은 processor/store/index가 담당한다.
 
 ```
 입력: KMA API XML 응답 (1공항)
 출력: { header: {...}, timeline: [...] } 객체 반환
       → main이 airports[icao]에 할당
-      → canonical hash 비교 후 변경 시 TAF_{timestamp}.json으로 저장
+      → canonical hash 비교 후 변경 시 TAF_{YYYYMMDDTHHMMSSmmmZ}.json으로 저장
 ```

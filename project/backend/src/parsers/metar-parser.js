@@ -35,7 +35,14 @@ function decodeXmlEntities(value) {
 function parseInnerMetar(xml) {
   const decoded = decodeXmlEntities(xml);
   const parsed = parser.parse(decoded);
-  return parsed["iwxxm:METAR"] || parsed;
+  return parsed["iwxxm:METAR"] || parsed["iwxxm:SPECI"] || parsed;
+}
+
+function normalizeIwxxmRoot(node) {
+  if (!node || typeof node !== "object") {
+    return {};
+  }
+  return node["iwxxm:METAR"] || node["iwxxm:SPECI"] || node;
 }
 
 function getOuterItem(xmlString) {
@@ -87,9 +94,9 @@ function parse(xmlString) {
   let metar = {};
   const metarNode = item.metarMsg || item.metar;
   if (typeof metarNode === "string") {
-    metar = parseInnerMetar(metarNode);
+    metar = normalizeIwxxmRoot(parseInnerMetar(metarNode));
   } else if (metarNode && typeof metarNode === "object") {
-    metar = metarNode["iwxxm:METAR"] || metarNode;
+    metar = normalizeIwxxmRoot(metarNode);
   }
 
   const issueTime =
