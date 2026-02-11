@@ -8,7 +8,7 @@
 1. `backend/src/index.js`
 2. `backend/src/config.js`
 3. `backend/src/store.js`
-4. `frontend/server.cjs`
+4. `frontend/server.js`
 5. `frontend/src/App.jsx`
 
 ### 핵심 기능
@@ -102,8 +102,7 @@ project/
 │   │           ├── alert-state.js
 │   │           ├── alert-dispatcher.js
 │   │           └── alert-settings.js
-│   ├── server.cjs                (운영 API + 정적서빙 + 스케줄러 시작)
-│   ├── server.js                 (레거시 파일, 현재 스크립트 미사용)
+│   ├── server.js                (운영 API + 정적서빙 + 스케줄러 시작)
 │   ├── vite.config.js
 │   ├── index.html
 │   ├── legacy/
@@ -143,7 +142,7 @@ KMA API (XML/텍스트/이미지)
 ### API/표출
 ```text
 frontend/src/utils/api.js
-  -> frontend/server.cjs (/api/*)
+  -> frontend/server.js (/api/*)
   -> backend/data/*/latest.json read
   -> App.jsx state 반영
   -> 컴포넌트 렌더링
@@ -151,7 +150,7 @@ frontend/src/utils/api.js
 
 ### TST1 오버레이
 ```text
-server.cjs
+server.js
   mergeTst1(payload, category)
   -> backend/data/TST1/<category>.json
   -> payload.airports.TST1 병합
@@ -178,7 +177,7 @@ server.cjs
 - `latest.json` 갱신, 파일 회전(max 10)
 - 실패 공항 이전값 `_stale` 병합 지원
 
-### frontend/server.cjs
+### frontend/server.js
 - `/api/metar|taf|warning|lightning|radar|status|airports|warning-types|alert-defaults`
 - `/api/refresh` (5개 프로세서 `Promise.allSettled` 실행)
 - `/data/*` 정적 파일 서빙 (레이더 PNG 포함)
@@ -244,7 +243,7 @@ backend/src/store.js
 ### 서버/프론트 의존성
 
 ```text
-frontend/server.cjs
+frontend/server.js
 ├─ fs, path, http
 ├─ ../backend/src/index
 ├─ ../backend/src/processors/*
@@ -321,7 +320,7 @@ frontend/src/utils/alerts/alert-engine.js
 - `PORT` (선택): 대시보드 서버 포트 (기본 5173)
 
 ### 변경 금지/주의
-- `frontend/server.js`는 레거시 파일이며 현재 실행 스크립트에서 사용하지 않음 (`frontend/server.cjs` 기준).
+- 서버 진입점은 `frontend/server.js` 단일 파일 기준으로 유지.
 - `TST1` 데이터는 `backend/data/TST1/*.json` 오버레이 전용이며 수집 대상 공항과 분리 운용.
 - 인증키는 `API_AUTH_KEY` 단일 키만 사용 (`KMA_AUTH_KEY`, `radar_auth_key` 미사용).
 
@@ -364,3 +363,4 @@ node backend/test/run-once.js radar
 ---
 
 최종 업데이트: 2026-02-11
+

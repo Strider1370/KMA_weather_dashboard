@@ -1,10 +1,17 @@
-﻿const fs = require("fs");
-const path = require("path");
-const http = require("http");
+import fs from "fs";
+import path from "path";
+import http from "http";
+import { createRequire } from "module";
+import { fileURLToPath } from "url";
+
+const require = createRequire(import.meta.url);
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const PORT = Number(process.env.PORT || 5173);
 const ROOT = path.join(__dirname, "dist");
 const DATA_ROOT = path.resolve(__dirname, "../backend/data");
+const TST1_ROOT = path.join(DATA_ROOT, "TST1");
 const SHARED_AIRPORTS = path.resolve(__dirname, "../shared/airports.js");
 const SHARED_WARNING_TYPES = path.resolve(__dirname, "../shared/warning-types.js");
 const SHARED_ALERT_DEFAULTS = path.resolve(__dirname, "../shared/alert-defaults.js");
@@ -25,6 +32,68 @@ function readLatest(category) {
   return JSON.parse(raw);
 }
 
+function readTst1Override(category) {
+  const file = path.join(TST1_ROOT, `${category}.json`);
+  if (!fs.existsSync(file)) return null;
+  try {
+    const raw = fs.readFileSync(file, "utf8").replace(/^\uFEFF/, "");
+    return JSON.parse(raw);
+  } catch (error) {
+    console.warn(`[TST1] Invalid JSON for ${category}: ${error.message}`);
+    return null;
+  }
+}
+
+function mergeTst1(payload, category) {
+  const override = readTst1Override(category);
+  if (!override) return payload;
+
+  const next = payload && typeof payload === "object" ? { ...payload } : {};
+  next.airports = next.airports && typeof next.airports === "object" ? { ...next.airports } : {};
+
+  const airportData = override.airports?.TST1 ?? override;
+  next.airports.TST1 = airportData;
+  if (!next.fetched_at && !next.updated_at) next.fetched_at = new Date().toISOString();
+  return next;
+}
+
+function readLightning() {
+  const lightningDir = path.join(DATA_ROOT, "lightning");
+  const latestFile = path.join(lightningDir, "latest.json");
+
+  let payload = {
+    type: "lightning",
+    fetched_at: new Date().toISOString(),
+    query: { itv_minutes: 3, range_km: 32 },
+    airports: {}
+  };
+
+  if (fs.existsSync(latestFile)) {
+    payload = JSON.parse(fs.readFileSync(latestFile, "utf8"));
+    if (!payload.airports) payload.airports = {};
+  }
+
+  return mergeTst1(payload, "lightning");
+}
+
+function readRadar() {
+  const radarDir = path.join(DATA_ROOT, "radar");
+  const latestFile = path.join(radarDir, "latest.json");
+  if (!fs.existsSync(latestFile)) {
+    return {
+      type: "RADAR",
+      updated_at: null,
+      image_count: 0,
+      interval_minutes: 5,
+      images: []
+    };
+  }
+
+  const payload = JSON.parse(fs.readFileSync(latestFile, "utf8"));
+  payload.images = Array.isArray(payload.images) ? payload.images : [];
+  return payload;
+}
+
 function getDataStatus(category) {
   try {
     const dir = path.join(DATA_ROOT, category);
@@ -32,9 +101,13 @@ function getDataStatus(category) {
       return { exists: false, last_updated: null, file_count: 0 };
     }
 
+    const filePattern = category === "radar"
+      ? (name) => /^RDR_\d{12}\.png$/.test(name)
+      : (name) => name.endsWith(".json") && name !== "latest.json";
+
     const files = fs.readdirSync(dir)
-      .filter(name => name.endsWith(".json") && name !== "latest.json")
-      .map(name => {
+      .filter(filePattern)
+      .map((name) => {
         const fullPath = path.join(dir, name);
         const stats = fs.statSync(fullPath);
         return { name, mtime: stats.mtime };
@@ -45,7 +118,7 @@ function getDataStatus(category) {
     const latestFile = path.join(dir, "latest.json");
     if (fs.existsSync(latestFile)) {
       const data = JSON.parse(fs.readFileSync(latestFile, "utf8"));
-      lastUpdated = data.fetched_at || null;
+      lastUpdated = data.fetched_at || data.updated_at || null;
     }
 
     return {
@@ -64,7 +137,26 @@ function contentTypeFor(filePath) {
   if (filePath.endsWith(".css")) return "text/css; charset=utf-8";
   if (filePath.endsWith(".js")) return "application/javascript; charset=utf-8";
   if (filePath.endsWith(".json")) return "application/json; charset=utf-8";
+  if (filePath.endsWith(".png")) return "image/png";
   return "text/plain; charset=utf-8";
+}
+
+function serveDataAsset(req, res) {
+  const relative = req.url.replace(/^\/data\//, "");
+  const filePath = path.normalize(path.join(DATA_ROOT, relative));
+  if (!filePath.startsWith(DATA_ROOT)) {
+    sendText(res, 403, "Forbidden");
+    return true;
+  }
+  if (!fs.existsSync(filePath) || fs.statSync(filePath).isDirectory()) {
+    sendText(res, 404, "Not Found");
+    return true;
+  }
+
+  const body = fs.readFileSync(filePath);
+  res.writeHead(200, { "Content-Type": contentTypeFor(filePath), "Cache-Control": "no-cache" });
+  res.end(body);
+  return true;
 }
 
 function serveStatic(req, res) {
@@ -86,35 +178,46 @@ function serveStatic(req, res) {
   res.end(body);
 }
 
+function reloadCommonJs(modulePath) {
+  const resolved = require.resolve(modulePath);
+  delete require.cache[resolved];
+  return require(modulePath);
+}
+
 const server = http.createServer(async (req, res) => {
   try {
     if (req.url === "/api/metar") {
-      return sendJson(res, 200, readLatest("metar"));
+      return sendJson(res, 200, mergeTst1(readLatest("metar"), "metar"));
     }
 
     if (req.url === "/api/taf") {
-      return sendJson(res, 200, readLatest("taf"));
+      return sendJson(res, 200, mergeTst1(readLatest("taf"), "taf"));
     }
 
     if (req.url === "/api/warning") {
-      return sendJson(res, 200, readLatest("warning"));
+      return sendJson(res, 200, mergeTst1(readLatest("warning"), "warning"));
+    }
+
+    if (req.url === "/api/lightning") {
+      return sendJson(res, 200, readLightning());
+    }
+
+    if (req.url === "/api/radar") {
+      return sendJson(res, 200, readRadar());
     }
 
     if (req.url === "/api/airports") {
-      delete require.cache[SHARED_AIRPORTS];
-      const airports = require(SHARED_AIRPORTS);
+      const airports = reloadCommonJs(SHARED_AIRPORTS);
       return sendJson(res, 200, airports);
     }
 
     if (req.url === "/api/warning-types") {
-      delete require.cache[SHARED_WARNING_TYPES];
-      const warningTypes = require(SHARED_WARNING_TYPES);
+      const warningTypes = reloadCommonJs(SHARED_WARNING_TYPES);
       return sendJson(res, 200, warningTypes);
     }
 
     if (req.url === "/api/alert-defaults") {
-      delete require.cache[SHARED_ALERT_DEFAULTS];
-      const alertDefaults = require(SHARED_ALERT_DEFAULTS);
+      const alertDefaults = reloadCommonJs(SHARED_ALERT_DEFAULTS);
       return sendJson(res, 200, alertDefaults);
     }
 
@@ -123,18 +226,24 @@ const server = http.createServer(async (req, res) => {
       const metarProcessor = require("../backend/src/processors/metar-processor");
       const tafProcessor = require("../backend/src/processors/taf-processor");
       const warningProcessor = require("../backend/src/processors/warning-processor");
+      const lightningProcessor = require("../backend/src/processors/lightning-processor");
+      const radarProcessor = require("../backend/src/processors/radar-processor");
 
       try {
         const results = await Promise.allSettled([
           metarProcessor.processAll(),
           tafProcessor.processAll(),
           warningProcessor.process(),
+          lightningProcessor.process(),
+          radarProcessor.process()
         ]);
 
         const summary = {
           metar: results[0].status === "fulfilled" ? results[0].value : { error: results[0].reason?.message },
           taf: results[1].status === "fulfilled" ? results[1].value : { error: results[1].reason?.message },
           warning: results[2].status === "fulfilled" ? results[2].value : { error: results[2].reason?.message },
+          lightning: results[3].status === "fulfilled" ? results[3].value : { error: results[3].reason?.message },
+          radar: results[4].status === "fulfilled" ? results[4].value : { error: results[4].reason?.message }
         };
         console.log("[REFRESH] Results:", JSON.stringify(summary, null, 2));
         return sendJson(res, 200, summary);
@@ -148,9 +257,15 @@ const server = http.createServer(async (req, res) => {
       const status = {
         metar: getDataStatus("metar"),
         taf: getDataStatus("taf"),
-        warning: getDataStatus("warning")
+        warning: getDataStatus("warning"),
+        lightning: getDataStatus("lightning"),
+        radar: getDataStatus("radar")
       };
       return sendJson(res, 200, status);
+    }
+
+    if (req.url.startsWith("/data/")) {
+      return serveDataAsset(req, res);
     }
 
     return serveStatic(req, res);
@@ -163,9 +278,8 @@ const server = http.createServer(async (req, res) => {
 server.listen(PORT, () => {
   console.log(`Dashboard server started: http://localhost:${PORT}`);
 
-  // Start backend scheduler automatically
   const scheduler = require("../backend/src/index");
-  scheduler.main().catch(err => {
+  scheduler.main().catch((err) => {
     console.error("Scheduler failed to start:", err);
   });
 });

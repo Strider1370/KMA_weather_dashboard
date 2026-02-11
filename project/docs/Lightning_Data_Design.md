@@ -9,7 +9,7 @@
 - `backend/src/processors/lightning-processor.js`
 - `backend/src/parsers/lightning-parser.js`
 - `frontend/src/components/LightningMap.jsx`
-- `frontend/server.cjs` (`/api/lightning`, `mergeTst1`)
+- `frontend/server.js` (`/api/lightning`, `mergeTst1`)
 
 ---
 
@@ -182,7 +182,7 @@ processor는 다음 요약을 반환:
 ## 8. TST1 오버레이
 
 ### 8.1 서버 병합
-`frontend/server.cjs`:
+`frontend/server.js`:
 - `/api/lightning` 응답 생성 시 `mergeTst1(payload, "lightning")` 호출
 - `backend/data/TST1/lightning.json`이 있으면 `airports.TST1`로 병합
 
@@ -204,3 +204,4 @@ processor는 다음 요약을 반환:
 | 6 | 지도 시간 필터 | 선택 구간만 표시 |
 | 7 | T-08 신규 strike | 알림 발동 |
 | 8 | TST1 파일 존재 | `/api/lightning`에 `airports.TST1` 병합 |
+

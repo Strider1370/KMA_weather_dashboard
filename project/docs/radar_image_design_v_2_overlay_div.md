@@ -7,7 +7,7 @@
 
 ### 1.2 실제 구현 기준 파일
 - `backend/src/processors/radar-processor.js`
-- `frontend/server.cjs` (`/api/radar`, `/data/*`)
+- `frontend/server.js` (`/api/radar`, `/data/*`)
 - `frontend/src/components/RadarPanel.jsx`
 
 ---
@@ -123,7 +123,7 @@
 
 ## 7. 서버 API 노출
 
-`frontend/server.cjs`:
+`frontend/server.js`:
 - `GET /api/radar`:
   - `backend/data/radar/latest.json` 반환
   - 없으면 빈 payload 반환:
@@ -178,3 +178,4 @@
 | 7 | `/api/radar` latest 없음 | 빈 payload 반환 |
 | 8 | 프론트 프레임 애니메이션 | 500ms 간격 순환 |
 | 9 | 공항 선택 변경 | 오버레이 마커 위치 변경 |
+
