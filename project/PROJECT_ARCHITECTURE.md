@@ -1,3 +1,5 @@
+﻿<!-- NOTE: This document is encoded in UTF-8. Open/read/write using UTF-8 to avoid mojibake. -->
+
 # KMA Aviation Weather Dashboard - 프로젝트 아키텍처
 
 > KMA API 기반 항공기상 대시보드. METAR/TAF/WARNING/LIGHTNING/RADAR 수집, 캐시 저장, React UI 표출, 트리거 기반 알림 제공.
@@ -171,6 +173,10 @@ server.js
 - METAR/TAF/WARNING URL 생성 및 재시도 fetch
 - API 헤더(`resultCode/resultMsg`) 유효성 검사
 
+### backend/src/parsers/metar-parser.js
+- `iwxxm:METAR`/`iwxxm:SPECI` 루트 정규화
+- 헤더에 `report_type`(`METAR`/`SPECI`) 추출하여 저장
+
 ### backend/src/store.js
 - 타입: `metar`, `taf`, `warning`, `lightning`
 - canonical hash 기반 중복 저장 방지
@@ -187,6 +193,11 @@ server.js
 - 전체 데이터 로딩 및 공항 선택 상태 관리
 - 알림 평가/디스패치/쿨다운 처리
 - 좌측(METAR/TAF/WARNING) + 우측(Lightning/Radar) 레이아웃
+
+### frontend/src/components/MetarCard.jsx
+- 카드 타이틀: `METAR/SPECI`
+- 본문 상단에 `Report Type` 및 `Issue Time` 표시
+- `report_type` 미존재 시 `metarData.type` 또는 `METAR`로 fallback
 
 ## 6. 파일 의존성 맵
 
@@ -362,5 +373,7 @@ node backend/test/run-once.js radar
 
 ---
 
-최종 업데이트: 2026-02-11
+최종 업데이트: 2026-02-12
+
+
 

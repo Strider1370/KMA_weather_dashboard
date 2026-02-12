@@ -45,6 +45,18 @@ function normalizeIwxxmRoot(node) {
   return node["iwxxm:METAR"] || node["iwxxm:SPECI"] || node;
 }
 
+function detectReportType(metarNode) {
+  if (typeof metarNode === "string") {
+    if (metarNode.includes("iwxxm:SPECI")) return "SPECI";
+    if (metarNode.includes("iwxxm:METAR")) return "METAR";
+  }
+  if (metarNode && typeof metarNode === "object") {
+    if (metarNode["iwxxm:SPECI"]) return "SPECI";
+    if (metarNode["iwxxm:METAR"]) return "METAR";
+  }
+  return "METAR";
+}
+
 function getOuterItem(xmlString) {
   const outer = parser.parse(xmlString);
   const items = toArray(outer?.response?.body?.items?.item || outer?.body?.items?.item || outer?.items?.item);
@@ -93,6 +105,7 @@ function parse(xmlString) {
 
   let metar = {};
   const metarNode = item.metarMsg || item.metar;
+  const reportType = detectReportType(metarNode);
   if (typeof metarNode === "string") {
     metar = normalizeIwxxmRoot(parseInnerMetar(metarNode));
   } else if (metarNode && typeof metarNode === "object") {
@@ -191,6 +204,7 @@ function parse(xmlString) {
         text(item.airportNm) ||
         text(metar["iwxxm:aerodrome"]?.["aixm:AirportHeliport"]?.["aixm:timeSlice"]?.["aixm:AirportHeliportTimeSlice"]?.["aixm:name"]) ||
         null,
+      report_type: reportType,
       issue_time: issueTime,
       observation_time: observationTime,
       automated: String(metar["@_automatedStation"] || "false").toLowerCase() === "true"

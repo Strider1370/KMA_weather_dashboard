@@ -43,6 +43,7 @@ TAF는 예보 기간에 대한 상태 기계이지만, METAR는 **단일 관측 
 METARObservation = {
     icao              : String,                    // 공항 ICAO 코드
     airport_name      : String,                    // 공항명
+    report_type       : Enum { METAR, SPECI },    // 전문 종류
     issue_time        : DateTime,                  // 발표 시각 (ISO 8601)
     observation_time  : DateTime,                  // 관측 시각 (ISO 8601)
     auto              : Boolean,                   // 자동 관측 여부
@@ -168,6 +169,7 @@ xlink  = "http://www.w3.org/1999/xlink"
 |-----------|----------|----------|
 | icao | `iwxxm:aerodrome > ... > aixm:locationIndicatorICAO` | 텍스트 (TAF와 동일 경로) |
 | airport_name | 같은 경로 > `aixm:name` | 텍스트 |
+| report_type | 루트 노드명 (`iwxxm:METAR` 또는 `iwxxm:SPECI`) | `METAR` 또는 `SPECI` 문자열 |
 | issue_time | `iwxxm:issueTime > gml:TimeInstant > gml:timePosition` | ISO 8601 |
 | observation_time | `iwxxm:observationTime > gml:TimeInstant > gml:timePosition` | ISO 8601 |
 | auto | `iwxxm:METAR` 또는 `iwxxm:SPECI` 속성 `automatedStation` | "true"/"false" → Boolean |
@@ -349,7 +351,7 @@ METAR는 상태 기계가 불필요하므로 파이프라인이 단순하다.
 │    > iwxxm:METAR/SPECI 노드 탐색                 │
 │                                                  │
 │ 3. 헤더 추출 (3.3절)                             │
-│    - icao, airport_name, issue_time,             │
+│    - icao, airport_name, report_type, issue_time,│
 │      observation_time, auto                      │
 │                                                  │
 │ 4. 관측 블록 추출 (3.4절)                        │
@@ -398,6 +400,7 @@ METAR_{YYYYMMDDTHHMMSSmmmZ}.json
       "header": {
         "icao": "RKPC",
         "airport_name": "JEJU INTERNATIONAL AIRPORT",
+        "report_type": "METAR",
         "issue_time": "2026-02-08T10:00:00Z",
         "observation_time": "2026-02-08T10:00:00Z",
         "automated": false
@@ -512,6 +515,7 @@ project/
 **backend/src/parsers/metar-parser.js**:
 - KMA API XML → METAR 객체 파싱
 - `iwxxm:METAR`/`iwxxm:SPECI` 루트 정규화
+- 루트 노드 기준 `header.report_type` (`METAR`/`SPECI`) 추출
 - CAVOK/NSC 정규화
 - 기상현상 구조화 파싱 (URL 코드 추출 → WeatherPhenomenon)
 - 바람/시정/구름 변환
@@ -575,6 +579,7 @@ project/
 | 17 | 바람 VRB | variable=true, speed=3 → "VRB03KT" |
 | 18 | automatedStation="true" | auto=true |
 | 19 | 공유 함수: TAF와 METAR에서 동일 결과 | parse_weather_from_url, parse_cloud_layer 등 |
+| 20 | iwxxm:SPECI 입력 | header.report_type="SPECI" |
 
 ---
 
