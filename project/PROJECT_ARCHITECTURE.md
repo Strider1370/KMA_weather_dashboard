@@ -199,6 +199,12 @@ server.js
 - 본문 상단에 `Report Type` 및 `Issue Time` 표시
 - `report_type` 미존재 시 `metarData.type` 또는 `METAR`로 fallback
 
+### frontend/src/components/RadarPanel.jsx
+- 타임라인 왼쪽에 재생/일시정지 아이콘 버튼(`▶`/`❚❚`) 배치
+- 헤더 우측에 `재생시간` 칩 및 `- / +` 컨트롤로 프레임 간격 조절(`0.1~2.0초`)
+- 타임라인 하단에 현재 프레임 시각(`HH:mm`) 표시
+- 일시정지 상태에서도 최신 프레임 자동 반영(자동갱신 고정)
+
 ## 6. 파일 의존성 맵
 
 ### 백엔드 런타임 의존성

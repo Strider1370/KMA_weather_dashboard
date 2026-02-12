@@ -147,9 +147,55 @@ tr.row-danger td { background: #ffe9e7; }
 .zone-tag.danger { background: #fff0de; color: #b75c05; }
 .zone-tag.caution { background: #fff9dd; color: #8f6f00; }
 
-.radar-panel { display: grid; gap: 10px; }
+.radar-panel { display: grid; gap: 10px; padding-bottom: 0; }
 .radar-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
 .radar-head .sub { margin: 0; font-size: 0.78rem; }
+.radar-controls {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 8px;
+  align-items: center;
+}
+.radar-icon-btn {
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border-radius: 999px;
+  font-size: 0.95rem;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.radar-speed-chip {
+  justify-self: end;
+  font-size: 0.74rem;
+  color: var(--accent);
+  font-weight: 600;
+  border: 1px solid #b9dfd2;
+  background: #eaf7f3;
+  border-radius: 999px;
+  padding: 3px 8px;
+}
+.radar-speed-control {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.radar-speed-step {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border-radius: 8px;
+  background: #f5f7fa;
+  color: var(--ink);
+  border: 1px solid var(--line);
+  font-weight: 700;
+}
+.radar-speed-step:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
 .radar-wrap {
   position: relative;
   width: 100%;
@@ -179,6 +225,46 @@ tr.row-danger td { background: #ffe9e7; }
   background: transparent;
   border: none;
   text-shadow: 0 0 2px #ffffff;
+}
+.radar-timeline {
+  display: grid;
+  gap: 6px;
+  padding: 8px 2px 2px;
+}
+.radar-seek-wrap {
+  position: relative;
+  padding-bottom: 14px;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 8px;
+  align-items: center;
+}
+.radar-seek {
+  width: 100%;
+  margin: 0;
+}
+.radar-icon-inline {
+  width: 30px;
+  height: 30px;
+  font-size: 0.85rem;
+}
+.radar-time-row {
+  position: relative;
+  margin-top: 0;
+  grid-column: 2;
+  height: 16px;
+}
+.radar-current-time {
+  position: absolute;
+  top: 0;
+  --radar-thumb-size: 14px;
+  left: calc((var(--radar-progress, 0) * (100% - var(--radar-thumb-size))) + (var(--radar-thumb-size) / 2));
+  transform: translateX(-50%);
+  font-size: 0.74rem;
+  color: var(--accent);
+  font-weight: 800;
+  white-space: nowrap;
+  pointer-events: none;
 }
 
 /* ── Alert Settings Button ── */
@@ -430,6 +516,8 @@ tr.row-danger td { background: #ffe9e7; }
   .split { grid-template-columns: 1fr; }
   .status-grid { grid-template-columns: 1fr; }
   .alert-popup-container { max-width: 300px; }
+  .radar-controls { grid-template-columns: 1fr; }
+  .radar-controls button { justify-self: start; }
 }
 @media (max-width: 560px) {
   .hero-top { flex-wrap: wrap; align-items: flex-start; }
