@@ -115,6 +115,17 @@ button { background: var(--ink); color: #fff; border-color: var(--ink); cursor: 
 .warning-list { display: grid; gap: 10px; }
 .warning-item { border-left: 4px solid var(--accent-2); background: #fff8f4; border-radius: 10px; padding: 10px; font-size: 0.9rem; }
 .warning-item strong { display: block; }
+.warning-time-label {
+  display: block;
+  margin-top: 6px;
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+.warning-time-value {
+  display: block;
+  margin-top: 2px;
+  font-size: 0.84rem;
+}
 
 .table-wrap { overflow-x: auto; }
 table { width: 100%; border-collapse: collapse; }
