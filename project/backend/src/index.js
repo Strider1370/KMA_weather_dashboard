@@ -37,6 +37,17 @@ async function main() {
   cron.schedule(config.schedule.warning_interval, () => runWithLock("warning", warningProcessor.process));
   cron.schedule(config.schedule.lightning_interval, () => runWithLock("lightning", lightningProcessor.process));
   cron.schedule(config.schedule.radar_interval, () => runWithLock("radar", radarProcessor.process));
+
+  // 서버 시작 직후 1회 즉시 수집
+  console.log("Running initial data collection...");
+  await Promise.allSettled([
+    runWithLock("metar", metarProcessor.processAll),
+    runWithLock("taf", tafProcessor.processAll),
+    runWithLock("warning", warningProcessor.process),
+    runWithLock("lightning", lightningProcessor.process),
+    runWithLock("radar", radarProcessor.process),
+  ]);
+  console.log("Initial data collection complete.");
 }
 
 if (require.main === module) {

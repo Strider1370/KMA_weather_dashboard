@@ -134,46 +134,49 @@ WeatherPhenomenon은 강도(intensity) × 특성(descriptor) × 현상본체(phe
 | `SS` | — | SS | SS, +SS | 모래폭풍 |
 | `DS` | — | DS | DS, +DS | 먼지폭풍 |
 
-#### 2.4.8 특수 상태
+#### 2.4.8 구름 상태 (Cloud Cover)
+
+기상현상(weather)이 없는 경우 구름 양에 따라 아이콘을 결정한다.
+
+| 아이콘 키 | 코드 | 설명 | 비고 |
+|-----------|------|------|------|
+| `SKC` | SKC, CLR | 맑음 | 구름 없음 |
+| `FEW` | FEW | 구름 조금 | 1/8 ~ 2/8 |
+| `SCT` | SCT | 구름 갬 | 3/8 ~ 4/8 |
+| `BKN` | BKN | 구름 많음 | 5/8 ~ 7/8 |
+| `OVC` | OVC | 흐림 | 8/8 |
+
+#### 2.4.9 특수 상태
 
 | 아이콘 키 | 조건 | 설명 |
 |-----------|------|------|
 | `CAVOK` | cavok_flag == true | 맑음/양호 |
 | `NSW` | wx == [] (CAVOK 아닌 경우) | 중요 현상 없음 |
 
-### 2.5 아이콘 키 결정 알고리즘
+### 2.5 아이콘 키 결정 알고리즘 (보완)
 
-WeatherPhenomenon 객체에서 아이콘 키를 산출하는 알고리즘:
+아이콘 키는 `wx_{현상}_{낮밤}` 또는 `wx_{구름}_{낮밤}` 구조로 생성한다.
 
 ```
-함수 resolve_icon_key(wp: WeatherPhenomenon) → String:
-
-    // 1. descriptor + phenomena 조합으로 매핑 테이블 조회
-    if wp.descriptor ≠ null:
-        // descriptor가 있는 경우: descriptor + phenomena 결합
-        key = wp.descriptor + join(wp.phenomena)
-        // 예: descriptor=TS, phenomena=[RA] → "TSRA"
-        // 예: descriptor=SH, phenomena=[SN] → "SHSN"
-        // 예: descriptor=FZ, phenomena=[DZ] → "FZDZ"
-        // 예: descriptor=TS, phenomena=[SN,GR] → "TSSNGR"
-        
-        if key가 매핑 테이블에 존재:
-            return key
-        
-        // 매핑 테이블에 없는 조합: descriptor만 반환
-        // 예: 예상치 못한 조합
-        return wp.descriptor
+함수 resolve_icon_key(data, time) → String:
+    // 1. 낮/밤 판단 (_D, _N)
+    suffix = is_daytime(time) ? "D" : "N"
     
-    else:
-        // descriptor가 없는 경우: phenomena 첫 번째 요소
-        if wp.phenomena 비어있지 않음:
-            return wp.phenomena[0]
-            // 예: phenomena=[RA] → "RA"
-            // 예: phenomena=[BR] → "BR"
-            // 예: phenomena=[SN,RA] → "SN" (첫 번째 우선)
+    // 2. 기상현상이 있는 경우 (우선순위 적용)
+    if data.weather.length > 0:
+        base_key = resolve_weather_base_key(data.weather)
+        return "wx_" + base_key + "_" + suffix
         
-        // phenomena도 없음 (이론적으로 발생하지 않음)
-        return "UNKNOWN"
+    // 3. 기상현상이 없고 구름 정보가 있는 경우
+    if data.clouds.length > 0:
+        // 가장 양이 많은 구름층 기준
+        max_cloud = get_max_cloud_layer(data.clouds)
+        return "wx_" + max_cloud.amount + "_" + suffix
+        
+    // 4. 기상현상도 구름도 없는 경우 (CAVOK 등)
+    if data.cavok: return "wx_CAVOK_" + suffix
+    
+    return "wx_SKC_" + suffix
 ```
 
 ### 2.6 복수 기상현상 처리

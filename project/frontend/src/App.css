@@ -89,10 +89,44 @@ label { font-size: 0.9rem; font-weight: 700; }
 select, button { border-radius: 10px; border: 1px solid var(--line); background: #fff; font: inherit; padding: 9px 11px; }
 button { background: var(--ink); color: #fff; border-color: var(--ink); cursor: pointer; }
 
-.split { display: grid; grid-template-columns: 1.1fr 0.9fr; gap: 12px; }
-.dashboard-layout { display: grid; grid-template-columns: 1.25fr 0.75fr; gap: 12px; align-items: start; }
-.primary-column { display: grid; gap: 12px; }
-.secondary-column { display: grid; gap: 12px; }
+.dashboard-layout { 
+  display: grid; 
+  grid-template-columns: 1.25fr 0.75fr; 
+  gap: 16px; 
+  align-items: start;
+}
+.primary-column { 
+  display: flex; 
+  flex-direction: column; 
+  gap: 16px; 
+  min-width: 0; /* CRITICAL: Prevent column from expanding */
+}
+.secondary-column { 
+  display: flex; 
+  flex-direction: column; 
+  gap: 16px; 
+  min-width: 0;
+}
+
+.dashboard-top-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  align-items: stretch;
+  min-width: 0;
+}
+
+.dashboard-bottom-row {
+  width: 100%;
+  min-width: 0; /* CRITICAL: Prevent row from expanding */
+  overflow: hidden; /* Contain scrolling children */
+}
+
+/* Cleanup: Remove fixed heights to allow stretching in grid */
+.metar-v2, .metar-panel-v1 {
+  height: auto;
+  min-height: 220px;
+}
 .panel { padding: 14px; }
 .panel h3 { margin: 0 0 10px; font-size: 1rem; font-family: "Space Grotesk", sans-serif; }
 
@@ -102,7 +136,7 @@ button { background: var(--ink); color: #fff; border-color: var(--ink); cursor: 
   color: #d6f2ea;
   border-radius: 10px;
   padding: 12px;
-  min-height: 170px;
+  min-height: 200px;
   overflow: auto;
   font-family: "Consolas", monospace;
   font-size: 0.85rem;
@@ -538,3 +572,236 @@ tr.row-danger td { background: #ffe9e7; }
   .metric { font-size: 1.6rem; }
   .alert-settings-modal { width: 95%; }
 }
+
+/* ── New UI Version Styles (v2, v3) ── */
+
+/* METAR v2 (Sidebar/Card Refined) */
+.metar-v2 {
+  background: var(--paper);
+  color: var(--ink);
+  border: 1px solid var(--line);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  height: 280px; /* FIXED HEIGHT */
+  box-sizing: border-box;
+  transition: all 0.3s ease;
+  overflow: hidden;
+}
+.metar-v2-header { 
+  display: flex; 
+  justify-content: space-between; 
+  align-items: center;
+  margin-bottom: 4px;
+}
+.metar-v2-icao { font-size: 1.25rem; font-weight: 800; color: var(--accent); }
+.metar-v2-time { font-size: 0.75rem; color: var(--muted); }
+
+.metar-v2-main {
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
+  flex: 1; /* Expand to fill space */
+  padding: 4px 0;
+}
+.metar-v2-icon-box { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.metar-v2-icon-box .weather-icon-wrapper span { font-size: 3.8rem !important; line-height: 1; }
+.metar-v2-phenomena { font-size: 1rem; font-weight: 700; color: var(--muted); }
+
+.metar-v2-wind-side {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding-left: 20px;
+  border-left: 1px solid var(--line);
+}
+.wind-arrow-box-v2 {
+  width: 44px;
+  height: 44px;
+  background: #f1f3f5;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.wind-arrow-v2 { font-size: 1.8rem; font-weight: 900; color: var(--accent); transition: transform 0.5s ease; }
+.metar-v2-wind-value-v2 { font-size: 1.4rem; font-weight: 800; color: var(--ink); }
+
+.metar-v2-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 4px;
+  background: #f9fafb;
+  border-radius: 8px;
+  padding: 8px;
+  margin-bottom: 8px;
+}
+.metar-v2-item { text-align: center; }
+.metar-v2-label { font-size: 0.65rem; color: var(--muted); font-weight: 700; margin-bottom: 2px; }
+.metar-v2-value { font-size: 0.85rem; font-weight: 800; }
+
+.metar-v2 .dashboard-toggle-btn {
+  background: #f1f3f5;
+  border: none;
+  font-size: 0.75rem;
+  padding: 6px;
+  border-radius: 6px;
+  color: var(--muted);
+  cursor: pointer;
+  width: 100%;
+}
+
+/* Fix Mono Box for v1 inside 280px panel */
+.metar-panel-v1 {
+  height: 280px; /* FIXED HEIGHT */
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+}
+.metar-panel-v1 .mono {
+  flex: 1;
+  min-height: 0;
+  margin-top: 4px;
+}
+
+/* TAF v2 (Timeline Bar) */
+.taf-v2 { padding: 20px; }
+.taf-header-flex { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+.taf-v2-container { display: flex; flex-direction: column; gap: 8px; }
+.taf-v2-row { display: grid; grid-template-columns: 60px 1fr; gap: 20px; align-items: center; }
+.taf-v2-row.time-row { height: 45px; align-items: flex-end; }
+.taf-v2-row-label { font-size: 0.8rem; font-weight: 700; color: var(--muted); text-align: right; }
+
+.taf-v2-timeline-scale { position: relative; height: 100%; width: 100%; border-bottom: 2px solid var(--line); margin-bottom: 4px; }
+.scale-item { 
+  position: absolute; 
+  transform: translateX(-50%); 
+  display: flex; 
+  flex-direction: column; 
+  align-items: center;
+  bottom: 0;
+}
+.scale-date { 
+  font-size: 0.7rem; 
+  font-weight: 800; 
+  color: var(--accent-2); 
+  background: #fff; 
+  padding: 0 4px;
+  border-radius: 4px;
+  margin-bottom: 2px;
+  white-space: nowrap;
+}
+.scale-hour { font-size: 0.75rem; color: var(--muted); font-weight: 600; padding-bottom: 4px; }
+
+.taf-v2-timeline {
+  display: flex;
+  height: 44px;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #f1f3f5;
+  box-shadow: inset 0 1px 3px rgba(0,0,0,0.1);
+}
+.taf-v2-segment {
+  height: 100%;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #fff;
+  transition: width 0.3s;
+  min-width: 30px;
+  border-right: 1px solid rgba(255,255,255,0.15);
+  padding: 0 4px;
+  overflow: hidden;
+  white-space: nowrap;
+}
+.taf-v2-segment:last-child { border-right: none; }
+.taf-v2-segment .weather-icon-wrapper span { font-size: 1.4rem !important; }
+.segment-label { text-shadow: 0 1px 2px rgba(0,0,0,0.2); }
+.wind-arrow-inline { 
+  display: inline-block; 
+  font-weight: 900; 
+  margin-right: 4px; 
+  font-size: 1.1rem;
+  line-height: 1;
+}
+
+/* Timeline Severity Colors */
+.lvl-ok { background-color: #4caf50 !important; color: #fff; }
+.lvl-lime { background-color: #8bc34a !important; color: #fff; }
+.lvl-warn { background-color: #ff9800 !important; color: #fff; }
+.lvl-danger { background-color: #f44336 !important; color: #fff; }
+
+/* TAF v3 (Detailed Grid Refined) */
+.taf-v3-wrapper {
+  display: grid;
+  grid-template-columns: 80px 1fr;
+  gap: 4px;
+  align-items: start;
+}
+
+.taf-v3-labels {
+  display: flex;
+  flex-direction: column;
+  padding: 10px 0 15px; /* Match grid padding */
+}
+
+.taf-v3-label {
+  height: 40px; /* Base height for sync */
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding-right: 12px;
+  font-size: 0.8rem;
+  font-weight: 800;
+  color: var(--muted);
+  border-right: 2px solid var(--line);
+}
+
+/* Row-specific height overrides to match data content */
+.taf-v3-label:nth-child(1) { height: 30px; } /* Time */
+.taf-v3-label:nth-child(2) { height: 50px; } /* Weather Icon */
+.taf-v3-label:nth-child(3) { height: 30px; } /* Wind */
+.taf-v3-label:nth-child(4) { height: 30px; } /* Ceiling */
+.taf-v3-label:nth-child(5) { height: 30px; } /* Visibility */
+
+.taf-v3-grid {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  max-width: 100%;
+  padding: 10px 2px 15px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--line) transparent;
+  box-sizing: border-box;
+}
+
+.taf-v3-card {
+  min-width: 100px;
+  background: #f8fafc;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  overflow: hidden;
+}
+
+.taf-v3-card > div {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-bottom: 1px solid rgba(0,0,0,0.03);
+}
+
+.taf-v3-data-time { height: 30px; font-size: 0.75rem; font-weight: 800; color: var(--accent); background: #f1f5f9; }
+.taf-v3-data-icon { height: 50px; }
+.taf-v3-data-icon .weather-icon-wrapper span { font-size: 1.8rem !important; }
+.taf-v3-data-wind { height: 30px; font-size: 0.85rem; font-weight: 700; }
+.taf-v3-data-ceil { height: 30px; font-size: 0.85rem; font-weight: 600; color: var(--accent); }
+.taf-v3-data-vis { height: 30px; font-size: 0.8rem; font-weight: 600; color: var(--muted); border-bottom: none !important; }

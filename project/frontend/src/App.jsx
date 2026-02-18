@@ -35,6 +35,18 @@ export default function App() {
   const [activeAlerts, setActiveAlerts] = useState([]);
   const [showSettings, setShowSettings] = useState(false);
 
+  // UI Version states
+  const [metarVersion, setMetarVersion] = useState(() => localStorage.getItem("metar_version") || "v1");
+  const [tafVersion, setTafVersion] = useState(() => localStorage.getItem("taf_version") || "v1");
+
+  useEffect(() => {
+    localStorage.setItem("metar_version", metarVersion);
+  }, [metarVersion]);
+
+  useEffect(() => {
+    localStorage.setItem("taf_version", tafVersion);
+  }, [tafVersion]);
+
   const prevDataRef = useRef(null);
   const pollingRef = useRef(null);
 
@@ -157,6 +169,10 @@ export default function App() {
   function handleSettingsChange() {
     // 설정 변경 시 alertDefaults를 다시 로드하여 resolveSettings가 새 값을 반영
     loadAlertDefaults().then((defaults) => setAlertDefaults({ ...defaults }));
+    
+    // UI 버전 상태도 localStorage에서 다시 읽어옴
+    setMetarVersion(localStorage.getItem("metar_version") || "v1");
+    setTafVersion(localStorage.getItem("taf_version") || "v1");
   }
 
   const settings = alertDefaults ? resolveSettings(alertDefaults) : null;
@@ -234,16 +250,29 @@ export default function App() {
             )}
             <section className="dashboard-layout">
               <div className="primary-column">
-                <section className="split">
-                  <MetarCard metarData={data.metar} icao={selectedAirport} />
+                <div className="dashboard-top-row">
+                  <MetarCard 
+                    metarData={data.metar} 
+                    icao={selectedAirport} 
+                    version={metarVersion} 
+                    onVersionToggle={setMetarVersion} 
+                  />
                   <WarningList
                     warningData={data.warning}
                     icao={selectedAirport}
                     warningTypes={data.warningTypes}
                   />
-                </section>
-                <TafTimeline tafData={data.taf} icao={selectedAirport} />
+                </div>
+                <div className="dashboard-bottom-row">
+                  <TafTimeline 
+                    tafData={data.taf} 
+                    icao={selectedAirport} 
+                    version={tafVersion} 
+                    onVersionToggle={setTafVersion} 
+                  />
+                </div>
               </div>
+
               <div className="secondary-column">
                 <LightningMap
                   lightningData={data.lightning}

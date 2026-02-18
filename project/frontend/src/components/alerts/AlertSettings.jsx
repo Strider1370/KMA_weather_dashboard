@@ -33,6 +33,10 @@ export default function AlertSettings({ defaults, onClose, onSettingsChange }) {
   const [volume, setVolume] = useState(current.dispatchers.sound.volume);
   const [marqueeEnabled, setMarqueeEnabled] = useState(current.dispatchers.marquee.enabled);
 
+  // UI Version states (local to settings modal)
+  const [metarVersion, setMetarVersion] = useState(() => localStorage.getItem("metar_version") || "v1");
+  const [tafVersion, setTafVersion] = useState(() => localStorage.getItem("taf_version") || "v1");
+
   const [triggers, setTriggers] = useState(() => {
     const t = {};
     for (const [id, cfg] of Object.entries(current.triggers)) {
@@ -75,12 +79,19 @@ export default function AlertSettings({ defaults, onClose, onSettingsChange }) {
       triggers,
     };
     savePersonalSettings(overrides);
+    
+    // Save UI versions to localStorage
+    localStorage.setItem("metar_version", metarVersion);
+    localStorage.setItem("taf_version", tafVersion);
+    
     onSettingsChange?.(overrides);
     onClose();
   }
 
   function handleReset() {
     clearPersonalSettings();
+    localStorage.removeItem("metar_version");
+    localStorage.removeItem("taf_version");
     onSettingsChange?.(null);
     onClose();
   }
@@ -89,11 +100,31 @@ export default function AlertSettings({ defaults, onClose, onSettingsChange }) {
     <div className="alert-settings-overlay" onClick={onClose}>
       <div className="alert-settings-modal" onClick={(e) => e.stopPropagation()}>
         <div className="alert-settings-header">
-          <h2>알림 설정</h2>
+          <h2>설정</h2>
           <button className="alert-popup-close" onClick={onClose}>&times;</button>
         </div>
 
         <div className="alert-settings-body">
+          {/* Display Settings */}
+          <fieldset className="alert-settings-section">
+            <legend>디스플레이 설정</legend>
+            <label className="alert-settings-row">
+              <span>METAR 표시 모드</span>
+              <select value={metarVersion} onChange={(e) => setMetarVersion(e.target.value)}>
+                <option value="v1">텍스트 리스트 (기본)</option>
+                <option value="v2">사이드바 요약 (시각화)</option>
+              </select>
+            </label>
+            <label className="alert-settings-row">
+              <span>TAF 표시 모드</span>
+              <select value={tafVersion} onChange={(e) => setTafVersion(e.target.value)}>
+                <option value="v1">상세 테이블 (기본)</option>
+                <option value="v2">심각도 타임라인 (컬러 바)</option>
+                <option value="v3">시간별 상세 그리드 (아이콘)</option>
+              </select>
+            </label>
+          </fieldset>
+
           {/* Global */}
           <fieldset className="alert-settings-section">
             <legend>전체 설정</legend>

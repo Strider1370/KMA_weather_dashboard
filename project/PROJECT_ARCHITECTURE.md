@@ -195,19 +195,40 @@ server.js
 - 좌측(METAR/TAF/WARNING) + 우측(Lightning/Radar) 레이아웃
 
 ### frontend/src/components/MetarCard.jsx
-- 카드 타이틀: `METAR/SPECI`
-- 본문 상단에 `Report Type` 및 `Issue Time` 표시
-- `report_type` 미존재 시 `metarData.type` 또는 `METAR`로 fallback
+- **v1 (텍스트)**: 기존의 검정색 로그 배경 상세 텍스트 표출.
+- **v2 (사이드바)**: 아이콘, 풍향 화살표, 수치 그리드 기반의 요약 시각화.
+- 공통: 280px 고정 높이 적용으로 레이아웃 안정성 확보.
 
-### frontend/src/components/RadarPanel.jsx
-- 타임라인 왼쪽에 재생/일시정지 아이콘 버튼(`▶`/`❚❚`) 배치
-- 헤더 우측에 `재생시간` 칩 및 `- / +` 컨트롤로 프레임 간격 조절(`0.1~2.0초`)
-- 타임라인 하단에 현재 프레임 시각(`HH:mm`) 표시
-- 일시정지 상태에서도 최신 프레임 자동 반영(자동갱신 고정)
+### frontend/src/components/TafTimeline.jsx
+- **v1 (테이블)**: 12시간 단위 상세 데이터 표.
+- **v2 (타임라인)**: 연속 데이터 그룹화(`groupElementsByValue`) 기반의 색상 바 시각화. 날짜 변경선 표시.
+- **v3 (그리드)**: 시간대별 카드 형태 나열. 항목 레이블 왼쪽 고정.
+- 공통: 풍향 화살표(+180도 보정) 및 Gust(돌풍) 정보 포함.
+
+### frontend/src/utils/visual-mapper.js
+- 데이터 기반 아이콘 키 산출 및 임계값(Threshold)에 따른 색상 매핑 로직 통합.
+- 영하 온도 표시 정규화 (M -> -).
 
 ## 6. 파일 의존성 맵
 
 ### 백엔드 런타임 의존성
+... (생략) ...
+
+### 서버/프론트 의존성
+
+```text
+frontend/src/App.jsx
+├─ ./utils/visual-mapper (신규: 시각화 로직)
+├─ ./components/WeatherIcon (신규: 아이콘 렌더러)
+└─ ./components/* (v1/v2/v3 멀티 버전 지원)
+```
+
+## 7. 레이아웃 구조 (Tiered Layout)
+
+대시보드는 요소 간 간섭을 최소화하기 위해 층(Tier) 구조를 채택함:
+- **1층 (Top Row)**: METAR 카드와 공항경보가 가로로 나란히 배치 (높이 동기화).
+- **2층 (Bottom Row)**: TAF 예보가 가로 전체 너비 사용.
+- **우측 컬럼**: 낙뢰 지도와 레이더 패널 수직 배치.
 
 ```text
 backend/src/index.js
