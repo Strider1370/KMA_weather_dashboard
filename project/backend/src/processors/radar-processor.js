@@ -133,52 +133,65 @@ function updateLatestJson(radarDir) {
   return payload;
 }
 
-async function downloadLatestAvailable(radarDir) {
-  const candidates = getCandidateTms();
-  let lastTriedTm = null;
+async function syncLatestImages(radarDir) {
+  const maxCount = config.radar.max_images;
+  const interval = config.radar.interval_minutes;
+  const delay = config.radar.delay_minutes;
 
-  for (const tm of candidates) {
-    lastTriedTm = tm;
-    const filename = `RDR_${tm}.png`;
-    const filePath = path.join(radarDir, filename);
-    if (fs.existsSync(filePath)) {
-      return { downloaded: false, tm, reason: "exists" };
-    }
+  // 1. 최신 가능 시점 계산
+  const nowUtc = new Date();
+  const nowKst = new Date(nowUtc.getTime() + 9 * 60 * 60 * 1000);
+  nowKst.setUTCMinutes(nowKst.getUTCMinutes() - delay);
+  const minute = Math.floor(nowKst.getUTCMinutes() / interval) * interval;
+  nowKst.setUTCMinutes(minute, 0, 0);
 
+  // 2. 동기화가 필요한 36개 타임스탬프 목록 생성 (최신순)
+  const targetTms = [];
+  for (let i = 0; i < maxCount; i++) {
+    const t = new Date(nowKst.getTime() - i * interval * 60 * 1000);
+    targetTms.push(formatKstTm(t));
+  }
+
+  const targetFilenames = new Set(targetTms.map(tm => `RDR_${tm}.png`));
+  let downloadedCount = 0;
+  let skippedCount = 0;
+  let failedCount = 0;
+
+  // 3. 없는 파일만 골라 다운로드 (과거 데이터부터 채우기 위해 역순으로 처리)
+  const tmsToDownload = targetTms.filter(tm => !fs.existsSync(path.join(radarDir, `RDR_${tm}.png`))).reverse();
+
+  for (const tm of tmsToDownload) {
     const buffer = await fetchRadarImage(tm);
     if (buffer) {
-      fs.writeFileSync(filePath, buffer);
-      return { downloaded: true, tm, filename };
+      fs.writeFileSync(path.join(radarDir, `RDR_${tm}.png`), buffer);
+      downloadedCount++;
+      // API 과부하 방지를 위한 짧은 휴식
+      if (tmsToDownload.length > 5) await sleep(200);
+    } else {
+      failedCount++;
     }
   }
 
-  return { downloaded: false, tm: lastTriedTm, reason: "not_found" };
-}
-
-async function backfillIfEmpty(radarDir) {
-  const existing = fs.readdirSync(radarDir).filter((f) => /^RDR_\d{12}\.png$/.test(f));
-  if (existing.length > 0) return 0;
-
-  const endTm = getCandidateTms()[0];
-  const end = parseKstTm(endTm);
-  if (!end) return 0;
-
-  let added = 0;
-  for (let i = config.radar.max_images - 1; i >= 0; i -= 1) {
-    const tUtc = new Date(end.getTime() - i * 5 * 60 * 1000);
-    const tKst = new Date(tUtc.getTime() + 9 * 60 * 60 * 1000);
-    const tm = formatKstTm(tKst);
-    const filename = `RDR_${tm}.png`;
-    const filePath = path.join(radarDir, filename);
-    if (fs.existsSync(filePath)) continue;
-    const buffer = await fetchRadarImage(tm);
-    if (buffer) {
-      fs.writeFileSync(filePath, buffer);
-      added += 1;
+  // 4. 최신 36개 목록에 없는 오래된 파일 삭제
+  const allFiles = fs.readdirSync(radarDir).filter(f => /^RDR_\d{12}\.png$/.test(f));
+  let deletedCount = 0;
+  for (const file of allFiles) {
+    if (!targetFilenames.has(file)) {
+      try {
+        fs.unlinkSync(path.join(radarDir, file));
+        deletedCount++;
+      } catch (err) {
+        console.warn(`Failed to delete old radar file ${file}:`, err.message);
+      }
     }
-    await sleep(300);
   }
-  return added;
+
+  return {
+    downloaded: downloadedCount,
+    failed: failedCount,
+    deleted: deletedCount,
+    latestTm: targetTms[0]
+  };
 }
 
 async function process() {
@@ -187,19 +200,15 @@ async function process() {
   }
 
   const radarDir = ensureRadarDir();
-  const backfilled = await backfillIfEmpty(radarDir);
-  const downloadResult = await downloadLatestAvailable(radarDir);
-
-  cleanupOldImages(radarDir);
+  const syncResult = await syncLatestImages(radarDir);
   const latest = updateLatestJson(radarDir);
 
   return {
     type: "radar",
-    saved: downloadResult.downloaded || backfilled > 0,
+    saved: syncResult.downloaded > 0,
     imageCount: latest.image_count,
-    latestTm: downloadResult.tm || latest.images[latest.images.length - 1]?.tm || null,
-    downloaded: downloadResult.downloaded,
-    backfilled
+    latestTm: syncResult.latestTm,
+    syncSummary: syncResult
   };
 }
 

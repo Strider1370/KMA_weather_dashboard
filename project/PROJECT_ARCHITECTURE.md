@@ -239,10 +239,11 @@ backend/src/processors/lightning-processor.js
 ├─ ../parsers/lightning-parser
 └─ ../store
 
-backend/src/processors/radar-processor.js
-├─ fs
-├─ path
-└─ ../config
+### backend/src/processors/radar-processor.js
+- 현재 시점(`delay_minutes` 반영)부터 과거로 36개(`max_images`)의 타임스탬프 목록 생성
+- 로컬에 존재하지 않는 이미지만 선별적으로 다운로드하여 데이터 공백 자동 메움
+- 목록에 없는 오래된 파일 자동 삭제 및 `latest.json` 갱신
+- API 과부하 방지를 위해 대량 다운로드 시 짧은 지연시간(`sleep`) 적용
 
 backend/src/api-client.js
 └─ ./config
