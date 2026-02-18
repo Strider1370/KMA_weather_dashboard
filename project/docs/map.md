@@ -1,299 +1,229 @@
 # KMA Aviation Weather Dashboard
-## 낙뢰 맵 해안선·행정동 경계 표시 — 구현 설계 문서
+## 낙뢰 맵 행정동/시군구 경계 표시 — 구현 문서
 
 ---
 
 ## 개요
 
-현재 LightningMap 컴포넌트에 해안선과 행정동 경계를 SVG 레이어로 덧씌우는 작업이다.  
-기존 `toCanvasXY` 좌표 변환 함수를 그대로 재사용하며, 공항 ARP 기준 반경 32km 이내의 지도만 표시한다.
+`LightningMap` 컴포넌트에 행정동/시군구 경계를 SVG 레이어로 덧씌워 위치 맥락을 제공한다.
+
+- 행정동 폴리곤이 해안선도 경계로 포함하므로, `fill="#1e2d3d"` (육지색) + `stroke="#00cc66"` 으로 그리면 육지/해양 구분 + 행정동/시군구 경계 + 해안선이 동시에 표시된다. `coastline.geojson`은 사용하지 않는다.
+- 경계 단위는 설정에서 **시군구**(기본) / **행정동**(상세) 선택 가능.
+- 지도는 32km 원이 아닌 **정사각형 패널 전체**에 표시 (모서리까지 ≈45km 커버).
+- 공항 아이콘(✈)은 `shared/airports.js`의 `runway_hdg` 기준으로 회전.
 
 ---
 
 ## 대상 공항
 
-| ICAO | 공항명 | lat | lon |
-|------|--------|-----|-----|
-| RKSI | 인천국제공항 | 37.4602 | 126.4407 |
-| RKSS | 김포국제공항 | 37.5583 | 126.7906 |
-| RKPC | 제주국제공항 | 33.5113 | 126.4926 |
-| RKPU | 울산공항 | 35.5935 | 129.3520 |
-| RKJB | 무안국제공항 | 34.9914 | 126.3828 |
-| RKJY | 여수공항 | 34.8423 | 127.6167 |
-| RKNY | 양양국제공항 | 38.0613 | 128.6692 |
-| RKPK | 김해국제공항 | 35.1795 | 128.9380 |
+`shared/airports.js`에서 `mock_only: true`가 아닌 공항 8개를 자동 로드한다.
+하드코딩된 좌표를 사용하지 않는다.
+
+| ICAO | 공항명 | runway_hdg |
+|------|--------|-----------|
+| RKSI | 인천국제공항 | 150° |
+| RKSS | 김포국제공항 | 140° |
+| RKPC | 제주국제공항 | 70° |
+| RKPK | 김해국제공항 | 180° |
+| RKJB | 무안국제공항 | 10° |
+| RKNY | 양양국제공항 | 150° |
+| RKPU | 울산공항 | 180° |
+| RKJY | 여수공항 | 170° |
 
 ---
 
-## 최종 파일 구조
+## 파일 구조
 
 ```
 project/
-├── public/
-│   └── geo/
-│       ├── RKSI_admdong.geojson
-│       ├── RKSI_coastline.geojson
-│       ├── RKSS_admdong.geojson
-│       ├── RKSS_coastline.geojson
-│       └── ... (공항별 16개 파일)
-├── scripts/
-│   └── sliceGeoJSON.js        ← 빌드 전 1회 실행
-├── src/
-│   ├── components/
-│   │   └── LightningMap.jsx
-│   └── utils/
-│       └── geoToSVG.js
-├── map.geojson                ← 원본 행정동 (33MB)
-└── coastline.geojson          ← mapshaper로 추출한 해안선 (3MB)
+├── map.geojson                          ← 원본 행정동 (33MB, git 제외)
+├── shared/
+│   └── airports.js                      ← ARP 좌표 + runway_hdg 포함
+├── backend/
+│   └── test/
+│       └── sliceGeoJSON.js              ← 빌드 전 1회 실행 스크립트
+├── frontend/
+│   ├── public/
+│   │   └── geo/
+│   │       ├── RKSI_admdong.geojson     ← 행정동 (619 features)
+│   │       ├── RKSI_sigungu.geojson     ← 시군구 dissolved (50 features)
+│   │       └── ... (공항별 각 2개, 총 16개)
+│   └── src/
+│       ├── components/
+│       │   ├── LightningMap.jsx
+│       │   └── alerts/
+│       │       └── AlertSettings.jsx    ← 경계 단위 설정 포함
+│       └── utils/
+│           ├── helpers.js               ← toCanvasXY export 포함
+│           └── geoToSVG.js              ← GeoJSON → SVG path 변환
+└── package.json                         ← @turf/union devDependency
 ```
 
 ---
 
-## 1단계: GeoJSON 파일 준비 (완료)
+## 슬라이스 스크립트
 
-`map.geojson`(33MB)과 `coastline.geojson`(3MB)이 이미 준비된 상태.
+**위치**: `backend/test/sliceGeoJSON.js`
+**실행**: `project/` 디렉토리에서 `node backend/test/sliceGeoJSON.js`
 
-| 파일 | 역할 | 비고 |
-|------|------|------|
-| `map.geojson` | 행정동 경계 레이어 | 원본 그대로 사용 |
-| `coastline.geojson` | 해안선 레이어 | map.geojson에서 `-dissolve -lines`로 추출 |
+### 동작
 
-> simplify 생략. 공항별 32km bbox로 잘라서 쓰기 때문에 원본 해상도가 더 좋다.
+1. `shared/airports.js`에서 `mock_only`가 아닌 공항 목록 로드
+2. 각 공항 ARP 기준 **48km bbox** (32km × PADDING 1.5) 로 `map.geojson` 필터링
+   (정사각형 패널 모서리 ≈45km 커버를 위해 padding 1.5 사용)
+3. `_admdong.geojson`: bbox 내 행정동 feature 그대로 저장
+4. `_sigungu.geojson`: `properties.sgg` (5자리 시군구 코드) 기준으로 `@turf/union` dissolve 후 저장
 
----
+### @turf/union v7 API
 
-## 2단계: 공항별 GeoJSON 슬라이스 스크립트
-
-전국 GeoJSON을 통째로 브라우저에서 불러오면 너무 크다.  
-빌드 전 1회 실행하는 Node.js 스크립트로 공항별 32km bbox 파일을 미리 잘라 `public/geo/`에 저장한다.
-
-### scripts/sliceGeoJSON.js
+v7에서 API가 변경됨 — `union(fc)` 형태로 `FeatureCollection`을 단일 인자로 받는다.
 
 ```js
-const fs = require('fs');
-const path = require('path');
-
-const AIRPORTS = {
-  RKSI: { lat: 37.4602, lon: 126.4407 },
-  RKSS: { lat: 37.5583, lon: 126.7906 },
-  RKPC: { lat: 33.5113, lon: 126.4926 },
-  RKPU: { lat: 35.5935, lon: 129.3520 },
-  RKJB: { lat: 34.9914, lon: 126.3828 },
-  RKJY: { lat: 34.8423, lon: 127.6167 },
-  RKNY: { lat: 38.0613, lon: 128.6692 },
-  RKPK: { lat: 35.1795, lon: 128.9380 },
-};
-
-const RANGE_KM = 32;
-const PADDING = 1.2; // 여유 20%
-
-function getBbox(lat, lon, km) {
-  const dLat = (km * PADDING) / 111.32;
-  const dLon = (km * PADDING) / (111.32 * Math.cos(lat * Math.PI / 180));
-  return { minLat: lat-dLat, maxLat: lat+dLat, minLon: lon-dLon, maxLon: lon+dLon };
-}
-
-function flatCoords(geometry) {
-  const t = geometry.type;
-  if (t === 'LineString')      return geometry.coordinates;
-  if (t === 'MultiLineString') return geometry.coordinates.flat(1);
-  if (t === 'Polygon')         return geometry.coordinates.flat(1);
-  if (t === 'MultiPolygon')    return geometry.coordinates.flat(2);
-  return [];
-}
-
-function sliceGeoJSON(geojson, bbox) {
-  return {
-    type: 'FeatureCollection',
-    features: geojson.features.filter(f =>
-      flatCoords(f.geometry).some(([lon, lat]) =>
-        lon >= bbox.minLon && lon <= bbox.maxLon &&
-        lat >= bbox.minLat && lat <= bbox.maxLat
-      )
-    )
-  };
-}
-
-// 실행
-const outDir = path.join(__dirname, '../public/geo');
-fs.mkdirSync(outDir, { recursive: true });
-
-console.log('Loading GeoJSON files...');
-const admDong  = JSON.parse(fs.readFileSync('map.geojson', 'utf8'));
-const coastline = JSON.parse(fs.readFileSync('coastline.geojson', 'utf8'));
-
-for (const [icao, arp] of Object.entries(AIRPORTS)) {
-  const bbox = getBbox(arp.lat, arp.lon, RANGE_KM);
-
-  const dongSlice  = sliceGeoJSON(admDong, bbox);
-  const coastSlice = sliceGeoJSON(coastline, bbox);
-
-  fs.writeFileSync(path.join(outDir, `${icao}_admdong.geojson`),   JSON.stringify(dongSlice));
-  fs.writeFileSync(path.join(outDir, `${icao}_coastline.geojson`), JSON.stringify(coastSlice));
-
-  console.log(`${icao}: dong=${dongSlice.features.length} coast=${coastSlice.features.length}`);
-}
-console.log('Done! → public/geo/');
+const fc = { type: 'FeatureCollection', features: group };
+const result = union(fc); // v7 API (v6의 union(feat1, feat2) 아님)
 ```
 
-### 실행
+`@turf/union`은 `devDependencies`에만 추가 (빌드 스크립트 전용):
 
-`map.geojson`과 `coastline.geojson`이 프로젝트 루트에 있는 상태에서:
-
-```bash
-node scripts/sliceGeoJSON.js
+```json
+"devDependencies": {
+  "@turf/union": "^7.3.4"
+}
 ```
 
-> 빌드 전 한 번만 실행. 공항 ARP가 바뀌지 않는 한 재실행 불필요.
+### 생성 결과 (기준)
+
+| ICAO | 행정동 | 시군구 |
+|------|--------|--------|
+| RKSI | 619 | 50 |
+| RKSS | 1097 | 78 |
+| RKPC | 43 | 2 |
+| RKPK | 425 | 36 |
+| RKJB | 220 | 21 |
+| RKNY | 57 | 9 |
+| RKPU | 260 | 24 |
+| RKJY | 181 | 17 |
+
+> 빌드 전 한 번만 실행. 공항 ARP나 경계 데이터가 바뀌지 않는 한 재실행 불필요.
 
 ---
 
-## 3단계: GeoJSON → SVG Path 변환 유틸
+## 좌표 변환: `toCanvasXY`
 
-기존 `toCanvasXY` 함수를 재사용해 GeoJSON 좌표를 SVG 픽셀로 변환한다.
-
-### src/utils/geoToSVG.js
+`frontend/src/utils/helpers.js`에 export되어 있다. `LightningMap.jsx`와 `geoToSVG.js` 모두 이 함수를 사용한다.
 
 ```js
-import { toCanvasXY } from './helpers'; // 기존 함수 재사용
+export function toCanvasXY(point, arp, size, rangeKm) {
+  const center = size / 2;
+  const scale = center / rangeKm;
+  const dLonKm = (point.lon - arp.lon) * 111.32 * Math.cos((arp.lat * Math.PI) / 180);
+  const dLatKm = (point.lat - arp.lat) * 111.32;
+  return { x: center + dLonKm * scale, y: center - dLatKm * scale };
+}
+```
+
+---
+
+## GeoJSON → SVG Path 변환 유틸
+
+**위치**: `frontend/src/utils/geoToSVG.js`
+
+```js
+import { toCanvasXY } from './helpers';
 
 export function geoToSVGPaths(geojson, arp, size, rangeKm) {
   const results = [];
-
   geojson.features.forEach((feature, fi) => {
     const geom = feature.geometry;
-    let rings = [];
-
-    if (geom.type === 'LineString')       rings = [geom.coordinates];
-    else if (geom.type === 'MultiLineString') rings = geom.coordinates;
-    else if (geom.type === 'Polygon')     rings = geom.coordinates;
-    else if (geom.type === 'MultiPolygon')  rings = geom.coordinates.flat(1);
-
+    let rings = geom.type === 'Polygon' ? geom.coordinates
+               : geom.type === 'MultiPolygon' ? geom.coordinates.flat(1) : [];
     rings.forEach((ring, ri) => {
       const d = ring.map((coord, i) => {
-        const { x, y } = toCanvasXY(
-          { lon: coord[0], lat: coord[1] },
-          arp, size, rangeKm
-        );
+        const { x, y } = toCanvasXY({ lon: coord[0], lat: coord[1] }, arp, size, rangeKm);
         return `${i === 0 ? 'M' : 'L'}${x.toFixed(1)},${y.toFixed(1)}`;
-      }).join(' ');
-
+      }).join(' ') + ' Z';
       results.push({ key: `${fi}-${ri}`, d });
     });
   });
-
   return results;
 }
 ```
 
 ---
 
-## 4단계: LightningMap.jsx 수정
+## LightningMap.jsx 구조
 
-### 추가할 state / useEffect
+### Props
 
 ```jsx
-const [admDong,   setAdmDong]   = useState(null);
-const [coastline, setCoastline] = useState(null);
+function LightningMap({ lightningData, selectedAirport, airports, boundaryLevel = 'sigungu' })
+```
 
+- `airports`: `shared/airports.js` 공항 목록 (App.jsx에서 전달, `runway_hdg` 조회용)
+- `boundaryLevel`: `'sigungu'` | `'admdong'` (AlertSettings에서 설정, localStorage 경유)
+
+### 경계 GeoJSON 로드
+
+```js
 useEffect(() => {
   if (!selectedAirport) return;
   setAdmDong(null);
-  setCoastline(null);
-  Promise.all([
-    fetch(`/geo/${selectedAirport}_admdong.geojson`).then(r => r.json()),
-    fetch(`/geo/${selectedAirport}_coastline.geojson`).then(r => r.json()),
-  ]).then(([dong, coast]) => {
-    setAdmDong(dong);
-    setCoastline(coast);
-  });
-}, [selectedAirport]);
+  fetch(`/geo/${selectedAirport}_${boundaryLevel}.geojson`)
+    .then(r => r.json())
+    .then(setAdmDong)
+    .catch(() => {});
+}, [selectedAirport, boundaryLevel]);
 ```
 
 ### SVG 레이어 순서
 
-SVG는 나중에 그린 요소가 위에 표시된다. 아래 순서를 반드시 지킨다.
+| # | 레이어 | 비고 |
+|---|--------|------|
+| 1 | `<rect>` 배경 | `fill="#131a24"` (바다색) |
+| 2 | `<defs><clipPath>` | `<rect rx="14">` — 정사각형 패널 전체 |
+| 3 | 행정동/시군구 경계 | `fill="#1e2d3d"` (육지), `stroke="#00cc66"`, `strokeOpacity="0.4"` |
+| 4 | 존 원 (8/16/32km) | 점선 원 |
+| 5 | 공항 아이콘 ✈ | `rotate(runway_hdg - 90, center, center)` |
+| 6 | 낙뢰 마커 | 십자 선 |
 
-1. `<rect>` — 검은 배경
-2. 행정동 경계 (clipPath 적용)
-3. 해안선 (clipPath 적용)
-4. 존 원 (8 / 16 / 32km)
-5. 낙뢰 마커
-6. 공항 아이콘 ✈
+> clipPath를 원(circle)이 아닌 `rect rx="14"`로 지정해 정사각형 패널 전체에 지도를 표시한다.
 
-### SVG 코드
+### 공항 아이콘 회전
+
+✈ 이모지는 기본 방향이 동쪽(90°)이므로 `runway_hdg - 90`을 적용한다.
 
 ```jsx
-<svg viewBox={`0 0 ${size} ${size}`} ...>
-  <defs>
-    <clipPath id="map-clip">
-      <circle cx={center} cy={center} r={center} />
-    </clipPath>
-  </defs>
-
-  {/* 1. 배경 */}
-  <rect x="0" y="0" width={size} height={size} rx="14" fill="#131a24" />
-
-  {/* 2. 행정동 경계 */}
-  <g clipPath="url(#map-clip)">
-    {admDong && arp && geoToSVGPaths(admDong, arp, size, rangeKm).map(({ key, d }) => (
-      <path key={key} d={d} fill="none"
-        stroke="#1e3a4a" strokeWidth="0.4" strokeOpacity="0.7" />
-    ))}
-  </g>
-
-  {/* 3. 해안선 */}
-  <g clipPath="url(#map-clip)">
-    {coastline && arp && geoToSVGPaths(coastline, arp, size, rangeKm).map(({ key, d }) => (
-      <path key={key} d={d} fill="none"
-        stroke="#00cc66" strokeWidth="0.9" strokeOpacity="0.55" />
-    ))}
-  </g>
-
-  {/* 4. 존 원 */}
-  {ZONE_RADII_KM.map((zone) => ( /* 기존 코드 */ ))}
-
-  {/* 5. 낙뢰 */}
-  {visibleStrikes.map((strike, idx) => ( /* 기존 코드 */ ))}
-
-  {/* 6. 공항 아이콘 */}
-  <text x={center} y={center + 5} textAnchor="middle" fontSize="18" fill="#fff">✈</text>
-</svg>
+<text
+  transform={`rotate(${runwayHdg - 90}, ${center}, ${center})`}
+  ...
+>✈</text>
 ```
 
 ---
 
-## 레이어 스타일 가이드
+## 스타일 가이드
 
-| 레이어 | stroke | strokeWidth | strokeOpacity |
-|--------|--------|-------------|---------------|
-| 행정동 경계 | `#1e3a4a` (어두운 청록) | 0.4 | 0.7 |
-| 해안선 | `#00cc66` (레이더 그린) | 0.9 | 0.55 |
-
-> 해안선이 너무 강하면 `strokeOpacity` 0.4로 낮추고, 행정동이 안 보이면 0.9로 올리면서 조절한다.
+| 속성 | 값 | 비고 |
+|------|----|------|
+| fill | `#1e2d3d` | 육지색 (배경 `#131a24`이 바다색) |
+| stroke | `#00cc66` | 레이더 그린 |
+| strokeWidth | `0.6` | |
+| strokeOpacity | `0.4` | |
 
 ---
 
-## CLI 작업 순서 요약
+## 경계 단위 설정
 
-```bash
-# 1. 파일을 프로젝트 루트에 복사 (이미 완료)
-#    map.geojson / coastline.geojson
+**AlertSettings.jsx** (디스플레이 설정 섹션) → localStorage `lightning_boundary` 키 저장
+**App.jsx** → `boundaryLevel` state, `handleSettingsChange`에서 localStorage 읽어 갱신
+**LightningMap.jsx** → `boundaryLevel` prop으로 수신, useEffect 의존성에 포함
 
-# 2. 슬라이스 스크립트 생성
-mkdir -p scripts
-# scripts/sliceGeoJSON.js 파일 생성 (위 코드 그대로)
+`metar_version` / `taf_version` 과 동일한 localStorage 패턴을 따른다.
 
-# 3. 슬라이스 실행 → public/geo/ 에 16개 파일 생성
-node scripts/sliceGeoJSON.js
+---
 
-# 4. 유틸 파일 생성
-# src/utils/geoToSVG.js 생성 (위 코드 그대로)
+## 성능 고려사항
 
-# 5. LightningMap.jsx 수정
-#    - useState 2개 추가
-#    - useEffect 추가
-#    - SVG 레이어 추가
-
-# 6. 브라우저 확인 후 strokeOpacity / strokeWidth 조절
-```
+- `map.geojson` (33MB)은 **빌드 스크립트 전용**. 서버/클라이언트 런타임에 로드되지 않는다.
+- 슬라이스된 `_sigungu.geojson`은 공항당 수십 KB 수준으로, 브라우저 부하 없음.
+- 생성된 `frontend/public/geo/*.geojson`은 Vite dev 서버에서 `/geo/` 경로로 서빙되고, 프로덕션 빌드 시 `dist/geo/`로 복사된다.

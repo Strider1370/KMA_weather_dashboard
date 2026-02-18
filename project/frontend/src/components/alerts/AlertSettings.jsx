@@ -36,6 +36,7 @@ export default function AlertSettings({ defaults, onClose, onSettingsChange }) {
   // UI Version states (local to settings modal)
   const [metarVersion, setMetarVersion] = useState(() => localStorage.getItem("metar_version") || "v1");
   const [tafVersion, setTafVersion] = useState(() => localStorage.getItem("taf_version") || "v1");
+  const [lightningBoundary, setLightningBoundary] = useState(() => localStorage.getItem("lightning_boundary") || "sigungu");
 
   const [triggers, setTriggers] = useState(() => {
     const t = {};
@@ -83,6 +84,7 @@ export default function AlertSettings({ defaults, onClose, onSettingsChange }) {
     // Save UI versions to localStorage
     localStorage.setItem("metar_version", metarVersion);
     localStorage.setItem("taf_version", tafVersion);
+    localStorage.setItem("lightning_boundary", lightningBoundary);
     
     onSettingsChange?.(overrides);
     onClose();
@@ -92,6 +94,7 @@ export default function AlertSettings({ defaults, onClose, onSettingsChange }) {
     clearPersonalSettings();
     localStorage.removeItem("metar_version");
     localStorage.removeItem("taf_version");
+    localStorage.removeItem("lightning_boundary");
     onSettingsChange?.(null);
     onClose();
   }
@@ -121,6 +124,13 @@ export default function AlertSettings({ defaults, onClose, onSettingsChange }) {
                 <option value="v1">상세 테이블 (기본)</option>
                 <option value="v2">심각도 타임라인 (컬러 바)</option>
                 <option value="v3">시간별 상세 그리드 (아이콘)</option>
+              </select>
+            </label>
+            <label className="alert-settings-row">
+              <span>낙뢰 지도 경계</span>
+              <select value={lightningBoundary} onChange={(e) => setLightningBoundary(e.target.value)}>
+                <option value="sigungu">시군구 (기본)</option>
+                <option value="admdong">행정동 (상세)</option>
               </select>
             </label>
           </fieldset>

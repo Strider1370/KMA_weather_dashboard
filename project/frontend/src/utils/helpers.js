@@ -24,6 +24,14 @@ export function severityLabel(level) {
   return "Normal";
 }
 
+export function toCanvasXY(point, arp, size, rangeKm) {
+  const center = size / 2;
+  const scale = center / rangeKm;
+  const dLonKm = (point.lon - arp.lon) * 111.32 * Math.cos((arp.lat * Math.PI) / 180);
+  const dLatKm = (point.lat - arp.lat) * 111.32;
+  return { x: center + dLonKm * scale, y: center - dLatKm * scale };
+}
+
 export function warningMeta(typeCode, warningTypes) {
   const raw = String(typeCode || "").trim();
   const stripped = raw.replace(/^0+/, "");

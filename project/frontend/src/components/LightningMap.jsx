@@ -1,5 +1,6 @@
-import { useMemo, useState } from "react";
-import { safe } from "../utils/helpers";
+import { useMemo, useState, useEffect } from "react";
+import { safe, toCanvasXY } from "../utils/helpers";
+import { geoToSVGPaths } from "../utils/geoToSVG";
 
 const TIME_OPTIONS = [
   { label: "10m", value: 10 },
@@ -25,23 +26,26 @@ function getStrikeColor(strikeTimeIso) {
   return { color: "#999999", opacity: 0.25 };
 }
 
-function toCanvasXY(strike, arp, size, rangeKm) {
-  const center = size / 2;
-  const scale = center / rangeKm;
-  const dLonKm = (strike.lon - arp.lon) * 111.32 * Math.cos((arp.lat * Math.PI) / 180);
-  const dLatKm = (strike.lat - arp.lat) * 111.32;
-  return {
-    x: center + dLonKm * scale,
-    y: center - dLatKm * scale,
-  };
-}
-
-export default function LightningMap({ lightningData, selectedAirport }) {
+export default function LightningMap({ lightningData, selectedAirport, airports, boundaryLevel = 'sigungu' }) {
   const [timeRangeMin, setTimeRangeMin] = useState(30);
   const size = 420;
   const center = size / 2;
   const rangeKm = 32;
   const radiusScale = center / rangeKm;
+
+  const [admDong, setAdmDong] = useState(null);
+
+  useEffect(() => {
+    if (!selectedAirport) return;
+    setAdmDong(null);
+    fetch(`/geo/${selectedAirport}_${boundaryLevel}.geojson`)
+      .then(r => r.json())
+      .then(setAdmDong)
+      .catch(() => {});
+  }, [selectedAirport, boundaryLevel]);
+
+  const airportMeta = airports?.find(a => a.icao === selectedAirport) || null;
+  const runwayHdg = airportMeta?.runway_hdg ?? 0;
 
   const airportData = lightningData?.airports?.[selectedAirport] || null;
   const arp = airportData?.arp || null;
@@ -110,7 +114,19 @@ export default function LightningMap({ lightningData, selectedAirport }) {
             role="img"
             aria-label={`Lightning map for ${selectedAirport}`}
           >
+            <defs>
+              <clipPath id={`map-clip-${selectedAirport}`}>
+                <rect x="0" y="0" width={size} height={size} rx="14" />
+              </clipPath>
+            </defs>
             <rect x="0" y="0" width={size} height={size} rx="14" fill="#131a24" />
+            {admDong && arp && (
+              <g clipPath={`url(#map-clip-${selectedAirport})`}>
+                {geoToSVGPaths(admDong, arp, size, rangeKm).map(({ key, d }) => (
+                  <path key={key} d={d} fill="#1e2d3d" stroke="#00cc66" strokeWidth="0.6" strokeOpacity="0.4" />
+                ))}
+              </g>
+            )}
             {ZONE_RADII_KM.map((zone) => (
               <g key={zone.zone}>
                 <circle
@@ -133,7 +149,15 @@ export default function LightningMap({ lightningData, selectedAirport }) {
                 </text>
               </g>
             ))}
-            <text x={center} y={center + 5} textAnchor="middle" fontSize="18" fill="#ffffff">
+            <text
+              x={center}
+              y={center}
+              textAnchor="middle"
+              dominantBaseline="central"
+              fontSize="18"
+              fill="#ffffff"
+              transform={`rotate(${runwayHdg - 90}, ${center}, ${center})`}
+            >
               ✈
             </text>
 

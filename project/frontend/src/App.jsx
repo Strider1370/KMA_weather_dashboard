@@ -38,6 +38,7 @@ export default function App() {
   // UI Version states
   const [metarVersion, setMetarVersion] = useState(() => localStorage.getItem("metar_version") || "v1");
   const [tafVersion, setTafVersion] = useState(() => localStorage.getItem("taf_version") || "v1");
+  const [boundaryLevel, setBoundaryLevel] = useState(() => localStorage.getItem("lightning_boundary") || "sigungu");
 
   useEffect(() => {
     localStorage.setItem("metar_version", metarVersion);
@@ -173,6 +174,7 @@ export default function App() {
     // UI 버전 상태도 localStorage에서 다시 읽어옴
     setMetarVersion(localStorage.getItem("metar_version") || "v1");
     setTafVersion(localStorage.getItem("taf_version") || "v1");
+    setBoundaryLevel(localStorage.getItem("lightning_boundary") || "sigungu");
   }
 
   const settings = alertDefaults ? resolveSettings(alertDefaults) : null;
@@ -277,6 +279,8 @@ export default function App() {
                 <LightningMap
                   lightningData={data.lightning}
                   selectedAirport={selectedAirport}
+                  airports={data.airports}
+                  boundaryLevel={boundaryLevel}
                 />
                 <RadarPanel
                   radarData={data.radar}

@@ -42,6 +42,7 @@
 
 ### Dev
 - `concurrently`
+- `@turf/union` ^7.3.4 (GeoJSON 시군구 dissolve 빌드 스크립트 전용)
 
 ## 3. 디렉토리 구조 (현재 코드 기준)
 
@@ -66,7 +67,8 @@ project/
 │   │       ├── lightning-processor.js
 │   │       └── radar-processor.js
 │   ├── test/
-│   │   └── run-once.js
+│   │   ├── run-once.js
+│   │   └── sliceGeoJSON.js  (빌드 전 1회: map.geojson → geo/*.geojson)
 │   └── data/
 │       ├── metar/      (latest.json, METAR_*.json)
 │       ├── taf/        (latest.json, TAF_*.json)
@@ -75,6 +77,11 @@ project/
 │       ├── radar/      (latest.json, RDR_*.png)
 │       └── TST1/       (metar.json, taf.json, warning.json, lightning.json)
 ├── frontend/
+│   ├── public/
+│   │   └── geo/
+│   │       ├── RKSI_admdong.geojson   (행정동 슬라이스, 빌드 스크립트 생성)
+│   │       ├── RKSI_sigungu.geojson   (시군구 dissolved, 빌드 스크립트 생성)
+│   │       └── ... (공항별 각 2개, 총 16개)
 │   ├── src/
 │   │   ├── App.jsx
 │   │   ├── App.css
@@ -97,6 +104,7 @@ project/
 │   │   └── utils/
 │   │       ├── api.js
 │   │       ├── helpers.js
+│   │       ├── geoToSVG.js            (GeoJSON → SVG path 변환)
 │   │       └── alerts/
 │   │           ├── index.js
 │   │           ├── alert-triggers.js
@@ -110,7 +118,7 @@ project/
 │   ├── legacy/
 │   └── dist/
 ├── shared/
-│   ├── airports.js
+│   ├── airports.js              (runway_hdg 필드 포함)
 │   ├── warning-types.js
 │   ├── alert-defaults.js
 │   └── weather-icons.js
@@ -122,7 +130,9 @@ project/
 │   ├── Alert_System_Design.md
 │   ├── Lightning_Data_Design.md
 │   ├── radar_image_design_v_2_overlay_div.md
-│   └── Weather_Visualization_Mapping.md
+│   ├── Weather_Visualization_Mapping.md
+│   └── map.md                   (낙뢰 맵 행정동/시군구 경계 구현 문서)
+├── map.geojson                  (전국 행정동 원본 33MB, git 제외)
 ├── .env
 ├── .env.example
 ├── .editorconfig
@@ -193,6 +203,27 @@ server.js
 - 전체 데이터 로딩 및 공항 선택 상태 관리
 - 알림 평가/디스패치/쿨다운 처리
 - 좌측(METAR/TAF/WARNING) + 우측(Lightning/Radar) 레이아웃
+- `boundaryLevel` state: AlertSettings 저장 후 localStorage `lightning_boundary` 읽어 갱신. `LightningMap`에 prop 전달.
+
+### shared/airports.js
+- 실제 공항 8개 + TST1(mock) 정의
+- `runway_hdg` 필드: 각 공항 대표 활주로 자기방위각(°). LightningMap ✈ 회전에 사용.
+- `mock_only: true` 플래그로 수집 대상에서 TST1 제외.
+
+### backend/test/sliceGeoJSON.js (빌드 스크립트)
+- 1회 실행용 Node.js 스크립트. `npm run dev` 또는 운영 서버와 무관.
+- `shared/airports.js`에서 실제 공항 목록 로드 (mock_only 제외).
+- `map.geojson`(33MB)을 각 공항 ARP 기준 **48km bbox**(RANGE_KM 32 × PADDING 1.5)로 필터링.
+- `_admdong.geojson`: bbox 내 행정동 feature 원본 저장.
+- `_sigungu.geojson`: `properties.sgg`(5자리 시군구 코드) 기준 `@turf/union` v7 dissolve 후 저장.
+- 출력 경로: `frontend/public/geo/` (Vite dev `/geo/`, 빌드 시 `dist/geo/` 복사).
+- 실행: `project/` 디렉토리에서 `node backend/test/sliceGeoJSON.js`
+
+### frontend/src/utils/helpers.js
+- `toCanvasXY(point, arp, size, rangeKm)`: ARP 기준 등장방형(equirectangular) 투영으로 위경도 → SVG 픽셀 변환. LightningMap과 geoToSVG 양쪽에서 공유.
+
+### frontend/src/utils/geoToSVG.js
+- `geoToSVGPaths(geojson, arp, size, rangeKm)`: GeoJSON FeatureCollection을 SVG `<path d>` 문자열 배열로 변환. Polygon/MultiPolygon 지원.
 
 ### frontend/src/components/MetarCard.jsx
 - **v1 (텍스트)**: 기존의 검정색 로그 배경 상세 텍스트 표출.
@@ -204,6 +235,18 @@ server.js
 - **v2 (타임라인)**: 연속 데이터 그룹화(`groupElementsByValue`) 기반의 색상 바 시각화. 날짜 변경선 표시.
 - **v3 (그리드)**: 시간대별 카드 형태 나열. 항목 레이블 왼쪽 고정.
 - 공통: 풍향 화살표(+180도 보정) 및 Gust(돌풍) 정보 포함.
+
+### frontend/src/components/LightningMap.jsx
+- Props: `lightningData`, `selectedAirport`, `airports`, `boundaryLevel = 'sigungu'`
+- 공항 전환 또는 `boundaryLevel` 변경 시 `/geo/{ICAO}_{boundaryLevel}.geojson` fetch.
+- SVG 레이어 순서: 배경(#131a24) → clipPath(rect rx=14) → 행정동/시군구 경계(fill=#1e2d3d, stroke=#00cc66) → 존 원(8/16/32km) → ✈ 아이콘 → 낙뢰 마커.
+- ✈ 이모지는 `airports` prop에서 `runway_hdg` 조회 후 `rotate(hdg - 90, center, center)` 적용.
+- clipPath가 정사각형(rect rx=14)이므로 패널 전체에 지도 표시 (32km 원 바깥 모서리까지 포함).
+
+### frontend/src/components/alerts/AlertSettings.jsx
+- 디스플레이 설정 섹션: METAR 표시 모드(v1/v2), TAF 표시 모드(v1/v2/v3), **낙뢰 지도 경계(시군구/행정동)** 선택.
+- 저장 시 localStorage `lightning_boundary` 키 쓰기; 초기화 시 삭제.
+- `metar_version` / `taf_version`과 동일한 localStorage 패턴.
 
 ### frontend/src/utils/visual-mapper.js
 - 데이터 기반 아이콘 키 산출 및 임계값(Threshold)에 따른 색상 매핑 로직 통합.
@@ -312,7 +355,7 @@ frontend/src/utils/alerts/alert-engine.js
 
 #### 루트 `package.json`
 - dependencies: `dotenv`, `fast-xml-parser`, `node-cron`
-- devDependencies: `concurrently`
+- devDependencies: `concurrently`, `@turf/union` ^7.3.4
 
 #### `frontend/package.json`
 - dependencies: `react`, `react-dom`
@@ -398,10 +441,11 @@ node backend/test/run-once.js radar
 - `docs/Lightning_Data_Design.md`
 - `docs/radar_image_design_v_2_overlay_div.md`
 - `docs/Weather_Visualization_Mapping.md`
+- `docs/map.md` — 낙뢰 맵 행정동/시군구 경계 표시 구현 (sliceGeoJSON, geoToSVG, LightningMap 오버레이)
 
 ---
 
-최종 업데이트: 2026-02-12
+최종 업데이트: 2026-02-18
 
 
 
