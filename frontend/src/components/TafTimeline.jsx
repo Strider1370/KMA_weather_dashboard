@@ -55,13 +55,20 @@ export default function TafTimeline({ tafData, icao, version = "v1", onVersionTo
       convertWeatherToKorean(slot.display?.weather, slot.cavok)
     );
     const windGroups = groupElementsByValue(timeline, (slot) => {
-      const s = slot.wind?.speed || 0;
-      if (s > 25) return 'danger';
-      if (s > 15) return 'warn';
-      return 'ok';
+      const w = slot.wind;
+      const dir8 = Math.round((w?.direction ?? 0) / 45) % 8;  // 8방위 버킷
+      const spd5 = Math.round((w?.speed ?? 0) / 5) * 5;       // 5kt 단위 반올림
+      const gst5 = Math.round((w?.gust ?? 0) / 5) * 5;
+      return `${dir8}_${spd5}_${gst5}`;
     });
+    const getCeiling = (slot) =>
+      slot.clouds
+        ?.filter(c => c.amount === 'BKN' || c.amount === 'OVC')
+        .sort((a, b) => (a.base ?? Infinity) - (b.base ?? Infinity))[0]?.base ?? null;
+    const fmtCeiling = (base) =>
+      base != null ? String(Math.round(base / 100)).padStart(3, '0') : 'NSC';
     const ceilingGroups = groupElementsByValue(timeline, (slot) => {
-      const c = slot.clouds?.[0]?.base || null;
+      const c = getCeiling(slot);
       if (c === null || c >= 5000) return 'ok';
       if (c >= 3000) return 'lime';
       if (c >= 1500) return 'warn';
@@ -120,16 +127,14 @@ export default function TafTimeline({ tafData, icao, version = "v1", onVersionTo
             <div className="taf-v2-timeline">
               {windGroups.map((g, i) => {
                 const wind = g.data.wind;
+                const s = wind?.speed || 0;
+                const lvl = s > 25 ? 'danger' : s > 15 ? 'warn' : 'ok';
                 const windText = `${wind?.speed}${wind?.gust ? `G${wind.gust}` : ""}kt`;
                 const rotation = (wind?.direction || 0) + 180;
                 return (
-                  <div key={i} className={`taf-v2-segment lvl-${g.value}`} style={{ width: `${g.width}%` }}>
-                    {g.hourCount >= 1 && (
-                      <>
-                        <span className="wind-arrow-inline" style={{ transform: `rotate(${rotation}deg)` }}>↑</span>
-                        <span className="segment-label">{windText}</span>
-                      </>
-                    )}
+                  <div key={i} className={`taf-v2-segment lvl-${lvl}`} style={{ width: `${g.width}%` }} title={`${wind?.direction ?? 'VRB'}° ${windText}`}>
+                    <span className="wind-arrow-inline" style={{ transform: `rotate(${rotation}deg)` }}>↑</span>
+                    {g.hourCount >= 2 && <span className="segment-label">{windText}</span>}
                   </div>
                 );
               })}
@@ -141,7 +146,10 @@ export default function TafTimeline({ tafData, icao, version = "v1", onVersionTo
             <div className="taf-v2-timeline">
               {ceilingGroups.map((g, i) => (
                 <div key={i} className={`taf-v2-segment lvl-${g.value}`} style={{ width: `${g.width}%` }}>
-                  {g.hourCount >= 2 && <span className="segment-label">{g.data.clouds?.[0]?.base || '-'}ft</span>}
+                  {g.hourCount >= 2
+                    ? <span className="segment-label">{fmtCeiling(getCeiling(g.data))}</span>
+                    : <span className="segment-label" style={{ fontSize: '0.65em' }}>{fmtCeiling(getCeiling(g.data))}</span>
+                  }
                 </div>
               ))}
             </div>

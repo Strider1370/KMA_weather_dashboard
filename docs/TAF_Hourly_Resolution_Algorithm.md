@@ -1283,3 +1283,60 @@ backend/src/parsers/taf-parser.js 내부 처리 흐름:
       → main이 airports[icao]에 할당
       → canonical hash 비교 후 변경 시 TAF_{YYYYMMDDTHHMMSSmmmZ}.json으로 저장
 ```
+
+---
+
+## 부록 F. 프론트엔드 TAF v2 타임라인 표시 규칙
+
+`frontend/src/components/TafTimeline.jsx` v2 모드에서 `timeline[]` 데이터를 시각화하는 규칙이다.
+
+### F.1 바람 세그먼트 그룹화
+
+`groupElementsByValue`에 전달하는 키 생성 규칙:
+
+```
+dir8 = round(wind.direction / 45) % 8    // 8방위 버킷 (0=N, 1=NE, ..., 7=NW)
+spd5 = round(wind.speed / 5) * 5         // 5kt 단위 반올림
+gst5 = round(wind.gust / 5) * 5          // 돌풍 5kt 단위 반올림 (없으면 0)
+key  = "${dir8}_${spd5}_${gst5}"
+```
+
+같은 8방위 + 5kt 이내 풍속 변화는 하나의 세그먼트로 묶인다. 각 세그먼트의 심각도 클래스(`lvl-ok/warn/danger`)는 그룹 첫 슬롯의 실제 풍속으로 렌더링 시 별도 계산한다.
+
+| 풍속 | 클래스 |
+|------|--------|
+| > 25kt | `lvl-danger` |
+| > 15kt | `lvl-warn` |
+| ≤ 15kt | `lvl-ok` |
+
+세그먼트 표시:
+- **2시간 이상**: 화살표 + 속도 텍스트 (예: `"6kt"`, `"15G25kt"`)
+- **1시간**: 화살표만 (텍스트 생략)
+- **모든 세그먼트**: `title` 속성에 `"풍향° 속도kt"` → hover 시 브라우저 tooltip 표시
+
+### F.2 운고(Ceiling) 산출 및 표시
+
+**산출 기준**: BKN 또는 OVC 레이어 중 가장 낮은 고도.
+
+```
+getCeiling(slot):
+  layers = slot.clouds.filter(c => c.amount === 'BKN' || c.amount === 'OVC')
+  layers.sort by base ascending
+  return layers[0].base  // 없으면 null
+```
+
+FEW, SCT는 운고(ceiling)로 인정하지 않는다.
+
+**표시 형식**: 3자리 백피트 단위 (TAF 원문과 동일한 관례)
+
+```
+fmtCeiling(base):
+  if base == null: return "NSC"
+  return String(round(base / 100)).padStart(3, '0')
+
+예: 3000ft → "030",  500ft → "005",  없음 → "NSC"
+```
+
+세그먼트 표시:
+- **2시간 이상**: 정상 폰트 크기
+- **1시간**: 폰트 소형 (`0.65em`), 단위 표기 없이 숫자만
