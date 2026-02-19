@@ -100,6 +100,7 @@ button { background: var(--ink); color: #fff; border-color: var(--ink); cursor: 
   flex-direction: column;
   gap: 12px;
   min-width: 0; /* CRITICAL: Prevent column from expanding */
+  max-width: 1000px; /* Align with TAF Timeline */
 }
 .secondary-column {
   display: flex;
