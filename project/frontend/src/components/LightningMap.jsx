@@ -26,7 +26,16 @@ function getStrikeColor(strikeTimeIso) {
   return { color: "#999999", opacity: 0.25 };
 }
 
-export default function LightningMap({ lightningData, selectedAirport, airports, boundaryLevel = 'sigungu' }) {
+function pickRunwayDirection(runwayHdg, windDir) {
+  if (windDir == null) return runwayHdg;
+  const opt1 = runwayHdg;
+  const opt2 = (runwayHdg + 180) % 360;
+  const diff1 = Math.abs(((windDir - opt1 + 180 + 360) % 360) - 180);
+  const diff2 = Math.abs(((windDir - opt2 + 180 + 360) % 360) - 180);
+  return diff1 <= diff2 ? opt1 : opt2;
+}
+
+export default function LightningMap({ lightningData, selectedAirport, airports, boundaryLevel = 'sigungu', windDir = null }) {
   const [timeRangeMin, setTimeRangeMin] = useState(30);
   const size = 420;
   const center = size / 2;
@@ -46,6 +55,7 @@ export default function LightningMap({ lightningData, selectedAirport, airports,
 
   const airportMeta = airports?.find(a => a.icao === selectedAirport) || null;
   const runwayHdg = airportMeta?.runway_hdg ?? 0;
+  const effectiveHdg = pickRunwayDirection(runwayHdg, windDir);
 
   const airportData = lightningData?.airports?.[selectedAirport] || null;
   const arp = airportData?.arp || null;
@@ -156,7 +166,7 @@ export default function LightningMap({ lightningData, selectedAirport, airports,
               dominantBaseline="central"
               fontSize="18"
               fill="#ffffff"
-              transform={`rotate(${runwayHdg - 90}, ${center}, ${center})`}
+              transform={`rotate(${effectiveHdg - 90}, ${center}, ${center})`}
             >
               ✈
             </text>

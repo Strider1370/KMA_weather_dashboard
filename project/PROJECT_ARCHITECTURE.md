@@ -204,6 +204,7 @@ server.js
 - 알림 평가/디스패치/쿨다운 처리
 - 좌측(METAR/TAF/WARNING) + 우측(Lightning/Radar) 레이아웃
 - `boundaryLevel` state: AlertSettings 저장 후 localStorage `lightning_boundary` 읽어 갱신. `LightningMap`에 prop 전달.
+- `windDir`: `data.metar.airports[icao].observation.wind` 에서 추출. CALM(`w.calm`) 또는 VRB(`w.variable`) 시 null 전달 → LightningMap 기본 runway_hdg 사용.
 
 ### shared/airports.js
 - 실제 공항 8개 + TST1(mock) 정의
@@ -237,10 +238,11 @@ server.js
 - 공통: 풍향 화살표(+180도 보정) 및 Gust(돌풍) 정보 포함.
 
 ### frontend/src/components/LightningMap.jsx
-- Props: `lightningData`, `selectedAirport`, `airports`, `boundaryLevel = 'sigungu'`
+- Props: `lightningData`, `selectedAirport`, `airports`, `boundaryLevel = 'sigungu'`, `windDir = null`
 - 공항 전환 또는 `boundaryLevel` 변경 시 `/geo/{ICAO}_{boundaryLevel}.geojson` fetch.
 - SVG 레이어 순서: 배경(#131a24) → clipPath(rect rx=14) → 행정동/시군구 경계(fill=#1e2d3d, stroke=#00cc66) → 존 원(8/16/32km) → ✈ 아이콘 → 낙뢰 마커.
-- ✈ 이모지는 `airports` prop에서 `runway_hdg` 조회 후 `rotate(hdg - 90, center, center)` 적용.
+- `pickRunwayDirection(runwayHdg, windDir)`: runway_hdg의 양방향(hdg, hdg+180°) 중 windDir에 더 가까운 쪽 선택 (맞바람 이륙 원칙).
+- ✈ 이모지는 `rotate(effectiveHdg - 90, center, center)` 적용. CALM/VRB 시 기본 runway_hdg 사용.
 - clipPath가 정사각형(rect rx=14)이므로 패널 전체에 지도 표시 (32km 원 바깥 모서리까지 포함).
 
 ### frontend/src/components/alerts/AlertSettings.jsx
@@ -445,7 +447,7 @@ node backend/test/run-once.js radar
 
 ---
 
-최종 업데이트: 2026-02-18
+최종 업데이트: 2026-02-19
 
 
 

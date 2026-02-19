@@ -281,6 +281,11 @@ export default function App() {
                   selectedAirport={selectedAirport}
                   airports={data.airports}
                   boundaryLevel={boundaryLevel}
+                  windDir={(() => {
+                    const w = data.metar?.airports?.[selectedAirport]?.observation?.wind;
+                    if (!w || w.calm || w.variable) return null;
+                    return w.direction;
+                  })()}
                 />
                 <RadarPanel
                   radarData={data.radar}
