@@ -1,0 +1,55 @@
+{
+  "header": {
+    "icao": "TST1",
+    "airport_name": "Test Lightning Airport",
+    "report_type": "METAR",
+    "issue_time": "2026-02-19T03:00:00Z",
+    "observation_time": "2026-02-19T03:00:00Z",
+    "automated": false
+  },
+  "observation": {
+    "wind": {
+      "raw": "31035G50KT",
+      "direction": 310,
+      "speed": 35,
+      "gust": 50,
+      "unit": "KT",
+      "variable": false,
+      "calm": false,
+      "barb": null
+    },
+    "visibility": {
+      "value": 2000,
+      "cavok": false
+    },
+    "weather": [
+      {
+        "raw": "TSRA",
+        "intensity": "",
+        "descriptor": "TS",
+        "precipitation": "RA",
+        "icon_key": "thunderstorm"
+      }
+    ],
+    "clouds": [
+      { "raw": "FEW010CB", "amount": "FEW", "height_ft": 1000, "type": "CB" },
+      { "raw": "BKN020", "amount": "BKN", "height_ft": 2000, "type": null },
+      { "raw": "OVC040", "amount": "OVC", "height_ft": 4000, "type": null }
+    ],
+    "temperature": { "air": 8, "dewpoint": 7 },
+    "qnh": { "value": 998, "unit": "hPa" },
+    "wind_shear": "WS ALL RWY",
+    "display": {
+      "wind": "310° 35kt G50kt",
+      "visibility": "2000m",
+      "weather": "Thunderstorm Rain",
+      "clouds": "FEW 1000ft CB / BKN 2000ft / OVC 4000ft",
+      "temperature": "8° / 7°",
+      "qnh": "998 hPa",
+      "weather_icon": "thunderstorm",
+      "weather_intensity": "moderate"
+    }
+  },
+  "cavok_flag": false,
+  "nsc_flag": false
+}

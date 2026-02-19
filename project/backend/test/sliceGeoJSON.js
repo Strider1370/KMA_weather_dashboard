@@ -5,7 +5,7 @@ const path = require('path');
 const { union } = require('@turf/union');
 
 const airports = require('../../shared/airports.js');
-const REAL_AIRPORTS = airports.filter(a => !a.mock_only);
+const REAL_AIRPORTS = airports.filter(a => !a.mock_only || (a.lat && a.lon));
 
 const RANGE_KM = 32;
 const PADDING = 1.5; // 정사각형 패널 모서리(~45km) 커버를 위해 48km bbox 사용

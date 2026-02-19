@@ -1,5 +1,6 @@
 .env
 backend/data/
+!backend/data/TST1/
 node_modules/
 *.log
 .DS_Store

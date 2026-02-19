@@ -292,7 +292,8 @@ function parseWind(windNode) {
     speed: normalizedSpeed,
     gust: normalizedGust,
     unit,
-    variable
+    variable,
+    calm: normalizedSpeed <= 2
   };
 
   parsed.barb = resolveWindBarb(parsed);

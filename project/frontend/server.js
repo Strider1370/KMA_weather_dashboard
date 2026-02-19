@@ -28,6 +28,7 @@ function sendText(res, status, body, contentType = "text/plain; charset=utf-8") 
 
 function readLatest(category) {
   const file = path.join(DATA_ROOT, category, "latest.json");
+  if (!fs.existsSync(file)) return null;
   const raw = fs.readFileSync(file, "utf8");
   return JSON.parse(raw);
 }
@@ -51,7 +52,32 @@ function mergeTst1(payload, category) {
   const next = payload && typeof payload === "object" ? { ...payload } : {};
   next.airports = next.airports && typeof next.airports === "object" ? { ...next.airports } : {};
 
-  const airportData = override.airports?.TST1 ?? override;
+  let airportData = override.airports?.TST1 ?? override;
+
+  // 낙뢰 데이터인 경우, 시각이 필터링되지 않도록 현재 시각 기준으로 시프트
+  if (category === "lightning" && Array.isArray(airportData.strikes) && airportData.strikes.length > 0) {
+    airportData = JSON.parse(JSON.stringify(airportData)); // deep clone
+    const strikes = airportData.strikes;
+    
+    // 가장 최신 strike 시각 찾기
+    const latestStrikeTime = Math.max(...strikes.map(s => new Date(s.time).getTime()));
+    // 최신 strike가 현재로부터 5분 전이 되도록 오프셋 계산
+    const offset = (Date.now() - 5 * 60 * 1000) - latestStrikeTime;
+
+    strikes.forEach(s => {
+      const newTime = new Date(new Date(s.time).getTime() + offset);
+      s.time = newTime.toISOString();
+      if (s.time_kst) {
+        const kstTime = new Date(newTime.getTime() + 9 * 3600 * 1000);
+        s.time_kst = kstTime.toISOString().replace("Z", "+09:00");
+      }
+    });
+
+    if (airportData.summary) {
+      airportData.summary.latest_time = strikes[0].time;
+    }
+  }
+
   next.airports.TST1 = airportData;
   if (!next.fetched_at && !next.updated_at) next.fetched_at = new Date().toISOString();
   return next;
