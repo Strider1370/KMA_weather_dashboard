@@ -666,7 +666,11 @@ tr.row-danger td { background: #ffe9e7; }
 }
 
 /* TAF v2 (Timeline Bar) */
-.taf-v2 { padding: 20px; }
+.taf-v2 {
+  padding: 20px;
+  width: 1000px;
+  height: 339px;
+}
 .taf-header-flex { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
 .taf-v2-container { display: flex; flex-direction: column; gap: 8px; }
 .taf-v2-row { display: grid; grid-template-columns: 60px 1fr; gap: 20px; align-items: center; }
