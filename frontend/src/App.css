@@ -24,7 +24,7 @@ body {
 .shape-a { width: 320px; height: 320px; top: -120px; right: -60px; background: #87cfba; }
 .shape-b { width: 280px; height: 280px; left: -100px; bottom: -100px; background: #f1b49f; }
 
-.container { width: min(1100px, 92vw); margin: 28px auto 44px; display: grid; gap: 16px; }
+.container { width: 98%; max-width: 1550px; margin: 16px auto 32px; display: grid; gap: 12px; }
 .dashboard-title {
   display: inline-flex;
   align-items: center;
@@ -80,38 +80,40 @@ body {
 
 .summary-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; }
 .tile, .panel { background: var(--paper); border: 1px solid var(--line); border-radius: 14px; box-shadow: var(--shadow); }
-.tile { padding: 14px; }
-.tile h2 { margin: 0; font-size: 0.92rem; color: var(--muted); }
-.metric { margin: 8px 0 0; font-family: "Space Grotesk", sans-serif; font-size: 2rem; font-weight: 700; }
+.tile { padding: 10px; }
+.tile h2 { margin: 0; font-size: 0.85rem; color: var(--muted); }
+.metric { margin: 4px 0 0; font-family: "Space Grotesk", sans-serif; font-size: 1.6rem; font-weight: 700; }
 
 .controls { display: flex; align-items: center; gap: 10px; padding: 12px; }
 label { font-size: 0.9rem; font-weight: 700; }
 select, button { border-radius: 10px; border: 1px solid var(--line); background: #fff; font: inherit; padding: 9px 11px; }
 button { background: var(--ink); color: #fff; border-color: var(--ink); cursor: pointer; }
 
-.dashboard-layout { 
-  display: grid; 
-  grid-template-columns: 1.25fr 0.75fr; 
-  gap: 16px; 
+.dashboard-layout {
+  display: grid;
+  grid-template-columns: 1000px 1fr;
+  gap: 12px;
   align-items: start;
 }
-.primary-column { 
-  display: flex; 
-  flex-direction: column; 
-  gap: 16px; 
+.primary-column {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
   min-width: 0; /* CRITICAL: Prevent column from expanding */
+  max-width: 1000px; /* Align with TAF Timeline */
 }
-.secondary-column { 
-  display: flex; 
-  flex-direction: column; 
-  gap: 16px; 
+.secondary-column {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
   min-width: 0;
+  width: 100%;
 }
 
 .dashboard-top-row {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 16px;
+  gap: 12px;
   align-items: stretch;
   min-width: 0;
 }
@@ -580,10 +582,10 @@ tr.row-danger td { background: #ffe9e7; }
   background: var(--paper);
   color: var(--ink);
   border: 1px solid var(--line);
-  padding: 16px;
+  padding: 12px;
   display: flex;
   flex-direction: column;
-  height: 280px; /* FIXED HEIGHT */
+  height: 250px; /* FIXED HEIGHT REDUCED */
   box-sizing: border-box;
   transition: all 0.3s ease;
   overflow: hidden;
@@ -666,7 +668,13 @@ tr.row-danger td { background: #ffe9e7; }
 }
 
 /* TAF v2 (Timeline Bar) */
-.taf-v2 { padding: 20px; }
+.taf-v2 {
+  padding: 14px;
+  max-width: 1000px;
+  width: 100%;
+  height: auto; /* Removed fixed height to prevent vertical scrollbar */
+  overflow-x: auto;
+}
 .taf-header-flex { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
 .taf-v2-container { display: flex; flex-direction: column; gap: 8px; }
 .taf-v2-row { display: grid; grid-template-columns: 60px 1fr; gap: 20px; align-items: center; }

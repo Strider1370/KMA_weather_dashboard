@@ -37,7 +37,7 @@ function pickRunwayDirection(runwayHdg, windDir) {
 
 export default function LightningMap({ lightningData, selectedAirport, airports, boundaryLevel = 'sigungu', windDir = null }) {
   const [timeRangeMin, setTimeRangeMin] = useState(30);
-  const size = 420;
+  const size = 480;
   const center = size / 2;
   const rangeKm = 32;
   const radiusScale = center / rangeKm;
