@@ -1247,7 +1247,7 @@ TAF_{YYYYMMDDTHHMMSSmmmZ}.json
 ### E.1 파일 구조
 
 ```
-project/
+KMA_weather_dashboard/
   ├ backend/src/parsers/taf-parser.js
   ├ backend/src/processors/taf-processor.js
   ├ backend/src/store.js

@@ -35,7 +35,7 @@
 ## 파일 구조
 
 ```
-project/
+KMA_weather_dashboard/
 ├── map.geojson                          ← 원본 행정동 (33MB, git 제외)
 ├── shared/
 │   └── airports.js                      ← ARP 좌표 + runway_hdg 포함
@@ -64,7 +64,7 @@ project/
 ## 슬라이스 스크립트
 
 **위치**: `backend/test/sliceGeoJSON.js`
-**실행**: `project/` 디렉토리에서 `node backend/test/sliceGeoJSON.js`
+**실행**: 루트 디렉토리에서 `node backend/test/sliceGeoJSON.js`
 
 ### 동작
 

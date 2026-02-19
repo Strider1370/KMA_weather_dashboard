@@ -7,7 +7,12 @@
       "Bash(git fetch:*)",
       "Bash(git pull:*)",
       "Bash(dir:*)",
-      "Bash(findstr:*)"
+      "Bash(findstr:*)",
+      "Bash(cmd /c \"dir /b \"\"c:\\\\Users\\\\Jond Doe\\\\OneDrive\\\\Desktop\\\\새 폴더\\\\Project\\\\KMA_weather_dashboard\\\\project\\\\frontend\"\"\")",
+      "Bash(powershell -Command:*)",
+      "Bash(node:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)"
     ]
   }
 }

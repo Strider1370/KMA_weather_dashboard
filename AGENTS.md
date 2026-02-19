@@ -1,7 +1,6 @@
 # Repository Guidelines
 
 ## Project Structure & Module Organization
-The working application lives under `project/`.
 - `backend/src/`: data collection and processing (`processors/`, `parsers/`, `config.js`, `store.js`, scheduler in `index.js`).
 - `backend/test/run-once.js`: smoke runner for one-shot pipeline execution.
 - `frontend/src/`: React UI (`components/`, `utils/alerts/`, `App.jsx`).
@@ -11,7 +10,7 @@ The working application lives under `project/`.
 - Runtime outputs: `backend/data/{metar,taf,warning,lightning,radar}/` and test overlay `backend/data/TST1/`.
 
 ## Build, Test, and Development Commands
-Run from `project/` unless noted.
+Run from the repository root.
 - `npm install` and `npm --prefix frontend install`: install root/frontend dependencies.
 - `npm run dev`: starts API server (`5173`) and Vite dev server (`5174`).
 - `npm run dashboard`: production-style server (`frontend/server.js`).

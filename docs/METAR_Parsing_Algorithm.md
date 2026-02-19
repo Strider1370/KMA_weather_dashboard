@@ -500,7 +500,7 @@ display = {
 ### 6.1 파일 구조
 
 ```
-project/
+KMA_weather_dashboard/
   ├ backend/src/parsers/metar-parser.js
   ├ backend/src/processors/metar-processor.js
   ├ backend/src/store.js

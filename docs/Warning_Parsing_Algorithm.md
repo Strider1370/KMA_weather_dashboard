@@ -239,7 +239,7 @@ WARNINGS_{YYYYMMDDTHHMMSSmmmZ}.json
 기존 파일 구조에 추가:
 
 ```
-project/
+KMA_weather_dashboard/
   ├ backend/src/parsers/warning-parser.js
   ├ backend/src/processors/warning-processor.js
   ├ backend/src/store.js

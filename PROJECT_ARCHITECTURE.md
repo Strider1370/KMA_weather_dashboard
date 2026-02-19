@@ -47,7 +47,7 @@
 ## 3. 디렉토리 구조 (현재 코드 기준)
 
 ```text
-project/
+KMA_weather_dashboard/
 ├── backend/
 │   ├── src/
 │   │   ├── api-client.js
@@ -218,7 +218,7 @@ server.js
 - `_admdong.geojson`: bbox 내 행정동 feature 원본 저장.
 - `_sigungu.geojson`: `properties.sgg`(5자리 시군구 코드) 기준 `@turf/union` v7 dissolve 후 저장.
 - 출력 경로: `frontend/public/geo/` (Vite dev `/geo/`, 빌드 시 `dist/geo/` 복사).
-- 실행: `project/` 디렉토리에서 `node backend/test/sliceGeoJSON.js`
+- 실행: 루트 디렉토리에서 `node backend/test/sliceGeoJSON.js`
 
 ### frontend/src/utils/helpers.js
 - `toCanvasXY(point, arp, size, rangeKm)`: ARP 기준 등장방형(equirectangular) 투영으로 위경도 → SVG 픽셀 변환. LightningMap과 geoToSVG 양쪽에서 공유.
@@ -411,6 +411,8 @@ frontend/src/utils/alerts/alert-engine.js
 ## 10. 실행 방법
 
 ```bash
+# 루트 디렉토리에서 실행
+
 # 의존성 설치
 npm install
 npm --prefix frontend install
