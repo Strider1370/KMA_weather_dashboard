@@ -453,7 +453,7 @@ tr.row-danger td { background: #ffe9e7; }
   border-radius: 14px;
   box-shadow: 0 16px 48px rgba(0,0,0,0.2);
   width: 90%;
-  max-width: 520px;
+  max-width: 640px;
   max-height: 85vh;
   display: flex;
   flex-direction: column;
@@ -468,6 +468,39 @@ tr.row-danger td { background: #ffe9e7; }
 .alert-settings-header h2 {
   margin: 0;
   font-size: 1.1rem;
+}
+.alert-settings-layout {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+}
+.alert-settings-tabs {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 16px 10px;
+  border-right: 1px solid var(--line);
+  min-width: 80px;
+}
+.alert-settings-tab-btn {
+  background: none;
+  border: none;
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--muted);
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.15s, color 0.15s;
+}
+.alert-settings-tab-btn:hover {
+  background: var(--line);
+  color: var(--ink);
+}
+.alert-settings-tab-btn.active {
+  background: var(--accent);
+  color: #fff;
 }
 .alert-settings-body {
   padding: 16px 20px;
@@ -701,6 +734,7 @@ tr.row-danger td { background: #ffe9e7; }
   white-space: nowrap;
 }
 .scale-hour { font-size: 0.75rem; color: var(--muted); font-weight: 600; padding-bottom: 4px; }
+.scale-end { transform: translateX(-100%); }
 
 .taf-v2-timeline {
   display: flex;

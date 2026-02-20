@@ -384,6 +384,7 @@ function parse(xmlString) {
       issued,
       valid_start: valid.start,
       valid_end: valid.end,
+      report_status: text(taf?.["iwxxm:reportStatus"]) || null,
       temperatures: parseTemperatureHeader(taf, baseForecastNode, issued)
     },
     timeline

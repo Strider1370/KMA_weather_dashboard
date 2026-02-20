@@ -100,7 +100,7 @@ KMA_weather_dashboard/
 │   │   │       ├── AlertPopup.jsx
 │   │   │       ├── AlertSound.jsx
 │   │   │       ├── AlertMarquee.jsx
-│   │   │       └── AlertSettings.jsx
+│   │   │       └── Settings.jsx
 │   │   └── utils/
 │   │       ├── api.js
 │   │       ├── helpers.js
@@ -187,6 +187,9 @@ server.js
 - `iwxxm:METAR`/`iwxxm:SPECI` 루트 정규화
 - 헤더에 `report_type`(`METAR`/`SPECI`) 추출하여 저장
 
+### backend/src/parsers/taf-parser.js
+- `iwxxm:reportStatus` → `header.report_status` 필드 추출 (`'AMENDMENT'` 또는 `null`). 프론트엔드 AMD 표시에 활용.
+
 ### backend/src/store.js
 - 타입: `metar`, `taf`, `warning`, `lightning`
 - canonical hash 기반 중복 저장 방지
@@ -203,8 +206,9 @@ server.js
 - 전체 데이터 로딩 및 공항 선택 상태 관리
 - 알림 평가/디스패치/쿨다운 처리
 - 좌측(METAR/TAF/WARNING) + 우측(Lightning/Radar) 레이아웃
-- `boundaryLevel` state: AlertSettings 저장 후 localStorage `lightning_boundary` 읽어 갱신. `LightningMap`에 prop 전달.
+- `boundaryLevel` state: Settings 저장 후 localStorage `lightning_boundary` 읽어 갱신. `LightningMap`에 prop 전달.
 - `windDir`: `data.metar.airports[icao].observation.wind` 에서 추출. CALM(`w.calm`) 또는 VRB(`w.variable`) 시 null 전달 → LightningMap 기본 runway_hdg 사용.
+- `timeZone` state: localStorage `time_zone` ('UTC'|'KST') 초기화, 기본값 `'KST'`. 변경 시 localStorage에 즉시 persist. Header/StatusPanel/MetarCard/WarningList/TafTimeline 모두에 `tz` prop으로 전달. `Settings`에는 `timeZone` + `setTimeZone` prop 전달.
 
 ### shared/airports.js
 - 실제 공항 8개 + TST1(mock) 정의
@@ -222,6 +226,8 @@ server.js
 
 ### frontend/src/utils/helpers.js
 - `toCanvasXY(point, arp, size, rangeKm)`: ARP 기준 등장방형(equirectangular) 투영으로 위경도 → SVG 픽셀 변환. LightningMap과 geoToSVG 양쪽에서 공유.
+- `getDisplayDate(isoString, tz)`: KST 시 UTC+9h 시프트된 `Date` 객체 반환. 이후 `.getUTCHours()` 등 기존 UTC 메서드를 그대로 사용해 KST 표시값 산출. UTC 시 원본 `Date` 반환(동작 동일). **내부 계산에는 절대 사용 금지** — 표시 전용.
+- `formatUtc(value, tz='UTC')`: 하위 호환 확장. `tz='KST'` 시 `getDisplayDate`를 통해 +9h 시프트 후 `"YYYY-MM-DD HH:mm KST"` 형식 반환. `tz='UTC'`(기본값) 시 기존 동작 유지.
 
 ### frontend/src/utils/geoToSVG.js
 - `geoToSVGPaths(geojson, arp, size, rangeKm)`: GeoJSON FeatureCollection을 SVG `<path d>` 문자열 배열로 변환. Polygon/MultiPolygon 지원.
@@ -232,13 +238,18 @@ server.js
 - 공통: 280px 고정 높이 적용으로 레이아웃 안정성 확보.
 
 ### frontend/src/components/TafTimeline.jsx
-- **v1 (테이블)**: 시간별 슬롯 직접 표출 (`display.wind` 등 원문 필드 사용).
-- **v2 (타임라인)**: `groupElementsByValue` 기반 색상 바 시각화. 날짜 변경선 표시.
-  - **바람 그룹화**: 8방위(45° 단위) + 5kt 반올림 조합 키로 그룹화. 심각도(`lvl-ok/warn/danger`)는 실제 풍속으로 렌더링 시 별도 계산.
+- **v1 (테이블)**: 시간별 슬롯 직접 표출 (`display.wind` 등 원문 필드 사용). 헤더 `Time` 열 단위가 선택된 시간대(tz) 표시.
+- **v2 (타임라인)**: `groupElementsByValue` 기반 색상 바 시각화.
+  - **실제값 그룹화 원칙**: 근사값·심각도 기준 그룹화 금지. **실제 데이터 값을 버리거나 생략하면 안 된다.**
+  - **바람 그룹화**: 실제 `direction_speed_gust` 조합 키 사용 (예: `"330_15_25"`). 심각도(`lvl-ok/warn/danger`)는 렌더링 시 실제 풍속으로 별도 계산.
   - **바람 표시**: 2시간 이상 세그먼트는 화살표+속도 텍스트, 1시간 세그먼트는 화살표만. `title` 속성 hover 시 `풍향°/속도kt` 표시.
-  - **운고 기준**: BKN/OVC 최저층 고도 (FEW/SCT 제외). 고도 오름차순 정렬 후 최저값 추출. 3자리 백피트 단위 표시 (예: 3000ft → "030"), 없으면 "NSC". 1시간 세그먼트는 폰트 소형.
-- **v3 (그리드)**: 시간대별 카드 형태 나열. 항목 레이블 왼쪽 고정.
-- 공통: 풍향 화살표(+180도 보정) 및 Gust(돌풍) 정보 포함.
+  - **운고 그룹화**: `getCeiling(slot)` 실제 값(ft 또는 null)을 키로 그룹화. 심각도 클래스는 렌더링 시 `ceilLvl(c)` 별도 계산.
+  - **운고 기준**: BKN/OVC 최저층 고도 (FEW/SCT 제외). 3자리 백피트 단위 표시 (예: 3000ft → "030"), 없으면 "NSC". 1시간 세그먼트는 폰트 소형.
+  - **시정 그룹화**: 실제 `visibility.value` 미터값을 키로 그룹화. 심각도 클래스는 렌더링 시 `visLvl(v)` 별도 계산.
+  - **시간 눈금**: `getDisplayDate(slot.time, tz)`로 시간대 변환. 3시간 간격 표시 + 일(day) 경계 감지(`hour === 0`). `valid_end` 마커: 100% 위치에 별도 scale-end 아이템으로 우측 정렬 표시.
+  - **AMD 표시**: `target.header.report_status === 'AMENDMENT'` 시 제목에 "AMD" 표기.
+- **v3 (그리드)**: 시간대별 카드 형태 나열. `getDisplayDate(slot.time, tz).getUTCHours()` 사용.
+- 공통: `tz` prop(`'UTC'|'KST'`) 수신. 풍향 화살표(+180도 보정) 및 Gust(돌풍) 정보 포함.
 
 ### frontend/src/components/LightningMap.jsx
 - Props: `lightningData`, `selectedAirport`, `airports`, `boundaryLevel = 'sigungu'`, `windDir = null`
@@ -248,10 +259,15 @@ server.js
 - ✈ 이모지는 `rotate(effectiveHdg - 90, center, center)` 적용. CALM/VRB 시 기본 runway_hdg 사용.
 - clipPath가 정사각형(rect rx=14)이므로 패널 전체에 지도 표시 (32km 원 바깥 모서리까지 포함).
 
-### frontend/src/components/alerts/AlertSettings.jsx
-- 디스플레이 설정 섹션: METAR 표시 모드(v1/v2), TAF 표시 모드(v1/v2/v3), **낙뢰 지도 경계(시군구/행정동)** 선택.
-- 저장 시 localStorage `lightning_boundary` 키 쓰기; 초기화 시 삭제.
-- `metar_version` / `taf_version`과 동일한 localStorage 패턴.
+### frontend/src/components/alerts/Settings.jsx (구 AlertSettings.jsx)
+- 파일명 변경: `AlertSettings.jsx` → `Settings.jsx`, 컴포넌트명 `AlertSettings` → `Settings`.
+- **탭 구조 (좌측 사이드바)**: `activeTab` state('general'|'alert').
+  - **"일반" 탭**: METAR 표시 모드(v1/v2), TAF 표시 모드(v1/v2/v3), 낙뢰 지도 경계(시군구/행정동), **시간대 표시(UTC/KST)** 선택.
+  - **"알람" 탭**: 전체설정(alerts_enabled, cooldown, poll_interval), 알림방식(popup/sound/marquee), 트리거별 임계값.
+- localStorage 키 관리: `metar_version`, `taf_version`, `lightning_boundary`, `time_zone`.
+- 저장(`handleSave`) 시 모든 localStorage 키 쓰기 + `setTimeZone?.(localTimeZone)` 호출.
+- 초기화(`handleReset`) 시 `time_zone` 포함 전체 삭제, `setTimeZone?.("KST")` 호출.
+- `timeZone` / `setTimeZone` prop 수신 (App.jsx에서 전달).
 
 ### frontend/src/utils/visual-mapper.js
 - 데이터 기반 아이콘 키 산출 및 임계값(Threshold)에 따른 색상 매핑 로직 통합.
@@ -452,7 +468,11 @@ node backend/test/run-once.js radar
 
 ---
 
-최종 업데이트: 2026-02-19 (TafTimeline v2 바람/운고 표시 로직 개선)
+최종 업데이트: 2026-02-20
+
+### 주요 변경 이력 (최근)
+- **2026-02-20**: UTC/KST 시간대 표시 전환 기능 추가 (`getDisplayDate`, `formatUtc` 확장); Settings 탭 구조 도입(일반/알람 분리); `AlertSettings.jsx` → `Settings.jsx` 파일명 변경; TafTimeline v2 실제값 그룹화 원칙 적용(바람·운고·시정), valid_end 마커, AMD 표시, KST 시간 눈금 지원; `taf-parser.js` `report_status` 필드 추가.
+- **2026-02-19**: TafTimeline v2 바람/운고 표시 로직 개선, 운고 8방위+5kt 그룹화에서 실제 풍향/속도 그룹화로 변경.
 
 
 

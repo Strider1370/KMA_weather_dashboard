@@ -2,8 +2,19 @@ export function safe(value, fallback = "-") {
   return value == null || value === "" ? fallback : value;
 }
 
-export function formatUtc(value) {
+export function getDisplayDate(isoString, tz) {
+  const base = new Date(isoString);
+  if (tz === 'KST') return new Date(base.getTime() + 9 * 60 * 60 * 1000);
+  return base;
+}
+
+export function formatUtc(value, tz = 'UTC') {
   if (!value) return "-";
+  if (tz === 'KST') {
+    const d = getDisplayDate(value, 'KST');
+    const pad = (n) => String(n).padStart(2, '0');
+    return `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())} ${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())} KST`;
+  }
   return value.replace("T", " ").replace("Z", " UTC");
 }
 

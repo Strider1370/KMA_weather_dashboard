@@ -1,5 +1,5 @@
 import React from "react";
-import { safe, formatUtc, getSeverityLevel } from "../utils/helpers";
+import { safe, formatUtc, getSeverityLevel, getDisplayDate } from "../utils/helpers";
 import WeatherIcon from "./WeatherIcon";
 import { 
   resolveIconKey, 
@@ -7,7 +7,7 @@ import {
   convertWeatherToKorean 
 } from "../utils/visual-mapper";
 
-export default function TafTimeline({ tafData, icao, version = "v1", onVersionToggle }) {
+export default function TafTimeline({ tafData, icao, version = "v1", onVersionToggle, tz = "UTC" }) {
   const target = tafData?.airports?.[icao];
   const timeline = target?.timeline || [];
 
@@ -56,10 +56,7 @@ export default function TafTimeline({ tafData, icao, version = "v1", onVersionTo
     );
     const windGroups = groupElementsByValue(timeline, (slot) => {
       const w = slot.wind;
-      const dir8 = Math.round((w?.direction ?? 0) / 45) % 8;  // 8방위 버킷
-      const spd5 = Math.round((w?.speed ?? 0) / 5) * 5;       // 5kt 단위 반올림
-      const gst5 = Math.round((w?.gust ?? 0) / 5) * 5;
-      return `${dir8}_${spd5}_${gst5}`;
+      return `${w?.direction ?? 'VRB'}_${w?.speed ?? 0}_${w?.gust ?? 0}`;
     });
     const getCeiling = (slot) =>
       slot.clouds
@@ -67,31 +64,31 @@ export default function TafTimeline({ tafData, icao, version = "v1", onVersionTo
         .sort((a, b) => (a.base ?? Infinity) - (b.base ?? Infinity))[0]?.base ?? null;
     const fmtCeiling = (base) =>
       base != null ? String(Math.round(base / 100)).padStart(3, '0') : 'NSC';
-    const ceilingGroups = groupElementsByValue(timeline, (slot) => {
-      const c = getCeiling(slot);
+    const ceilLvl = (c) => {
       if (c === null || c >= 5000) return 'ok';
       if (c >= 3000) return 'lime';
       if (c >= 1500) return 'warn';
       return 'danger';
-    });
-    const visibilityGroups = groupElementsByValue(timeline, (slot) => {
-      const v = slot.visibility?.value || null;
+    };
+    const ceilingGroups = groupElementsByValue(timeline, (slot) => String(getCeiling(slot) ?? 'null'));
+    const visLvl = (v) => {
       if (v === null || v >= 9999) return 'ok';
       if (v >= 5000) return 'lime';
       if (v >= 1000) return 'warn';
       return 'danger';
-    });
+    };
+    const visibilityGroups = groupElementsByValue(timeline, (slot) => String(slot.visibility?.value ?? 'null'));
 
     return (
       <section className="panel taf-v2">
-        {renderHeader(`공항예보 (TAF) 타임라인 - ${icao}`)}
+        {renderHeader(`공항예보 (TAF${target.header?.report_status === 'AMENDMENT' ? ' AMD' : ''}) 타임라인 - ${icao}`)}
         <div className="taf-v2-container">
           {/* 시간 눈금 (날짜 표시 포함) */}
           <div className="taf-v2-row time-row">
             <div className="taf-v2-row-label">시간</div>
             <div className="taf-v2-timeline-scale">
               {timeline.map((slot, i) => {
-                const dateObj = new Date(slot.time);
+                const dateObj = getDisplayDate(slot.time, tz);
                 const hour = dateObj.getUTCHours();
                 const isFirst = i === 0;
                 const isNewDay = hour === 0;
@@ -107,6 +104,14 @@ export default function TafTimeline({ tafData, icao, version = "v1", onVersionTo
                 }
                 return null;
               })}
+              {target.header?.valid_end && (() => {
+                const endDate = getDisplayDate(target.header.valid_end, tz);
+                return (
+                  <div className="scale-item scale-end" style={{ left: '100%' }}>
+                    <span className="scale-hour">{endDate.getUTCHours()}시</span>
+                  </div>
+                );
+              })()}
             </div>
           </div>
           {/* 날씨 행 */}
@@ -144,25 +149,34 @@ export default function TafTimeline({ tafData, icao, version = "v1", onVersionTo
           <div className="taf-v2-row">
             <div className="taf-v2-row-label">운고</div>
             <div className="taf-v2-timeline">
-              {ceilingGroups.map((g, i) => (
-                <div key={i} className={`taf-v2-segment lvl-${g.value}`} style={{ width: `${g.width}%` }}>
-                  {g.hourCount >= 2
-                    ? <span className="segment-label">{fmtCeiling(getCeiling(g.data))}</span>
-                    : <span className="segment-label" style={{ fontSize: '0.65em' }}>{fmtCeiling(getCeiling(g.data))}</span>
-                  }
-                </div>
-              ))}
+              {ceilingGroups.map((g, i) => {
+                const c = getCeiling(g.data);
+                return (
+                  <div key={i} className={`taf-v2-segment lvl-${ceilLvl(c)}`} style={{ width: `${g.width}%` }}>
+                    {g.hourCount >= 2
+                      ? <span className="segment-label">{fmtCeiling(c)}</span>
+                      : <span className="segment-label" style={{ fontSize: '0.65em' }}>{fmtCeiling(c)}</span>
+                    }
+                  </div>
+                );
+              })}
             </div>
           </div>
           {/* 시정 행 */}
           <div className="taf-v2-row">
             <div className="taf-v2-row-label">시정</div>
             <div className="taf-v2-timeline">
-              {visibilityGroups.map((g, i) => (
-                <div key={i} className={`taf-v2-segment lvl-${g.value}`} style={{ width: `${g.width}%` }}>
-                  {g.hourCount >= 2 && <span className="segment-label">{g.data.display?.visibility}</span>}
-                </div>
-              ))}
+              {visibilityGroups.map((g, i) => {
+                const v = g.data.visibility?.value ?? null;
+                return (
+                  <div key={i} className={`taf-v2-segment lvl-${visLvl(v)}`} style={{ width: `${g.width}%` }}>
+                    {g.hourCount >= 2
+                      ? <span className="segment-label">{g.data.display?.visibility}</span>
+                      : <span className="segment-label" style={{ fontSize: '0.65em' }}>{g.data.display?.visibility}</span>
+                    }
+                  </div>
+                );
+              })}
             </div>
           </div>
         </div>
@@ -192,7 +206,7 @@ export default function TafTimeline({ tafData, icao, version = "v1", onVersionTo
               
               return (
                 <div key={i} className="taf-v3-card">
-                  <div className="taf-v3-data-time">{new Date(slot.time).getUTCHours()}시</div>
+                  <div className="taf-v3-data-time">{getDisplayDate(slot.time, tz).getUTCHours()}시</div>
                   <div className="taf-v3-data-icon"><WeatherIcon iconKey={iconKey} /></div>
                   <div className="taf-v3-data-wind">
                     <span className="wind-arrow-inline" style={{ transform: `rotate(${rotation}deg)` }}>↑</span>
@@ -217,7 +231,7 @@ export default function TafTimeline({ tafData, icao, version = "v1", onVersionTo
         <table>
           <thead>
             <tr>
-              <th>Time (UTC)</th>
+              <th>Time ({tz})</th>
               <th>Wind</th>
               <th>Visibility</th>
               <th>Weather</th>
@@ -233,7 +247,7 @@ export default function TafTimeline({ tafData, icao, version = "v1", onVersionTo
               });
               return (
                 <tr key={i} className={`row-${level}`}>
-                  <td>{formatUtc(slot.time)}</td>
+                  <td>{formatUtc(slot.time, tz)}</td>
                   <td>{safe(slot.display?.wind)}</td>
                   <td>{safe(slot.display?.visibility)}</td>
                   <td>{safe(slot.display?.weather)}</td>

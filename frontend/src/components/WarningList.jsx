@@ -1,4 +1,4 @@
-import { safe, warningMeta } from "../utils/helpers";
+import { safe, warningMeta, getDisplayDate } from "../utils/helpers";
 
 const WARNING_NAME_KO = {
   WIND_SHEAR: "급변풍",
@@ -13,9 +13,9 @@ const WARNING_NAME_KO = {
   UNKNOWN: "미확인경보",
 };
 
-function formatValidTime(value) {
+function formatValidTime(value, tz = "UTC") {
   if (!value) return "--일 --시 --분";
-  const date = new Date(value);
+  const date = getDisplayDate(value, tz);
   if (Number.isNaN(date.getTime())) return "--일 --시 --분";
 
   const day = String(date.getUTCDate()).padStart(2, "0");
@@ -24,7 +24,7 @@ function formatValidTime(value) {
   return `${day}일 ${hour}시 ${minute}분`;
 }
 
-export default function WarningList({ warningData, icao, warningTypes }) {
+export default function WarningList({ warningData, icao, warningTypes, tz = "UTC" }) {
   const block = warningData?.airports?.[icao];
   const list = block?.warnings || [];
 
@@ -43,7 +43,7 @@ export default function WarningList({ warningData, icao, warningTypes }) {
             const color = meta.color || "#d4603a";
             const key = item.wrng_type_key === "UNKNOWN" && meta.key ? meta.key : item.wrng_type_key;
             const name = WARNING_NAME_KO[key] || safe(item.wrng_type_name) || "미확인경보";
-            const validRange = `${formatValidTime(item.valid_start)} ~ ${formatValidTime(item.valid_end)}`;
+            const validRange = `${formatValidTime(item.valid_start, tz)} ~ ${formatValidTime(item.valid_end, tz)}`;
 
             return (
               <article

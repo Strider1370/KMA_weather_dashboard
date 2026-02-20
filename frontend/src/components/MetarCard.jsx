@@ -2,7 +2,7 @@ import { safe, formatUtc, getSeverityLevel } from "../utils/helpers";
 import WeatherIcon, { WindBarb } from "./WeatherIcon";
 import { resolveIconKey, resolveWindBarb, convertWeatherToKorean } from "../utils/visual-mapper";
 
-export default function MetarCard({ metarData, icao, version = "v1", onVersionToggle }) {
+export default function MetarCard({ metarData, icao, version = "v1", onVersionToggle, tz = "UTC" }) {
   const target = metarData?.airports?.[icao];
 
   if (!target) {
@@ -32,7 +32,7 @@ export default function MetarCard({ metarData, icao, version = "v1", onVersionTo
       <article className="metar-v2 panel">
         <div className="metar-v2-header">
           <div className="metar-v2-icao">{icao}</div>
-          <div className="metar-v2-time">{formatUtc(issueTime)} METAR</div>
+          <div className="metar-v2-time">{formatUtc(issueTime, tz)} METAR</div>
         </div>
 
         <div className="metar-v2-main">
@@ -82,7 +82,7 @@ export default function MetarCard({ metarData, icao, version = "v1", onVersionTo
 
   const lines = [
     `Report Type: ${safe(target.header?.report_type || metarData?.type || "METAR")}`,
-    `Issue Time: ${safe(formatUtc(issueTime))}`,
+    `Issue Time: ${safe(formatUtc(issueTime, tz))}`,
     `Wind: ${safe(target.observation?.display?.wind)}`,
     `Visibility: ${safe(target.observation?.display?.visibility)}`,
     `Weather: ${safe(target.observation?.display?.weather)}`,

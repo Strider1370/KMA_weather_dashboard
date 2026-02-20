@@ -8,7 +8,8 @@ export default function Header({
   airports = [],
   selectedAirport,
   onAirportChange,
-  onRefresh
+  onRefresh,
+  tz = "UTC"
 }) {
   return (
     <header className="hero">
@@ -65,7 +66,7 @@ export default function Header({
         </div>
       </div>
       <p className="sub">
-        {lastUpdated ? `Last Updated: ${formatUtc(lastUpdated)}` : "Loading latest backend data..."}
+        {lastUpdated ? `Last Updated: ${formatUtc(lastUpdated, tz)}` : "Loading latest backend data..."}
       </p>
     </header>
   );

@@ -1290,18 +1290,28 @@ backend/src/parsers/taf-parser.js 내부 처리 흐름:
 
 `frontend/src/components/TafTimeline.jsx` v2 모드에서 `timeline[]` 데이터를 시각화하는 규칙이다.
 
+### F.0 실제값 그룹화 원칙 (핵심 설계 원칙)
+
+> **실제 데이터 값을 버리거나 생략하면 안 된다.**
+
+`groupElementsByValue`에 전달하는 키는 **반드시 실제 데이터 값**을 사용해야 한다. 근사값(예: 8방위 버킷, 5kt 반올림) 또는 심각도(예: 'danger'/'warn'/'ok')를 기준으로 그룹화하면 실제 값이 손실된다.
+
+- **그룹화 키**: 실제 값 → 연속 구간 병합
+- **심각도 클래스**: 렌더링 시 실제 값으로 별도 계산 (그룹화와 독립)
+
+이 원칙을 위반하면 타임라인에 잘못된 수치가 표시될 수 있다.
+
 ### F.1 바람 세그먼트 그룹화
 
 `groupElementsByValue`에 전달하는 키 생성 규칙:
 
 ```
-dir8 = round(wind.direction / 45) % 8    // 8방위 버킷 (0=N, 1=NE, ..., 7=NW)
-spd5 = round(wind.speed / 5) * 5         // 5kt 단위 반올림
-gst5 = round(wind.gust / 5) * 5          // 돌풍 5kt 단위 반올림 (없으면 0)
-key  = "${dir8}_${spd5}_${gst5}"
+key = "${wind.direction ?? 'VRB'}_${wind.speed ?? 0}_${wind.gust ?? 0}"
 ```
 
-같은 8방위 + 5kt 이내 풍속 변화는 하나의 세그먼트로 묶인다. 각 세그먼트의 심각도 클래스(`lvl-ok/warn/danger`)는 그룹 첫 슬롯의 실제 풍속으로 렌더링 시 별도 계산한다.
+실제 풍향·풍속·돌풍 값을 그대로 키로 사용한다. 완전히 동일한 바람 조건이 연속될 때만 하나의 세그먼트로 묶인다.
+
+심각도 클래스(`lvl-ok/warn/danger`)는 그룹 첫 슬롯의 실제 풍속으로 렌더링 시 별도 계산한다.
 
 | 풍속 | 클래스 |
 |------|--------|
@@ -1310,7 +1320,7 @@ key  = "${dir8}_${spd5}_${gst5}"
 | ≤ 15kt | `lvl-ok` |
 
 세그먼트 표시:
-- **2시간 이상**: 화살표 + 속도 텍스트 (예: `"6kt"`, `"15G25kt"`)
+- **2시간 이상**: 화살표 + 속도 텍스트 (예: `"15G25kt"`, `"6kt"`)
 - **1시간**: 화살표만 (텍스트 생략)
 - **모든 세그먼트**: `title` 속성에 `"풍향° 속도kt"` → hover 시 브라우저 tooltip 표시
 
@@ -1327,6 +1337,15 @@ getCeiling(slot):
 
 FEW, SCT는 운고(ceiling)로 인정하지 않는다.
 
+**그룹화 키**: `getCeiling(slot)` 결과값(ft 정수 또는 null)을 문자열로 변환하여 키로 사용. 심각도는 렌더링 시 `ceilLvl(c)`로 별도 계산.
+
+| 운고 | 클래스 |
+|------|--------|
+| null 또는 ≥ 5000ft | `lvl-ok` |
+| 3000ft 이상 | `lvl-lime` |
+| 1500ft 이상 | `lvl-warn` |
+| 1500ft 미만 | `lvl-danger` |
+
 **표시 형식**: 3자리 백피트 단위 (TAF 원문과 동일한 관례)
 
 ```
@@ -1340,3 +1359,77 @@ fmtCeiling(base):
 세그먼트 표시:
 - **2시간 이상**: 정상 폰트 크기
 - **1시간**: 폰트 소형 (`0.65em`), 단위 표기 없이 숫자만
+
+### F.3 시정(Visibility) 그룹화 및 표시
+
+**그룹화 키**: `slot.visibility?.value` 실제 미터값을 문자열로 변환하여 키로 사용. 심각도는 렌더링 시 `visLvl(v)`로 별도 계산.
+
+| 시정 | 클래스 |
+|------|--------|
+| null 또는 ≥ 9999m | `lvl-ok` |
+| 5000m 이상 | `lvl-lime` |
+| 1000m 이상 | `lvl-warn` |
+| 1000m 미만 | `lvl-danger` |
+
+세그먼트 표시: `slot.display?.visibility` 문자열 사용.
+- **2시간 이상**: 정상 폰트 크기
+- **1시간**: 폰트 소형 (`0.65em`)
+
+### F.4 시간 눈금 및 시간대 표시
+
+#### F.4.1 시간대 변환 원칙
+
+모든 내부 계산은 UTC로 수행한다. 표시만 `tz` prop('UTC'|'KST')에 따라 변환한다.
+
+```
+표시용 Date 획득:
+  displayDate = getDisplayDate(slot.time, tz)
+  // KST: new Date(utcMs + 9*3600*1000)
+  // UTC: 원본 Date 그대로
+
+시간(hour) 추출:
+  hour = displayDate.getUTCHours()
+  // KST 시 +9h 시프트된 값의 UTC시간 = KST 현지 시각
+```
+
+`visual-mapper.js`의 `isDaytime()` 등 내부 분류 함수는 변경하지 않는다.
+
+#### F.4.2 시간 눈금 배치 규칙
+
+```
+표시 조건:
+  (1) 첫 번째 슬롯(i === 0) → 항상 표시
+  (2) 자정(hour === 0) → 날짜 변경선 + 일(day) 표시
+  (3) 3시간 단위(i % 3 === 0) → 시간만 표시
+
+position: left = (i / timeline.length) * 100%
+```
+
+KST 모드에서 `hour === 0`은 UTC 15:00Z에 해당 — KST 자정(00:00 KST)이 올바르게 날짜 경계로 표시된다.
+
+#### F.4.3 valid_end 마커
+
+TAF 유효기간 종료 시각을 타임라인 오른쪽 끝(100% 위치)에 별도 마커로 표시한다.
+
+```
+if target.header?.valid_end:
+  endDate = getDisplayDate(target.header.valid_end, tz)
+  // position: left = 100%, transform: translateX(-100%)  ← .scale-end 클래스
+  표시: endDate.getUTCHours() + "시"
+```
+
+`hourRange`가 start-inclusive, end-exclusive이므로 마지막 슬롯은 `valid_end - 1h`이다. 별도 마커로 실제 종료 시각을 표시한다.
+
+### F.5 TAF AMD 식별 및 표시
+
+파서(`taf-parser.js`)가 `iwxxm:reportStatus` → `header.report_status` 필드에 저장한다.
+
+```
+표시 제목:
+  report_status === 'AMENDMENT'
+    → "공항예보 (TAF AMD) 타임라인 - {ICAO}"
+  그 외
+    → "공항예보 (TAF) 타임라인 - {ICAO}"
+```
+
+AMD TAF는 정규 발표 시각과 다른 유효기간을 가질 수 있다. valid_end 마커(F.4.3)가 실제 종료 시각을 항상 정확히 표시하므로 별도 처리 불필요.

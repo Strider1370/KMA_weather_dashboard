@@ -22,7 +22,7 @@ import RadarPanel from "./components/RadarPanel";
 import AlertPopup from "./components/alerts/AlertPopup";
 import AlertSound from "./components/alerts/AlertSound";
 import AlertMarquee from "./components/alerts/AlertMarquee";
-import AlertSettings from "./components/alerts/AlertSettings";
+import Settings from "./components/alerts/Settings";
 import "./App.css";
 
 export default function App() {
@@ -39,6 +39,7 @@ export default function App() {
   const [metarVersion, setMetarVersion] = useState(() => localStorage.getItem("metar_version") || "v1");
   const [tafVersion, setTafVersion] = useState(() => localStorage.getItem("taf_version") || "v1");
   const [boundaryLevel, setBoundaryLevel] = useState(() => localStorage.getItem("lightning_boundary") || "sigungu");
+  const [timeZone, setTimeZone] = useState(() => localStorage.getItem("time_zone") || "KST");
 
   useEffect(() => {
     localStorage.setItem("metar_version", metarVersion);
@@ -47,6 +48,10 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem("taf_version", tafVersion);
   }, [tafVersion]);
+
+  useEffect(() => {
+    localStorage.setItem("time_zone", timeZone);
+  }, [timeZone]);
 
   const prevDataRef = useRef(null);
   const pollingRef = useRef(null);
@@ -175,6 +180,7 @@ export default function App() {
     setMetarVersion(localStorage.getItem("metar_version") || "v1");
     setTafVersion(localStorage.getItem("taf_version") || "v1");
     setBoundaryLevel(localStorage.getItem("lightning_boundary") || "sigungu");
+    setTimeZone(localStorage.getItem("time_zone") || "UTC");
   }
 
   const settings = alertDefaults ? resolveSettings(alertDefaults) : null;
@@ -227,6 +233,7 @@ export default function App() {
           selectedAirport={selectedAirport}
           onAirportChange={setSelectedAirport}
           onRefresh={handleRefresh}
+          tz={timeZone}
         />
 
         {loading && !data.metar && (
@@ -247,30 +254,33 @@ export default function App() {
                 warning={data.warning}
                 lightning={data.lightning}
               />
-              <StatusPanel status={data.status} />
+              <StatusPanel status={data.status} tz={timeZone} />
               </>
             )}
             <section className="dashboard-layout">
               <div className="primary-column">
                 <div className="dashboard-top-row">
-                  <MetarCard 
-                    metarData={data.metar} 
-                    icao={selectedAirport} 
-                    version={metarVersion} 
-                    onVersionToggle={setMetarVersion} 
+                  <MetarCard
+                    metarData={data.metar}
+                    icao={selectedAirport}
+                    version={metarVersion}
+                    onVersionToggle={setMetarVersion}
+                    tz={timeZone}
                   />
                   <WarningList
                     warningData={data.warning}
                     icao={selectedAirport}
                     warningTypes={data.warningTypes}
+                    tz={timeZone}
                   />
                 </div>
                 <div className="dashboard-bottom-row">
-                  <TafTimeline 
-                    tafData={data.taf} 
-                    icao={selectedAirport} 
-                    version={tafVersion} 
-                    onVersionToggle={setTafVersion} 
+                  <TafTimeline
+                    tafData={data.taf}
+                    icao={selectedAirport}
+                    version={tafVersion}
+                    onVersionToggle={setTafVersion}
+                    tz={timeZone}
                   />
                 </div>
               </div>
@@ -298,10 +308,12 @@ export default function App() {
       </main>
 
       {showSettings && alertDefaults && (
-        <AlertSettings
+        <Settings
           defaults={alertDefaults}
           onClose={() => setShowSettings(false)}
           onSettingsChange={handleSettingsChange}
+          timeZone={timeZone}
+          setTimeZone={setTimeZone}
         />
       )}
     </>
