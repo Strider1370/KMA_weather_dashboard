@@ -38,6 +38,8 @@ export default function Settings({ defaults, onClose, onSettingsChange, timeZone
   const [tafVersion, setTafVersion] = useState(() => localStorage.getItem("taf_version") || "v1");
   const [lightningBoundary, setLightningBoundary] = useState(() => localStorage.getItem("lightning_boundary") || "sigungu");
   const [localTimeZone, setLocalTimeZone] = useState(timeZone || "KST");
+  const [showRadar, setShowRadar] = useState(() => localStorage.getItem("show_radar_overlay") === "true");
+  const [radarOpacity, setRadarOpacity] = useState(() => parseFloat(localStorage.getItem("radar_overlay_opacity") || "0.6"));
   const [activeTab, setActiveTab] = useState("general");
 
   const [triggers, setTriggers] = useState(() => {
@@ -88,6 +90,8 @@ export default function Settings({ defaults, onClose, onSettingsChange, timeZone
     localStorage.setItem("taf_version", tafVersion);
     localStorage.setItem("lightning_boundary", lightningBoundary);
     localStorage.setItem("time_zone", localTimeZone);
+    localStorage.setItem("show_radar_overlay", showRadar);
+    localStorage.setItem("radar_overlay_opacity", radarOpacity);
     setTimeZone?.(localTimeZone);
     
     onSettingsChange?.(overrides);
@@ -100,6 +104,8 @@ export default function Settings({ defaults, onClose, onSettingsChange, timeZone
     localStorage.removeItem("taf_version");
     localStorage.removeItem("lightning_boundary");
     localStorage.removeItem("time_zone");
+    localStorage.removeItem("show_radar_overlay");
+    localStorage.removeItem("radar_overlay_opacity");
     setTimeZone?.("KST");
     onSettingsChange?.(null);
     onClose();
@@ -164,6 +170,16 @@ export default function Settings({ defaults, onClose, onSettingsChange, timeZone
                     <option value="KST">KST (한국 표준시, UTC+9)</option>
                   </select>
                 </label>
+                <label className="alert-settings-row">
+                  <span>낙뢰 지도 레이더 오버레이</span>
+                  <input type="checkbox" checked={showRadar} onChange={(e) => setShowRadar(e.target.checked)} />
+                </label>
+                {showRadar && (
+                  <label className="alert-settings-row alert-settings-sub">
+                    <span>레이더 투명도 ({Math.round(radarOpacity * 100)}%)</span>
+                    <input type="range" min={0.1} max={0.9} step={0.1} value={radarOpacity} onChange={(e) => setRadarOpacity(parseFloat(e.target.value))} />
+                  </label>
+                )}
               </fieldset>
             )}
 

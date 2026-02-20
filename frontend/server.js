@@ -168,7 +168,8 @@ function contentTypeFor(filePath) {
 }
 
 function serveDataAsset(req, res) {
-  const relative = req.url.replace(/^\/data\//, "");
+  const urlPath = req.url.split('?')[0];
+  const relative = urlPath.replace(/^\/data\//, "");
   const filePath = path.normalize(path.join(DATA_ROOT, relative));
   if (!filePath.startsWith(DATA_ROOT)) {
     sendText(res, 403, "Forbidden");

@@ -35,7 +35,7 @@ function pickRunwayDirection(runwayHdg, windDir) {
   return diff1 <= diff2 ? opt1 : opt2;
 }
 
-export default function LightningMap({ lightningData, selectedAirport, airports, boundaryLevel = 'sigungu', windDir = null }) {
+export default function LightningMap({ lightningData, selectedAirport, airports, boundaryLevel = 'sigungu', windDir = null, showRadar = false, radarOpacity = 0.5 }) {
   const [timeRangeMin, setTimeRangeMin] = useState(30);
   const size = 480;
   const center = size / 2;
@@ -43,6 +43,7 @@ export default function LightningMap({ lightningData, selectedAirport, airports,
   const radiusScale = center / rangeKm;
 
   const [admDong, setAdmDong] = useState(null);
+  const [radarTileUrl, setRadarTileUrl] = useState(null);
 
   useEffect(() => {
     if (!selectedAirport) return;
@@ -53,6 +54,16 @@ export default function LightningMap({ lightningData, selectedAirport, airports,
       .catch(() => {});
   }, [selectedAirport, boundaryLevel]);
 
+  useEffect(() => {
+    // 테스트 목적으로 TST1 공항에만 레이더 중첩을 허용함
+    if (!selectedAirport || !showRadar || selectedAirport !== 'TST1') { 
+      setRadarTileUrl(null); 
+      return; 
+    }
+    // ?t= 파라미터로 브라우저 캐시 무효화
+    setRadarTileUrl(`/data/radar-tiles/${selectedAirport}_latest.png?t=${Date.now()}`);
+  }, [selectedAirport, showRadar]);
+
   const airportMeta = airports?.find(a => a.icao === selectedAirport) || null;
   const runwayHdg = airportMeta?.runway_hdg ?? 0;
   const effectiveHdg = pickRunwayDirection(runwayHdg, windDir);
@@ -60,6 +71,9 @@ export default function LightningMap({ lightningData, selectedAirport, airports,
   const airportData = lightningData?.airports?.[selectedAirport] || null;
   const arp = airportData?.arp || null;
   const strikes = airportData?.strikes || [];
+
+  // 레이더 표시 시에는 타일 범위인 45km에 맞추고, 일반 지도에서는 32km 유지
+  const currentRangeKm = (showRadar && selectedAirport === 'TST1') ? 45 : 32;
 
   const visibleStrikes = useMemo(() => {
     const cutoff = Date.now() - timeRangeMin * 60 * 1000;
@@ -132,17 +146,27 @@ export default function LightningMap({ lightningData, selectedAirport, airports,
             <rect x="0" y="0" width={size} height={size} rx="14" fill="#131a24" />
             {admDong && arp && (
               <g clipPath={`url(#map-clip-${selectedAirport})`}>
-                {geoToSVGPaths(admDong, arp, size, rangeKm).map(({ key, d }) => (
+                {geoToSVGPaths(admDong, arp, size, currentRangeKm).map(({ key, d }) => (
                   <path key={key} d={d} fill="#1e2d3d" stroke="#00cc66" strokeWidth="0.6" strokeOpacity="0.4" />
                 ))}
               </g>
+            )}
+            {radarTileUrl && (
+              <image
+                href={radarTileUrl}
+                x="0" y="0"
+                width={size} height={size}
+                opacity={radarOpacity}
+                clipPath={`url(#map-clip-${selectedAirport})`}
+                style={{ imageRendering: 'auto' }}
+              />
             )}
             {ZONE_RADII_KM.map((zone) => (
               <g key={zone.zone}>
                 <circle
                   cx={center}
                   cy={center}
-                  r={zone.km * radiusScale}
+                  r={zone.km * (center / currentRangeKm)}
                   fill="none"
                   stroke={zone.color}
                   strokeDasharray="8 5"
@@ -150,7 +174,7 @@ export default function LightningMap({ lightningData, selectedAirport, airports,
                   strokeWidth="1.5"
                 />
                 <text
-                  x={center + zone.km * radiusScale + 4}
+                  x={center + zone.km * (center / currentRangeKm) + 4}
                   y={center - 6}
                   fill={zone.color}
                   fontSize="11"
@@ -172,7 +196,7 @@ export default function LightningMap({ lightningData, selectedAirport, airports,
             </text>
 
             {visibleStrikes.map((strike, idx) => {
-              const { x, y } = toCanvasXY(strike, arp, size, rangeKm);
+              const { x, y } = toCanvasXY(strike, arp, size, currentRangeKm);
               const { color, opacity } = getStrikeColor(strike.time);
               return (
                 <g key={`${strike.time}-${strike.lon}-${strike.lat}-${idx}`} stroke={color} strokeOpacity={opacity} strokeWidth="2">

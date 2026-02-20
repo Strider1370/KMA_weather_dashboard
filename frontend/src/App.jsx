@@ -40,6 +40,8 @@ export default function App() {
   const [tafVersion, setTafVersion] = useState(() => localStorage.getItem("taf_version") || "v1");
   const [boundaryLevel, setBoundaryLevel] = useState(() => localStorage.getItem("lightning_boundary") || "sigungu");
   const [timeZone, setTimeZone] = useState(() => localStorage.getItem("time_zone") || "KST");
+  const [showRadar, setShowRadar] = useState(() => localStorage.getItem("show_radar_overlay") === "true");
+  const [radarOpacity, setRadarOpacity] = useState(() => parseFloat(localStorage.getItem("radar_overlay_opacity") || "0.6"));
 
   useEffect(() => {
     localStorage.setItem("metar_version", metarVersion);
@@ -180,7 +182,9 @@ export default function App() {
     setMetarVersion(localStorage.getItem("metar_version") || "v1");
     setTafVersion(localStorage.getItem("taf_version") || "v1");
     setBoundaryLevel(localStorage.getItem("lightning_boundary") || "sigungu");
-    setTimeZone(localStorage.getItem("time_zone") || "UTC");
+    setTimeZone(localStorage.getItem("time_zone") || "KST");
+    setShowRadar(localStorage.getItem("show_radar_overlay") === "true");
+    setRadarOpacity(parseFloat(localStorage.getItem("radar_overlay_opacity") || "0.6"));
   }
 
   const settings = alertDefaults ? resolveSettings(alertDefaults) : null;
@@ -286,18 +290,19 @@ export default function App() {
               </div>
 
               <div className="secondary-column">
-                <LightningMap
-                  lightningData={data.lightning}
-                  selectedAirport={selectedAirport}
-                  airports={data.airports}
-                  boundaryLevel={boundaryLevel}
-                  windDir={(() => {
-                    const w = data.metar?.airports?.[selectedAirport]?.observation?.wind;
-                    if (!w || w.calm || w.variable) return null;
-                    return w.direction;
-                  })()}
-                />
-                <RadarPanel
+                                  <LightningMap
+                                    lightningData={data.lightning}
+                                    selectedAirport={selectedAirport}
+                                    airports={data.airports}
+                                    boundaryLevel={boundaryLevel}
+                                    windDir={(() => {
+                                      const w = data.metar?.airports?.[selectedAirport]?.observation?.wind;
+                                      if (!w || w.calm || w.variable) return null;
+                                      return w.direction;
+                                    })()}
+                                    showRadar={showRadar}
+                                    radarOpacity={radarOpacity}
+                                  />                <RadarPanel
                   radarData={data.radar}
                   selectedAirport={selectedAirport}
                 />
