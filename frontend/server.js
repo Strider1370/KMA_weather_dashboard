@@ -8,8 +8,6 @@ const require = createRequire(import.meta.url);
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const store = require("../backend/src/store");
-
 const PORT = Number(process.env.PORT || 5173);
 const ROOT = path.join(__dirname, "dist");
 const DATA_ROOT = path.resolve(__dirname, "../backend/data");
@@ -29,13 +27,10 @@ function sendText(res, status, body, contentType = "text/plain; charset=utf-8") 
 }
 
 function readLatest(category) {
-  const cached = store.getCached(category);
-  if (cached !== null) return cached;
-
-  // cold start 폴백: 캐시가 아직 채워지지 않은 경우에만 디스크 읽기
   const file = path.join(DATA_ROOT, category, "latest.json");
   if (!fs.existsSync(file)) return null;
-  return JSON.parse(fs.readFileSync(file, "utf8"));
+  const raw = fs.readFileSync(file, "utf8");
+  return JSON.parse(raw);
 }
 
 function readTst1Override(category) {
@@ -89,11 +84,9 @@ function mergeTst1(payload, category) {
 }
 
 function readLightning() {
-  const cached = store.getCached("lightning");
-  if (cached !== null) return mergeTst1(cached, "lightning");
+  const lightningDir = path.join(DATA_ROOT, "lightning");
+  const latestFile = path.join(lightningDir, "latest.json");
 
-  // cold start 폴백
-  const latestFile = path.join(DATA_ROOT, "lightning", "latest.json");
   let payload = {
     type: "lightning",
     fetched_at: new Date().toISOString(),
