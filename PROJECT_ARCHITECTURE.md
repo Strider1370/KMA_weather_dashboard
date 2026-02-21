@@ -159,7 +159,9 @@ KMA API (XML/텍스트/이미지)
 ```text
 frontend/src/utils/api.js
   -> frontend/server.js (/api/*)
-  -> backend/data/*/latest.json read
+  -> store.getCached(type) 인메모리 캐시 조회
+       hit  -> 즉시 res.json()
+       miss -> backend/data/*/latest.json read (cold start 폴백, 1회)
   -> App.jsx state 반영
   -> 컴포넌트 렌더링
 ```
@@ -204,12 +206,14 @@ server.js
 - canonical hash 기반 중복 저장 방지
 - `latest.json` 갱신, 파일 회전(max 10)
 - 실패 공항 이전값 `_stale` 병합 지원
+- `getCached(type)`: `cache[type].prev_data`를 반환하는 API 서빙용 게터 (스케줄러가 같은 프로세스에서 실행되므로 공유 메모리 직접 참조)
 
 ### frontend/server.js
 - `/api/metar|taf|warning|lightning|radar|status|airports|warning-types|alert-defaults`
 - `/api/refresh` (5개 프로세서 `Promise.allSettled` 실행)
 - `/data/*` 정적 파일 서빙 (레이더 PNG 포함)
 - 서버 시작 시 backend scheduler 자동 기동
+- `readLatest(category)` / `readLightning()`: `store.getCached(type)` 인메모리 캐시 우선 조회, null이면 `latest.json` 디스크 폴백 (cold start 1회만)
 
 ### frontend/src/App.jsx
 - 전체 데이터 로딩 및 공항 선택 상태 관리
@@ -225,8 +229,9 @@ server.js
 
 ---
 
-최종 업데이트: 2026-02-20
+최종 업데이트: 2026-02-21
 
 ### 주요 변경 이력 (최근)
+- **2026-02-21**: **인메모리 캐시 API 서빙 적용**; `store.js`에 `getCached(type)` 게터 추가; `server.js`의 `readLatest`/`readLightning`이 캐시 우선 조회 후 cold start 시에만 디스크 폴백; `radar`/바이너리 데이터는 제외; `Scheduler_Cache_Design.md` §3.4·§8 업데이트. **WIND_SHEAR 중복 경보 제거**; `warning-parser.js`에 동일 유효시간 중복 skip 로직 추가; `Warning_Parsing_Algorithm.md` §3.4·§8 업데이트.
 - **2026-02-20**: **고해상도 이진 레이더 타일 생성 및 중첩 기능 추가**; `generate-full-radar.js`, `generate-radar-tile.js` 테스트 스크립트 도입; Marshall-Palmer mm/h 변환 및 24단계 공식 색상 적용; Settings 내 레이더 오버레이 토글 및 투명도 조절 UI 추가; `TST1` 지역 우선 적용 및 축척(45km) 동기화 로직 구현.
 - **2026-02-20**: UTC/KST 시간대 표시 전환 기능 추가; Settings 탭 구조 도입; TafTimeline v2 실제값 그룹화 원칙 적용.

@@ -50,6 +50,10 @@ const cache = {
 };
 ```
 
+`prev_data`는 두 가지 목적으로 사용된다:
+1. **변경 감지 / stale 병합**: `mergeWithPrevious()`에서 이전 데이터 복구 소스
+2. **API 서빙**: `getCached(type)`을 통해 `server.js`가 디스크 없이 즉시 응답
+
 ### 3.2 canonical hash
 저장 여부 판단은 `canonicalHash(data)`로 결정한다.
 
@@ -59,6 +63,18 @@ const cache = {
 - `_stale`
 
 즉, 메타 필드 변화만 있을 때는 변경으로 보지 않는다.
+
+### 3.2 getCached(type)
+
+```js
+function getCached(type) {
+  return cache[type]?.prev_data ?? null;
+}
+```
+
+- `frontend/server.js`의 `readLatest(category)` / `readLightning()`이 호출
+- 스케줄러와 서버가 같은 프로세스(Node.js require cache 공유)이므로 별도 IPC 없이 동작
+- null 반환 시(cold start): 호출자가 `latest.json` 디스크 폴백을 1회 수행
 
 ### 3.3 unchanged 동작
 `store.save(type, data)`에서 hash 동일 시:
@@ -196,3 +212,5 @@ backend/data/
 | 8 | 락 동작 | 동일 타입 중복 실행 스킵 |
 | 9 | 재시작 | latest 기반으로 hash/prev_data 정상 복원 |
 | 10 | RADAR 수집 | PNG/metadata 최신화 및 이미지 순환 |
+| 11 | 정상 운영 중 `/api/metar` 조회 | getCached() hit → 디스크 접근 없이 즉시 응답 |
+| 12 | cold start 직후 첫 API 조회 | getCached() null → latest.json 폴백 → 응답 |
