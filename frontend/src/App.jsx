@@ -263,7 +263,7 @@ export default function App() {
                 lightning={data.lightning}
               />
               <StatusPanel status={data.status} tz={timeZone} />
-              <StatsPanel stats={statsData} tz={timeZone} />
+              <StatsPanel stats={statsData} metar={data.metar} tz={timeZone} />
               </>
             )}
             <section className="dashboard-layout">

@@ -15,7 +15,22 @@ function pct(success, total) {
   return (success / total * 100).toFixed(1) + "%";
 }
 
-export default function StatsPanel({ stats, tz = "UTC" }) {
+function ageMinutes(isoTime) {
+  if (!isoTime) return null;
+  return Math.floor((Date.now() - new Date(isoTime).getTime()) / 60000);
+}
+
+function ageLabel(ageMin) {
+  if (ageMin === null) return "—";
+  if (ageMin < 60) return `${ageMin}분 전`;
+  return `${Math.floor(ageMin / 60)}h${ageMin % 60}m 전`;
+}
+
+// RKSI: 30분 주기 → 40분 허용 / 그 외: 60분 주기 → 70분 허용
+const METAR_LIMIT = { RKSI: 40 };
+const METAR_DEFAULT_LIMIT = 70;
+
+export default function StatsPanel({ stats, metar, tz = "UTC" }) {
   if (!stats || !stats.types) return null;
 
   // 에러 유형별 합산 (전 타입)
@@ -145,7 +160,60 @@ export default function StatsPanel({ stats, tz = "UTC" }) {
         </>
       )}
 
-      {/* 표 4: 최근 수집 이력 */}
+      {/* 표 4: METAR 데이터 신선도 */}
+      {metar?.airports && Object.keys(metar.airports).length > 0 && (() => {
+        const metarStats = stats?.types?.metar;
+        return (
+          <>
+            <h4 className="stats-subtitle">METAR Data Freshness <span className="stats-hint">(RKSI: 40분 / 기타: 70분 초과 시 지연, SPECI 제외)</span></h4>
+            <div className="stats-table-wrap">
+              <table className="stats-table">
+                <thead>
+                  <tr>
+                    <th>Airport</th>
+                    <th>Report Type</th>
+                    <th>관측 시각</th>
+                    <th>경과</th>
+                    <th>현재 상태</th>
+                    <th>정상 수신</th>
+                    <th>지연</th>
+                    <th>정시율</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {Object.entries(metar.airports)
+                    .sort(([a], [b]) => a.localeCompare(b))
+                    .map(([icao, data]) => {
+                      const reportType = data?.header?.report_type || "—";
+                      const obsTime = data?.header?.observation_time || null;
+                      const ageMin = ageMinutes(obsTime);
+                      const isSpeci = reportType === "SPECI";
+                      const limit = METAR_LIMIT[icao] ?? METAR_DEFAULT_LIMIT;
+                      const late = !isSpeci && ageMin !== null && ageMin >= limit;
+                      const ontime = metarStats?.airport_ontime?.[icao] || 0;
+                      const lateCount = metarStats?.airport_late?.[icao] || 0;
+                      const totalChecked = ontime + lateCount;
+                      return (
+                        <tr key={icao} className={late ? "stats-row-warn" : ""}>
+                          <td className="stats-type">{icao}</td>
+                          <td className={isSpeci ? "stats-warn-text" : ""}>{reportType}</td>
+                          <td className="stats-time">{formatUtc(obsTime, tz)}</td>
+                          <td className={late ? "stats-failure" : "stats-success"}>{ageLabel(ageMin)}</td>
+                          <td>{isSpeci ? "—" : late ? "❌ 지연" : "✅ 정상"}</td>
+                          <td className="stats-success">{totalChecked ? ontime : "—"}</td>
+                          <td className={lateCount ? "stats-failure" : ""}>{totalChecked ? lateCount : "—"}</td>
+                          <td className={lateCount > ontime ? "stats-failure" : totalChecked ? "stats-success" : ""}>{totalChecked ? pct(ontime, totalChecked) : "—"}</td>
+                        </tr>
+                      );
+                    })}
+                </tbody>
+              </table>
+            </div>
+          </>
+        );
+      })()}
+
+      {/* 표 5: 최근 수집 이력 */}
       {recentRuns.length > 0 && (
         <>
           <h4 className="stats-subtitle">Recent Collection Runs <span className="stats-hint">(latest 20)</span></h4>

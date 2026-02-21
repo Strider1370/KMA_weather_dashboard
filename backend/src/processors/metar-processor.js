@@ -28,13 +28,24 @@ async function processAll() {
     store.mergeWithPrevious(result, "metar", failedAirports);
   }
 
+  const airportObsTimes = {};
+  for (const [icao, data] of Object.entries(result.airports)) {
+    if (data?.header) {
+      airportObsTimes[icao] = {
+        observation_time: data.header.observation_time || null,
+        report_type: data.header.report_type || null
+      };
+    }
+  }
+
   const saveResult = store.save("metar", result);
   return {
     type: "metar",
     saved: saveResult.saved,
     filePath: saveResult.filePath || null,
     total: Object.keys(result.airports).length,
-    failedAirports
+    failedAirports,
+    airportObsTimes
   };
 }
 
