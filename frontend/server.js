@@ -5,6 +5,8 @@ import { createRequire } from "module";
 import { fileURLToPath } from "url";
 
 const require = createRequire(import.meta.url);
+const store = require("../backend/src/store");
+const statsModule = require("../backend/src/stats");
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
@@ -27,10 +29,12 @@ function sendText(res, status, body, contentType = "text/plain; charset=utf-8") 
 }
 
 function readLatest(category) {
+  const cached = store.getCached(category);
+  if (cached !== null) return cached;
+  // cold start 폴백: initFromFiles() 전에 요청이 오는 경우
   const file = path.join(DATA_ROOT, category, "latest.json");
   if (!fs.existsSync(file)) return null;
-  const raw = fs.readFileSync(file, "utf8");
-  return JSON.parse(raw);
+  return JSON.parse(fs.readFileSync(file, "utf8"));
 }
 
 function readTst1Override(category) {
@@ -84,21 +88,20 @@ function mergeTst1(payload, category) {
 }
 
 function readLightning() {
-  const lightningDir = path.join(DATA_ROOT, "lightning");
-  const latestFile = path.join(lightningDir, "latest.json");
-
+  const cached = store.getCached("lightning");
+  if (cached !== null) return mergeTst1(cached, "lightning");
+  // cold start 폴백
+  const latestFile = path.join(DATA_ROOT, "lightning", "latest.json");
   let payload = {
     type: "lightning",
     fetched_at: new Date().toISOString(),
     query: { itv_minutes: 3, range_km: 32 },
     airports: {}
   };
-
   if (fs.existsSync(latestFile)) {
     payload = JSON.parse(fs.readFileSync(latestFile, "utf8"));
     if (!payload.airports) payload.airports = {};
   }
-
   return mergeTst1(payload, "lightning");
 }
 
@@ -231,6 +234,10 @@ const server = http.createServer(async (req, res) => {
 
     if (req.url === "/api/radar") {
       return sendJson(res, 200, readRadar());
+    }
+
+    if (req.url === "/api/stats") {
+      return sendJson(res, 200, statsModule.getStats());
     }
 
     if (req.url === "/api/airports") {

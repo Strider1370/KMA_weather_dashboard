@@ -1,6 +1,7 @@
 ﻿const cron = require("node-cron");
 const config = require("./config");
 const store = require("./store");
+const stats = require("./stats");
 const metarProcessor = require("./processors/metar-processor");
 const tafProcessor = require("./processors/taf-processor");
 const warningProcessor = require("./processors/warning-processor");
@@ -19,8 +20,10 @@ async function runWithLock(type, job) {
   try {
     const result = await job();
     console.log(`[${new Date().toISOString()}] ${type}:`, result);
+    stats.recordSuccess(type, result);
   } catch (error) {
     console.error(`[${new Date().toISOString()}] ${type} failed:`, error.message);
+    stats.recordFailure(type, error.message);
   } finally {
     locks[type] = false;
   }
@@ -29,6 +32,7 @@ async function runWithLock(type, job) {
 async function main() {
   store.ensureDirectories(config.storage.base_path);
   store.initFromFiles(config.storage.base_path);
+  stats.initFromFile(config.storage.base_path);
 
   console.log("Scheduler started");
 

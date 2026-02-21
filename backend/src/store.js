@@ -145,6 +145,10 @@ function updateCache(type, data, hash) {
   cache[type].prev_data = data;
 }
 
+function getCached(type) {
+  return cache[type]?.prev_data ?? null;
+}
+
 function initFromFiles(basePath) {
   for (const type of TYPES) {
     const dir = getTypeDir(basePath, type);
@@ -201,6 +205,7 @@ module.exports = {
   shouldSave,
   mergeWithPrevious,
   updateCache,
+  getCached,
   initFromFiles,
   save
 };

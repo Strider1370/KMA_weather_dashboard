@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import { loadAllData, loadAlertDefaults, triggerRefresh } from "./utils/api";
+import { loadAllData, loadAlertDefaults, triggerRefresh, fetchStats } from "./utils/api";
 import {
   evaluate,
   buildAlertKey,
@@ -23,6 +23,7 @@ import AlertPopup from "./components/alerts/AlertPopup";
 import AlertSound from "./components/alerts/AlertSound";
 import AlertMarquee from "./components/alerts/AlertMarquee";
 import Settings from "./components/alerts/Settings";
+import StatsPanel from "./components/StatsPanel";
 import "./App.css";
 
 export default function App() {
@@ -34,6 +35,7 @@ export default function App() {
   const [alertDefaults, setAlertDefaults] = useState(null);
   const [activeAlerts, setActiveAlerts] = useState([]);
   const [showSettings, setShowSettings] = useState(false);
+  const [statsData, setStatsData] = useState(null);
 
   // UI Version states
   const [metarVersion, setMetarVersion] = useState(() => localStorage.getItem("metar_version") || "v1");
@@ -70,11 +72,13 @@ export default function App() {
     setLoading(true);
     setError(null);
     try {
-      const [result, defaults] = await Promise.all([
+      const [result, defaults, stats] = await Promise.all([
         loadAllData(),
         alertDefaults ? Promise.resolve(alertDefaults) : loadAlertDefaults(),
+        fetchStats(),
       ]);
       setData(result);
+      if (stats) setStatsData(stats);
       if (!alertDefaults) setAlertDefaults(defaults);
 
       setSelectedAirport((prev) => {
@@ -259,6 +263,7 @@ export default function App() {
                 lightning={data.lightning}
               />
               <StatusPanel status={data.status} tz={timeZone} />
+              <StatsPanel stats={statsData} tz={timeZone} />
               </>
             )}
             <section className="dashboard-layout">
