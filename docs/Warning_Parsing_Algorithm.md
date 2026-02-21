@@ -96,6 +96,13 @@ API의 시간 필드는 `YYYYMMDDHHmm` 형식(예: `202602081137`)이다.
         wrng_type_name: "Unknown Warning"
 ```
 
+### 3.4 중복 제거 규칙 (Deduplication)
+
+급변풍경보(`WIND_SHEAR`)의 경우, 기상청 내부 메커니즘에 의해 동일한 유효시간을 가진 경보가 중복 발표되는 특성이 있다. 이를 위해 아래 규칙을 적용한다.
+
+- **대상**: `wrng_type_key`가 `WIND_SHEAR`인 경보
+- **규칙**: 동일 공항 내에서 `valid_start` 및 `valid_end`가 이미 처리된 급변풍경보와 동일한 경우, 해당 데이터는 추가하지 않고 무시한다.
+
 ---
 
 ## 4. 파싱 파이프라인
@@ -114,7 +121,8 @@ API의 시간 필드는 `YYYYMMDDHHmm` 형식(예: `202602081137`)이다.
 │    - validTm1, validTm2 → ISO 8601 변환      │
 │    - wrngMsg → 원문 보존                     │
 │                                              │
-│ 4. Warning 객체 생성                         │
+│ 4. Warning 객체 생성 및 중복 검사            │
+│    - WIND_SHEAR 타입인 경우 유효시간 비교    │
 │                                              │
 │ 5. 공항별 그룹핑                             │
 │                                              │
@@ -289,3 +297,4 @@ KMA_weather_dashboard/
 | 7 | 경보 정렬 | 같은 공항 내 발표 시각 오름차순 |
 | 8 | 빈 응답 (경보 없음) | airports: {}, total_count: 0 |
 | 9 | wrngMsg 원문 보존 | 특수문자(=, /) 포함 정상 저장 |
+| 10 | 급변풍 중복 제거 | 동일 유효시간의 WIND_SHEAR 1건만 유지 |
