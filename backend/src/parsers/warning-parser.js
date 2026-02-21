@@ -89,6 +89,17 @@ function parse(xmlString) {
       };
     }
 
+    if (warning.wrng_type_key === "WIND_SHEAR") {
+      const isDuplicate = result.airports[icao].warnings.some(existing => 
+        existing.wrng_type_key === "WIND_SHEAR" &&
+        existing.valid_start === warning.valid_start &&
+        existing.valid_end === warning.valid_end
+      );
+      if (isDuplicate) {
+        continue;
+      }
+    }
+
     result.airports[icao].warnings.push(warning);
     result.total_count += 1;
   }
