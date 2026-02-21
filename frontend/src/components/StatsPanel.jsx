@@ -105,31 +105,40 @@ export default function StatsPanel({ stats, tz = "UTC" }) {
         </>
       )}
 
-      {/* 표 3: 공항별 부분 실패 */}
+      {/* 표 3: 공항별 실패 횟수 및 실패율 */}
       {sortedAirports.length > 0 && (
         <>
-          <h4 className="stats-subtitle">Airport Partial Failures <span className="stats-hint">(within successful runs)</span></h4>
+          <h4 className="stats-subtitle">Airport API Failures</h4>
           <div className="stats-table-wrap">
             <table className="stats-table">
               <thead>
                 <tr>
                   <th>Airport</th>
-                  <th>METAR</th>
-                  <th>TAF</th>
-                  <th>Lightning</th>
-                  <th>Total</th>
+                  <th>METAR (fails/runs)</th>
+                  <th>Rate</th>
+                  <th>TAF (fails/runs)</th>
+                  <th>Rate</th>
+                  <th>Lightning (fails/runs)</th>
+                  <th>Rate</th>
                 </tr>
               </thead>
               <tbody>
-                {sortedAirports.map(([icao, counts]) => (
-                  <tr key={icao}>
-                    <td className="stats-type">{icao}</td>
-                    <td>{counts.metar || 0}</td>
-                    <td>{counts.taf || 0}</td>
-                    <td>{counts.lightning || 0}</td>
-                    <td className="stats-failure">{counts.total}</td>
-                  </tr>
-                ))}
+                {sortedAirports.map(([icao, counts]) => {
+                  const metarRuns = stats.types.metar?.total_runs || 0;
+                  const tafRuns = stats.types.taf?.total_runs || 0;
+                  const lightningRuns = stats.types.lightning?.total_runs || 0;
+                  return (
+                    <tr key={icao}>
+                      <td className="stats-type">{icao}</td>
+                      <td className={counts.metar ? "stats-failure" : ""}>{counts.metar ? `${counts.metar}/${metarRuns}` : "—"}</td>
+                      <td className={counts.metar ? "stats-failure" : ""}>{counts.metar ? pct(counts.metar, metarRuns) : "—"}</td>
+                      <td className={counts.taf ? "stats-failure" : ""}>{counts.taf ? `${counts.taf}/${tafRuns}` : "—"}</td>
+                      <td className={counts.taf ? "stats-failure" : ""}>{counts.taf ? pct(counts.taf, tafRuns) : "—"}</td>
+                      <td className={counts.lightning ? "stats-failure" : ""}>{counts.lightning ? `${counts.lightning}/${lightningRuns}` : "—"}</td>
+                      <td className={counts.lightning ? "stats-failure" : ""}>{counts.lightning ? pct(counts.lightning, lightningRuns) : "—"}</td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
