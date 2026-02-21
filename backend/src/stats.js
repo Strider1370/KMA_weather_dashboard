@@ -6,6 +6,11 @@ const path = require("path");
 const TYPES = ["metar", "taf", "warning", "lightning", "radar"];
 const MAX_RECENT_RUNS = 50;
 
+// METAR 정시 전문 지연 판단 기준 (분)
+// RKSI: 30분 주기 → 40분 허용 / 기타: 60분 주기 → 70분 허용
+const METAR_LIMIT_MIN = { RKSI: 40 };
+const METAR_DEFAULT_LIMIT_MIN = 70;
+
 function makeTypeEntry() {
   return {
     total_runs: 0,
@@ -45,6 +50,9 @@ function initFromFile(basePath) {
         if (!loaded.types[t].error_counts) loaded.types[t].error_counts = {};
         if (!loaded.types[t].airport_failures) loaded.types[t].airport_failures = {};
       }
+      // metar 전용 정시 수신 통계 필드 보정
+      if (!loaded.types.metar.airport_ontime) loaded.types.metar.airport_ontime = {};
+      if (!loaded.types.metar.airport_late) loaded.types.metar.airport_late = {};
       if (!Array.isArray(loaded.recent_runs)) loaded.recent_runs = [];
       statsData = loaded;
     } catch (e) {
@@ -86,6 +94,24 @@ function recordSuccess(type, result) {
   const failedAirports = Array.isArray(result?.failedAirports) ? result.failedAirports : [];
   for (const icao of failedAirports) {
     entry.airport_failures[icao] = (entry.airport_failures[icao] || 0) + 1;
+  }
+
+  // METAR 정시 수신 통계 (SPECI 제외)
+  if (type === "metar" && result?.airportObsTimes) {
+    if (!entry.airport_ontime) entry.airport_ontime = {};
+    if (!entry.airport_late) entry.airport_late = {};
+    const now = Date.now();
+    for (const [icao, info] of Object.entries(result.airportObsTimes)) {
+      if (!info.observation_time) continue;
+      if (info.report_type === "SPECI") continue;
+      const ageMin = Math.floor((now - new Date(info.observation_time).getTime()) / 60000);
+      const limit = METAR_LIMIT_MIN[icao] ?? METAR_DEFAULT_LIMIT_MIN;
+      if (ageMin >= limit) {
+        entry.airport_late[icao] = (entry.airport_late[icao] || 0) + 1;
+      } else {
+        entry.airport_ontime[icao] = (entry.airport_ontime[icao] || 0) + 1;
+      }
+    }
   }
 
   addRecentRun(type, true, null, failedAirports);
