@@ -54,6 +54,19 @@ export default function StatsPanel({ stats, metar, tz = "UTC" }) {
   }
   const sortedAirports = Object.entries(airportTotals).sort((a, b) => b[1].total - a[1].total);
 
+  // 공항별 주요 에러 (metar/taf/lightning 합산 후 최다 에러)
+  function getDominantError(icao) {
+    const combined = {};
+    for (const type of TYPES_WITH_AIRPORTS) {
+      const errs = stats.types[type]?.airport_error_counts?.[icao] || {};
+      for (const [msg, cnt] of Object.entries(errs)) {
+        combined[msg] = (combined[msg] || 0) + cnt;
+      }
+    }
+    const sorted = Object.entries(combined).sort((a, b) => b[1] - a[1]);
+    return sorted.length > 0 ? sorted[0][0] : null;
+  }
+
   const recentRuns = (stats.recent_runs || []).slice(0, 20);
 
   return (
@@ -135,6 +148,7 @@ export default function StatsPanel({ stats, metar, tz = "UTC" }) {
                   <th>Rate</th>
                   <th>Lightning (fails/runs)</th>
                   <th>Rate</th>
+                  <th>주요 에러</th>
                 </tr>
               </thead>
               <tbody>
@@ -142,6 +156,7 @@ export default function StatsPanel({ stats, metar, tz = "UTC" }) {
                   const metarRuns = stats.types.metar?.total_runs || 0;
                   const tafRuns = stats.types.taf?.total_runs || 0;
                   const lightningRuns = stats.types.lightning?.total_runs || 0;
+                  const dominantError = getDominantError(icao);
                   return (
                     <tr key={icao}>
                       <td className="stats-type">{icao}</td>
@@ -151,6 +166,7 @@ export default function StatsPanel({ stats, metar, tz = "UTC" }) {
                       <td className={counts.taf ? "stats-failure" : ""}>{counts.taf ? pct(counts.taf, tafRuns) : "—"}</td>
                       <td className={counts.lightning ? "stats-failure" : ""}>{counts.lightning ? `${counts.lightning}/${lightningRuns}` : "—"}</td>
                       <td className={counts.lightning ? "stats-failure" : ""}>{counts.lightning ? pct(counts.lightning, lightningRuns) : "—"}</td>
+                      <td className="stats-error-cell">{dominantError || "—"}</td>
                     </tr>
                   );
                 })}

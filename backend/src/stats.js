@@ -49,6 +49,7 @@ function initFromFile(basePath) {
         if (!loaded.types[t]) loaded.types[t] = makeTypeEntry();
         if (!loaded.types[t].error_counts) loaded.types[t].error_counts = {};
         if (!loaded.types[t].airport_failures) loaded.types[t].airport_failures = {};
+        if (!loaded.types[t].airport_error_counts) loaded.types[t].airport_error_counts = {};
       }
       // metar 전용 정시 수신 통계 필드 보정
       if (!loaded.types.metar.airport_ontime) loaded.types.metar.airport_ontime = {};
@@ -94,6 +95,16 @@ function recordSuccess(type, result) {
   const failedAirports = Array.isArray(result?.failedAirports) ? result.failedAirports : [];
   for (const icao of failedAirports) {
     entry.airport_failures[icao] = (entry.airport_failures[icao] || 0) + 1;
+  }
+
+  // 공항별 에러 메시지 집계
+  if (result?.airportErrors && typeof result.airportErrors === "object") {
+    if (!entry.airport_error_counts) entry.airport_error_counts = {};
+    for (const [icao, errMsg] of Object.entries(result.airportErrors)) {
+      if (!entry.airport_error_counts[icao]) entry.airport_error_counts[icao] = {};
+      const key = errMsg || "Unknown error";
+      entry.airport_error_counts[icao][key] = (entry.airport_error_counts[icao][key] || 0) + 1;
+    }
   }
 
   // METAR 정시 수신 통계 (SPECI 제외)

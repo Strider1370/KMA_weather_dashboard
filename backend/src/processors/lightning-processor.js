@@ -98,6 +98,7 @@ async function process() {
 
   const previous = store.loadLatest(path.join(config.storage.base_path, "lightning"));
   const failedAirports = [];
+  const airportErrors = {};
 
   for (const airport of config.airports) {
     try {
@@ -111,6 +112,7 @@ async function process() {
       };
     } catch (error) {
       failedAirports.push(airport.icao);
+      airportErrors[airport.icao] = error.message || "Unknown error";
       const prevAirport = previous?.airports?.[airport.icao];
       if (prevAirport) {
         result.airports[airport.icao] = {
@@ -135,7 +137,8 @@ async function process() {
     filePath: saveResult.filePath || null,
     airports: Object.keys(result.airports).length,
     totalStrikes,
-    failedAirports
+    failedAirports,
+    airportErrors
   };
 }
 
