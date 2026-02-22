@@ -11,6 +11,7 @@ async function processAll() {
   };
 
   const failedAirports = [];
+  const airportErrors = {};
 
   for (const airport of config.airports) {
     try {
@@ -21,6 +22,7 @@ async function processAll() {
       }
     } catch (error) {
       failedAirports.push(airport.icao);
+      airportErrors[airport.icao] = error.message || "Unknown error";
     }
   }
 
@@ -45,6 +47,7 @@ async function processAll() {
     filePath: saveResult.filePath || null,
     total: Object.keys(result.airports).length,
     failedAirports,
+    airportErrors,
     airportObsTimes
   };
 }
