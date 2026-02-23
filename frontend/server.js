@@ -5,6 +5,7 @@ import { createRequire } from "module";
 import { fileURLToPath } from "url";
 
 const require = createRequire(import.meta.url);
+const statsModule = require("../backend/src/stats");
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
@@ -230,6 +231,10 @@ const server = http.createServer(async (req, res) => {
 
     if (req.url === "/api/radar") {
       return sendJson(res, 200, readRadar());
+    }
+
+    if (req.url === "/api/stats") {
+      return sendJson(res, 200, statsModule.getStats());
     }
 
     if (req.url === "/api/airports") {

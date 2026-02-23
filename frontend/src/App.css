@@ -178,6 +178,25 @@ tr.row-danger td { background: #ffe9e7; }
 .status-sub { font-size: 0.8rem; color: var(--muted); }
 .status-note { margin: 0; padding: 10px; background: #fffef5; border-radius: 8px; border: 1px solid #f0ead8; font-size: 0.85rem; color: var(--muted); }
 
+/* Stats Panel */
+.stats-panel h4.stats-subtitle { margin: 14px 0 6px; font-size: 0.85rem; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; }
+.stats-panel .stats-since { font-size: 0.8rem; font-weight: 400; color: var(--muted); margin-left: 8px; }
+.stats-hint { font-size: 0.75rem; font-weight: 400; color: var(--muted); text-transform: none; letter-spacing: 0; }
+.stats-table-wrap { overflow-x: auto; margin-bottom: 4px; }
+.stats-table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
+.stats-table th { text-align: left; padding: 6px 10px; background: #f2f4f7; color: var(--muted); font-size: 0.78rem; font-weight: 600; border-bottom: 1px solid var(--line); }
+.stats-table td { padding: 5px 10px; border-bottom: 1px solid #f0ece5; vertical-align: middle; }
+.stats-table tbody tr:last-child td { border-bottom: none; }
+.stats-table tbody tr:hover { background: #fafaf8; }
+.stats-row-warn { background: #fff8f5; }
+.stats-row-warn:hover { background: #fff2ec !important; }
+.stats-type { font-weight: 600; font-size: 0.8rem; color: var(--ink); }
+.stats-success { color: #1a7d4a; font-weight: 600; }
+.stats-failure { color: #c0392b; font-weight: 600; }
+.stats-time { color: var(--muted); font-size: 0.78rem; white-space: nowrap; }
+.stats-error-cell { color: #8b2c2c; font-size: 0.8rem; word-break: break-word; max-width: 240px; }
+.stats-empty { color: var(--muted); font-size: 0.85rem; padding: 8px 0; margin: 0; }
+
 .loading-message { text-align: center; padding: 40px; color: var(--muted); font-size: 1.1rem; }
 .error-message { text-align: center; padding: 40px; color: #cc3d3d; font-size: 1rem; }
 .lightning-panel { display: grid; gap: 10px; }

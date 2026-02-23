@@ -32,6 +32,10 @@ export async function loadAlertDefaults() {
   return fetchJson("/api/alert-defaults");
 }
 
+export async function fetchStats() {
+  return fetchJsonOptional("/api/stats");
+}
+
 export async function triggerRefresh() {
   const response = await fetch("/api/refresh", { method: "POST" });
   if (!response.ok) {

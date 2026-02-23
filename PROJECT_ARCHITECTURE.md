@@ -155,7 +155,8 @@ KMA API (XML/텍스트/이미지)
 ```text
 frontend/src/utils/api.js
   -> frontend/server.js (/api/*)
-  -> backend/data/*/latest.json read
+  -> store.getCached(type) [메모리]
+     └─ null이면 backend/data/*/latest.json read [cold start 폴백]
   -> App.jsx state 반영
   -> 컴포넌트 렌더링
 ```
@@ -173,6 +174,7 @@ server.js
 ### backend/src/index.js
 - 스케줄 등록 및 실행 lock 관리 (`runWithLock`)
 - `metar/taf/warning/lightning/radar` 주기 작업 실행
+- `runWithLock` try/catch에서 `stats.recordSuccess()` / `stats.recordFailure()` 호출
 
 ### backend/src/config.js
 - `.env` 로드
@@ -190,17 +192,25 @@ server.js
 ### backend/src/parsers/taf-parser.js
 - `iwxxm:reportStatus` → `header.report_status` 필드 추출 (`'AMENDMENT'` 또는 `null`). 프론트엔드 AMD 표시에 활용.
 
+### backend/src/stats.js
+- 타입별 수집 성공/실패 통계 인메모리 관리
+- `error_counts`: 에러 메시지별 발생 횟수 집계 (KMA 서버 과실 증거)
+- `airport_failures`: metar/taf/lightning 공항별 부분 실패 누적
+- `recent_runs`: 최신 50건 수집 이력
+- `backend/data/stats/latest.json`에 영구 저장, 재시작 후 누적 복원
+- `initFromFile(basePath)` / `recordSuccess(type, result)` / `recordFailure(type, errMsg)` / `getStats()`
+
 ### backend/src/store.js
 - 타입: `metar`, `taf`, `warning`, `lightning`
 - canonical hash 기반 중복 저장 방지
 - `latest.json` 갱신, 파일 회전(max 10)
 - 실패 공항 이전값 `_stale` 병합 지원
-
 ### frontend/server.js
-- `/api/metar|taf|warning|lightning|radar|status|airports|warning-types|alert-defaults`
+- `/api/metar|taf|warning|lightning|radar|stats|status|airports|warning-types|alert-defaults`
 - `/api/refresh` (5개 프로세서 `Promise.allSettled` 실행)
 - `/data/*` 정적 파일 서빙 (레이더 PNG 포함)
 - 서버 시작 시 backend scheduler 자동 기동
+- `readLatest()`, `readLightning()`: 디스크(`latest.json`)에서 직접 읽음
 
 ### frontend/src/App.jsx
 - 전체 데이터 로딩 및 공항 선택 상태 관리
@@ -209,6 +219,7 @@ server.js
 - `boundaryLevel` state: Settings 저장 후 localStorage `lightning_boundary` 읽어 갱신. `LightningMap`에 prop 전달.
 - `windDir`: `data.metar.airports[icao].observation.wind` 에서 추출. CALM(`w.calm`) 또는 VRB(`w.variable`) 시 null 전달 → LightningMap 기본 runway_hdg 사용.
 - `timeZone` state: localStorage `time_zone` ('UTC'|'KST') 초기화, 기본값 `'KST'`. 변경 시 localStorage에 즉시 persist. Header/StatusPanel/MetarCard/WarningList/TafTimeline 모두에 `tz` prop으로 전달. `Settings`에는 `timeZone` + `setTimeZone` prop 전달.
+- `statsData` state 관리; `detailsOpen` 시 `StatsPanel` 렌더링
 
 ### shared/airports.js
 - 실제 공항 8개 + TST1(mock) 정의
@@ -250,6 +261,10 @@ server.js
   - **AMD 표시**: `target.header.report_status === 'AMENDMENT'` 시 제목에 "AMD" 표기.
 - **v3 (그리드)**: 시간대별 카드 형태 나열. `getDisplayDate(slot.time, tz).getUTCHours()` 사용.
 - 공통: `tz` prop(`'UTC'|'KST'`) 수신. 풍향 화살표(+180도 보정) 및 Gust(돌풍) 정보 포함.
+
+### frontend/src/components/StatsPanel.jsx
+- `detailsOpen` 패널 내 `StatusPanel` 아래 위치
+- 4개 표: 타입별 통계 / 에러 유형별 집계 / 공항별 부분 실패 / 최근 수집 이력
 
 ### frontend/src/components/LightningMap.jsx
 - Props: `lightningData`, `selectedAirport`, `airports`, `boundaryLevel = 'sigungu'`, `windDir = null`
@@ -468,11 +483,9 @@ node backend/test/run-once.js radar
 
 ---
 
-최종 업데이트: 2026-02-20
+최종 업데이트: 2026-02-21
 
 ### 주요 변경 이력 (최근)
+- **2026-02-21**: **API 수집 실패 통계 기능 추가**; `backend/src/stats.js` 신규 (타입별·공항별·에러 유형별 통계, 파일 영구 저장); `runWithLock`에 `recordSuccess/Failure` 훅; `/api/stats` 엔드포인트; `StatsPanel` 컴포넌트 (`detailsOpen` 패널 내 4개 표).
 - **2026-02-20**: UTC/KST 시간대 표시 전환 기능 추가 (`getDisplayDate`, `formatUtc` 확장); Settings 탭 구조 도입(일반/알람 분리); `AlertSettings.jsx` → `Settings.jsx` 파일명 변경; TafTimeline v2 실제값 그룹화 원칙 적용(바람·운고·시정), valid_end 마커, AMD 표시, KST 시간 눈금 지원; `taf-parser.js` `report_status` 필드 추가.
 - **2026-02-19**: TafTimeline v2 바람/운고 표시 로직 개선, 운고 8방위+5kt 그룹화에서 실제 풍향/속도 그룹화로 변경.
-
-
-

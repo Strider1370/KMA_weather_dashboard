@@ -50,7 +50,24 @@ const cache = {
 };
 ```
 
-### 3.2 canonical hash
+`prev_data`는 두 가지 용도로 사용된다:
+1. **변경 감지**: `shouldSave()`에서 이전 hash와 비교
+2. **API 서빙**: `getCached(type)`을 통해 `server.js`가 메모리 우선 응답에 사용
+
+### 3.2 getCached(type)
+`server.js`의 `/api/metar|taf|warning|lightning` 응답 시 호출된다.
+
+```js
+function getCached(type) {
+  return cache[type]?.prev_data ?? null;
+}
+```
+
+- 반환값이 `null`이 아니면 메모리에서 즉시 응답
+- `null`이면 디스크(`latest.json`) 폴백 (cold start 시에만 해당)
+- `server.js`와 `backend/src/index.js`는 같은 Node.js 프로세스 내에서 동일한 `store` 모듈 인스턴스를 공유하므로, 스케줄러가 `updateCache()`로 갱신하면 서버 측에서 즉시 반영된다.
+
+### 3.3 canonical hash (구 3.2)
 저장 여부 판단은 `canonicalHash(data)`로 결정한다.
 
 해시 계산 시 제외 필드:
@@ -60,7 +77,7 @@ const cache = {
 
 즉, 메타 필드 변화만 있을 때는 변경으로 보지 않는다.
 
-### 3.3 unchanged 동작
+### 3.5 unchanged 동작
 `store.save(type, data)`에서 hash 동일 시:
 - 새 타임스탬프 파일은 생성하지 않음
 - 기존 `latest.json`의 `fetched_at`만 갱신
@@ -196,3 +213,5 @@ backend/data/
 | 8 | 락 동작 | 동일 타입 중복 실행 스킵 |
 | 9 | 재시작 | latest 기반으로 hash/prev_data 정상 복원 |
 | 10 | RADAR 수집 | PNG/metadata 최신화 및 이미지 순환 |
+| 11 | API 요청 (정상 운영 중) | `[CACHE HIT]` — 디스크 I/O 없이 메모리 응답 |
+| 12 | API 요청 (cold start) | `[DISK READ]` — latest.json 폴백 후 이후 요청은 캐시 |
