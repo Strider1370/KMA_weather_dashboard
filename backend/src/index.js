@@ -17,13 +17,14 @@ async function runWithLock(type, job) {
   }
 
   locks[type] = true;
+  const startTime = new Date().toISOString();
   try {
     const result = await job();
     console.log(`[${new Date().toISOString()}] ${type}:`, result);
-    stats.recordSuccess(type, result);
+    stats.recordSuccess(type, result, startTime);
   } catch (error) {
     console.error(`[${new Date().toISOString()}] ${type} failed:`, error.message);
-    stats.recordFailure(type, error.message);
+    stats.recordFailure(type, error.message, startTime);
   } finally {
     locks[type] = false;
   }

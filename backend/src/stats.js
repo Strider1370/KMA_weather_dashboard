@@ -6,10 +6,15 @@ const path = require("path");
 const TYPES = ["metar", "taf", "warning", "lightning", "radar"];
 const MAX_RECENT_RUNS = 50;
 
-// METAR 정시 전문 지연 판단 기준 (분)
-// RKSI: 30분 주기 → 40분 허용 / 기타: 60분 주기 → 70분 허용
-const METAR_LIMIT_MIN = { RKSI: 40 };
-const METAR_DEFAULT_LIMIT_MIN = 70;
+// In-memory only — cleared when a run completes (not persisted to disk)
+const retryState = {};
+
+// RKSI observes every 30 min; all others observe every hour.
+function getExpectedMetarTime(icao, now) {
+  const d = new Date(now);
+  const windowMin = (icao === "RKSI" && d.getUTCMinutes() >= 30) ? 30 : 0;
+  return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), d.getUTCHours(), windowMin));
+}
 
 function makeTypeEntry() {
   return {
@@ -71,10 +76,12 @@ function saveToFile() {
   }
 }
 
-function addRecentRun(type, success, error, failedAirports) {
+function addRecentRun(type, success, error, failedAirports, startTime) {
+  const endTime = new Date().toISOString();
   statsData.recent_runs.unshift({
     type,
-    time: new Date().toISOString(),
+    start_time: startTime || endTime,
+    time: endTime,
     success,
     error: error || null,
     failed_airports: failedAirports || []
@@ -84,7 +91,17 @@ function addRecentRun(type, success, error, failedAirports) {
   }
 }
 
-function recordSuccess(type, result) {
+function setRetryState(type, staleIcaos, attempt, maxRetries) {
+  retryState[type] = { stale_icaos: staleIcaos, attempt, max_retries: maxRetries };
+}
+
+function clearRetryState(type) {
+  delete retryState[type];
+}
+
+function recordSuccess(type, result, startTime) {
+  clearRetryState(type);
+
   const entry = statsData.types[type];
   if (!entry) return;
 
@@ -107,17 +124,17 @@ function recordSuccess(type, result) {
     }
   }
 
-  // METAR 정시 수신 통계 (SPECI 제외)
+  // METAR 정시 수신 통계: 정시 관측 윈도우 기준 (SPECI 제외)
+  // RKSI는 30분 주기, 그 외는 60분 주기 윈도우
   if (type === "metar" && result?.airportObsTimes) {
     if (!entry.airport_ontime) entry.airport_ontime = {};
     if (!entry.airport_late) entry.airport_late = {};
-    const now = Date.now();
+    const now = new Date();
     for (const [icao, info] of Object.entries(result.airportObsTimes)) {
       if (!info.observation_time) continue;
       if (info.report_type === "SPECI") continue;
-      const ageMin = Math.floor((now - new Date(info.observation_time).getTime()) / 60000);
-      const limit = METAR_LIMIT_MIN[icao] ?? METAR_DEFAULT_LIMIT_MIN;
-      if (ageMin >= limit) {
+      const expected = getExpectedMetarTime(icao, now);
+      if (new Date(info.observation_time) < expected) {
         entry.airport_late[icao] = (entry.airport_late[icao] || 0) + 1;
       } else {
         entry.airport_ontime[icao] = (entry.airport_ontime[icao] || 0) + 1;
@@ -125,11 +142,13 @@ function recordSuccess(type, result) {
     }
   }
 
-  addRecentRun(type, true, null, failedAirports);
+  addRecentRun(type, true, null, failedAirports, startTime);
   saveToFile();
 }
 
-function recordFailure(type, errorMsg) {
+function recordFailure(type, errorMsg, startTime) {
+  clearRetryState(type);
+
   const entry = statsData.types[type];
   if (!entry) return;
 
@@ -143,12 +162,12 @@ function recordFailure(type, errorMsg) {
   const key = errorMsg || "Unknown error";
   entry.error_counts[key] = (entry.error_counts[key] || 0) + 1;
 
-  addRecentRun(type, false, errorMsg, []);
+  addRecentRun(type, false, errorMsg, [], startTime);
   saveToFile();
 }
 
 function getStats() {
-  return statsData;
+  return { ...statsData, retry_state: retryState };
 }
 
-module.exports = { initFromFile, recordSuccess, recordFailure, getStats };
+module.exports = { initFromFile, recordSuccess, recordFailure, getStats, setRetryState, clearRetryState };

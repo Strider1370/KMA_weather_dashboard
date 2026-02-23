@@ -19,11 +19,13 @@ METAR, TAF, 공항경보, 낙뢰, 레이더 데이터를 주기적으로 수집�
 
 | 데이터 | Cron | 주기 |
 |---|---|---|
-| METAR | `*/10 * * * *` | 10분 |
-| TAF | `*/30 * * * *` | 30분 |
+| METAR | `*/5 * * * *` | 5분 |
+| TAF | `*/10 * * * *` | 10분 |
 | WARNING | `*/5 * * * *` | 5분 |
 | LIGHTNING | `*/3 * * * *` | 3분 |
 | RADAR | `*/5 * * * *` | 5분 |
+
+METAR 5분 주기 근거: 비정기 특별 관측(SPECI)이 언제 발행될지 알 수 없어, 빠른 폴링이 필요하다.
 
 ### 2.2 실행 락
 `backend/src/index.js`의 `runWithLock(type, job)`가 동일 타입 중복 실행을 방지한다.
@@ -33,6 +35,35 @@ const locks = { metar: false, taf: false, warning: false, lightning: false, rada
 ```
 
 동일 타입 작업이 실행 중이면 해당 주기는 스킵된다.
+
+### 2.3 재시도 로직
+
+#### APPLICATION_ERROR 재시도
+KMA API가 `APPLICATION_ERROR`(resultCode "01")를 반환할 경우 서버 측 일시 오류로 간주하고 재시도한다.
+
+**METAR / TAF** (`metar-processor.js`, `taf-processor.js`):
+- 초기 공항 순회 후 실패 공항을 모아 **배치 재시도** (최대 `app_error_max_retries`회, 각 30초 대기)
+- 배치 단위로 재시도하므로 대기 시간이 공항 수에 무관하게 고정된다.
+
+**WARNING** (`warning-processor.js`):
+- 단일 API 호출이므로 최대 `app_error_max_retries_warning`회 재시도 (각 30초 대기)
+
+#### 정시성 재시도 (METAR / TAF)
+APPLICATION_ERROR 재시도 이후에도 데이터가 현재 관측 윈도우보다 오래됐을 경우 정시성 재시도를 수행한다.
+
+- **METAR 윈도우**: RKSI는 30분 주기(HH:00Z, HH:30Z), 나머지는 60분 주기(HH:00Z)
+- **TAF 윈도우**: 6시간 주기 (00Z / 06Z / 12Z / 18Z)
+- 최대 `punctuality_max_retries`회(10회), 각 30초 간격으로 재시도
+- 재시도 중인 공항 목록과 회차는 `stats.setRetryState()`를 통해 인메모리에 기록되어 프론트엔드에 실시간 노출됨
+
+관련 config 값:
+
+| 키 | 기본값 | 설명 |
+|---|---|---|
+| `app_error_retry_ms` | 30000 | 재시도 대기 시간 (ms) |
+| `app_error_max_retries` | 2 | METAR/TAF APPLICATION_ERROR 배치 재시도 횟수 |
+| `app_error_max_retries_warning` | 1 | WARNING APPLICATION_ERROR 재시도 횟수 |
+| `punctuality_max_retries` | 10 | 정시성 재시도 최대 횟수 |
 
 ---
 
@@ -157,8 +188,11 @@ backend/data/
 ### 6.2 METAR/TAF 대표 흐름
 1. 공항 순회 호출
 2. 파싱 성공 건만 `result.airports`에 반영
-3. 실패 공항 복구 시도(`mergeWithPrevious`)
-4. `store.save(type, result)`로 hash 비교/저장
+3. APPLICATION_ERROR 발생 공항 배치 재시도 (최대 2회 × 30초)
+4. 정시성 재시도: 현재 관측 윈도우 이전 데이터인 공항에 대해 최대 10회 × 30초 재시도
+   - 재시도 중 `stats.setRetryState()`로 회차 기록
+5. 실패 공항 복구 시도(`mergeWithPrevious`)
+6. `store.save(type, result)`로 hash 비교/저장
 
 ### 6.3 WARNING 대표 흐름
 1. 경보 API 1회 호출
@@ -196,6 +230,10 @@ backend/data/
 `config.api`:
 - `timeout_ms`
 - `max_retries`
+- `app_error_retry_ms` (APPLICATION_ERROR / 정시성 재시도 간격, ms)
+- `app_error_max_retries` (METAR/TAF APPLICATION_ERROR 배치 재시도 횟수)
+- `app_error_max_retries_warning` (WARNING APPLICATION_ERROR 재시도 횟수)
+- `punctuality_max_retries` (정시성 재시도 최대 횟수)
 
 ---
 

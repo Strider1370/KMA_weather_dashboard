@@ -110,19 +110,28 @@ backend/data/stats/latest.json
   "recent_runs": [
     {
       "type": "warning",
-      "time": "2026-02-21T12:55:00.000Z",
+      "start_time": "2026-02-21T12:55:00.000Z",
+      "time": "2026-02-21T12:55:31.000Z",
       "success": false,
       "error": "APPLICATION_ERROR",
       "failed_airports": []
     },
     {
       "type": "metar",
-      "time": "2026-02-21T12:50:00.000Z",
+      "start_time": "2026-02-21T12:50:00.000Z",
+      "time": "2026-02-21T12:53:12.000Z",
       "success": true,
       "error": null,
       "failed_airports": ["RKSI", "RKSS"]
     }
-  ]
+  ],
+  "retry_state": {
+    "metar": {
+      "stale_icaos": ["RKSI", "RKPK"],
+      "attempt": 3,
+      "max_retries": 10
+    }
+  }
 }
 ```
 
@@ -139,7 +148,13 @@ backend/data/stats/latest.json
 | `types.metar.airport_ontime` | object | 공항 ICAO → 정시 수신 횟수 (SPECI 제외, metar 전용) |
 | `types.metar.airport_late` | object | 공항 ICAO → 지연 수신 횟수 (SPECI 제외, metar 전용) |
 | `recent_runs` | array | 최신 50건 수집 이력, 역순 정렬 |
+| `recent_runs[].start_time` | ISO string | 수집 시작 시각 (runWithLock 진입 시점) |
+| `recent_runs[].time` | ISO string | 수집 완료 시각 |
 | `recent_runs[].failed_airports` | array | 해당 실행에서 실패한 공항 목록 (성공 실행에서도 partial failure 기록) |
+| `retry_state` | object | 현재 진행 중인 정시성 재시도 상태 (인메모리 전용, 파일 미저장) |
+| `retry_state.metar.stale_icaos` | array | 재시도 중인 공항 ICAO 목록 |
+| `retry_state.metar.attempt` | number | 현재 재시도 회차 (1~10) |
+| `retry_state.metar.max_retries` | number | 최대 재시도 횟수 |
 
 ### 2.4 성공 vs 실패 판단 기준
 
@@ -154,13 +169,19 @@ backend/data/stats/latest.json
 
 ### 2.5 METAR 정시 수신 판단 기준
 
-| 공항 | 발행 주기 | 지연 판단 기준 |
-|------|---------|------------|
-| RKSI | 30분 | 관측 시각 기준 40분 초과 |
-| 기타 전 공항 | 60분 | 관측 시각 기준 70분 초과 |
+경과 시간 임계값 방식 대신 **관측 윈도우 기준**으로 판단한다.
 
+| 공항 | 관측 주기 | 현재 윈도우 계산 |
+|------|---------|----------------|
+| RKSI | 30분 | 현재 분 ≥ 30 → HH:30Z, 그 외 → HH:00Z |
+| 기타 전 공항 | 60분 | HH:00Z |
+
+판단 규칙:
+- `observation_time < 현재 윈도우 시작` → 미확보 (`airport_late[icao]++`)
+- `observation_time >= 현재 윈도우 시작` → 정상 (`airport_ontime[icao]++`)
 - SPECI(특별 관측)는 비정기 발행이므로 판단 대상에서 제외
-- `recordSuccess("metar", result)` 호출 시점의 현재 시각 기준으로 `header.observation_time` 경과 시간 계산
+
+예시: 10:03Z에 수집한 경우 기대 윈도우 = 10:00Z. `observation_time = 09:00Z`이면 미확보, `10:00Z`이면 정상.
 
 ---
 
@@ -196,24 +217,34 @@ let statsData = {
 - 이전 버전 파일 호환: 누락 필드 자동 보정 (`error_counts`, `airport_failures`, `airport_ontime`, `airport_late`)
 - `statsFilePath` 설정
 
-#### `recordSuccess(type, result)`
+#### `recordSuccess(type, result, startTime)`
+- `clearRetryState(type)` 호출
 - `total_runs++`, `success++`, `last_run` 갱신
 - `result.failedAirports` 배열 각 ICAO에 대해 `airport_failures[icao]++`
-- **metar 전용**: `result.airportObsTimes` 존재 시, 공항별 `observation_time` 경과를 기준값과 비교하여 `airport_ontime[icao]++` 또는 `airport_late[icao]++` 누적 (SPECI 제외)
-- `recent_runs`에 `{ type, time, success: true, error: null, failed_airports }` prepend
+- **metar 전용**: `result.airportObsTimes` 존재 시, 공항별 `observation_time`을 관측 윈도우 기준으로 비교하여 `airport_ontime[icao]++` 또는 `airport_late[icao]++` 누적 (SPECI 제외)
+- `recent_runs`에 `{ type, start_time, time, success: true, error: null, failed_airports }` prepend
 - `saveToFile()` 호출
 
-#### `recordFailure(type, errorMsg)`
+#### `recordFailure(type, errorMsg, startTime)`
+- `clearRetryState(type)` 호출
 - `total_runs++`, `failure++`, `last_run` / `last_failure` / `last_error` 갱신
 - `error_counts[errorMsg]++` (에러 유형별 집계)
-- `recent_runs`에 `{ type, time, success: false, error: errorMsg, failed_airports: [] }` prepend
+- `recent_runs`에 `{ type, start_time, time, success: false, error: errorMsg, failed_airports: [] }` prepend
 - `saveToFile()` 호출
+
+#### `setRetryState(type, staleIcaos, attempt, maxRetries)`
+- `retryState[type]` 갱신 (인메모리 전용)
+- `metar-processor.js`의 정시성 재시도 루프에서 각 회차 슬립 직전 호출
+
+#### `clearRetryState(type)`
+- `retryState[type]` 삭제
+- `recordSuccess` / `recordFailure` 호출 시 자동 실행
 
 #### `saveToFile()`
 - `statsFilePath`에 `JSON.stringify(statsData, null, 2)` 동기 write
 
 #### `getStats()`
-- `statsData` 반환
+- `{ ...statsData, retry_state: retryState }` 반환 (`retry_state`는 인메모리, 파일 미저장)
 
 ### 3.3 훅 위치 (`backend/src/index.js`)
 
@@ -222,11 +253,12 @@ const stats = require("./stats");
 
 async function runWithLock(type, job) {
   // ... 락 처리 ...
+  const startTime = new Date().toISOString();
   try {
     const result = await job();
-    stats.recordSuccess(type, result);
+    stats.recordSuccess(type, result, startTime);
   } catch (error) {
-    stats.recordFailure(type, error.message);
+    stats.recordFailure(type, error.message, startTime);
   } finally {
     locks[type] = false;
   }
@@ -320,22 +352,31 @@ Props: `stats` (statsData 객체), `metar` (현재 메타 데이터), `tz` (시�
 
 #### 표 4: METAR 데이터 신선도 + 누적 정시율
 
-현재 전문 상태와 누적 정시 수신 통계를 함께 표시:
+현재 전문 상태와 누적 정시 수신 통계를 함께 표시. **판단 기준은 관측 윈도우** (과거 경과 시간 임계값 아님).
 
-| 공항 | Report Type | 관측 시각 | 경과 | 현재 상태 | 정상 수신 | 지연 | 정시율 |
+| 공항 | Report Type | 관측 시각 | 경과 | 현재 상태 | 정상 수신 | 미확보 | 정시율 |
 |------|------------|---------|------|---------|---------|------|--------|
-| RKSI | METAR | 21:00 KST | 15분 전 | ✅ 정상 | 40 | 6 | 87.0% |
-| RKSS | SPECI | 20:47 KST | 28분 전 | — | 38 | 8 | 82.6% |
+| RKSI | METAR | 10:00Z | 3분 전 | ✅ 정상 | 40 | 6 | 87.0% |
+| RKPK | METAR | 09:00Z | 63분 전 | ⏳ 재시도 중 (2/10) | 38 | 8 | 82.6% |
+| RKSS | SPECI | 09:47Z | 13분 전 | — | 38 | 8 | 82.6% |
 
-- SPECI: 현재 상태 `—`, 누적 정시율은 METAR(정시) 전문만 카운트하므로 별도 표기
+- `✅ 정상`: `observation_time >= 현재 윈도우 시작`
+- `⏳ 재시도 중 (N/10)`: 정시성 재시도 진행 중 (`retry_state.metar` 참조)
+- `❌ 미확보`: 재시도 완료 후에도 stale 상태
+- SPECI: 현재 상태 `—`
 - 통계 데이터 없으면 `—` 표시
 
-#### 표 5: 최근 수집 이력 (최신 20건)
+#### 표 5a/5b: 최근 수집 이력 (타입별 분리, 각 최신 20건)
 
-| 시각 | 타입 | 결과 | 에러 메시지 | 실패 공항 |
-|------|------|------|------------|---------|
-| 21:00 KST | WARNING | ❌ | APPLICATION_ERROR | — |
-| 21:00 KST | METAR | ✅ | — | RKSI, RKSS |
+METAR/TAF와 WARNING/LIGHTNING/RADAR를 별도 테이블로 표시.
+
+| 시작 | 소요 | 타입 | 결과 | 에러 메시지 | 실패 공항 |
+|------|------|------|------|------------|---------|
+| 10:05 KST | 3m 12s | METAR | ✅ | — | RKSI |
+| 10:05 KST | 31s | WARNING | ❌ | APPLICATION_ERROR | — |
+
+- `시작`: `start_time` (runWithLock 진입 시점)
+- `소요`: `time - start_time` (재시도 포함 전체 소요 시간)
 
 ### 5.3 데이터 로딩 (`frontend/src/App.jsx`)
 
@@ -353,7 +394,7 @@ StatsPanel은 `detailsOpen && statsData` 조건 하에 렌더링.
 | `backend/src/processors/metar-processor.js` | `airportObsTimes` 반환 추가 |
 | `frontend/server.js` | `statsModule` require + `/api/stats` 라우터 |
 | `frontend/src/utils/api.js` | `fetchStats()` 추가 |
-| `frontend/src/components/StatsPanel.jsx` | NEW + 표 4 정시율 컬럼 추가 |
+| `frontend/src/components/StatsPanel.jsx` | NEW + 표 4 정시율 컬럼 추가; 관측 윈도우 기반 판단 + 재시도 상태 표시; 표 5 METAR/TAF·기타 분리 + 시작/소요 컬럼 추가 |
 | `frontend/src/App.jsx` | `statsData` state + `StatsPanel` 렌더링 |
 
 ---
@@ -377,3 +418,4 @@ StatsPanel은 `detailsOpen && statsData` 조건 하에 렌더링.
 
 최초 작성: 2026-02-21
 정시율 추적 추가: 2026-02-22
+관측 윈도우 기반 판단·재시도 상태·시작/소요 시간 추가: 2026-02-23

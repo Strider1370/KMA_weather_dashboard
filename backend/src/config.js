@@ -31,7 +31,11 @@ module.exports = {
     auth_key: process.env.API_AUTH_KEY || "",
     default_params: { pageNo: 1, numOfRows: 10, dataType: "XML" },
     timeout_ms: 10000,
-    max_retries: 3
+    max_retries: 3,
+    app_error_retry_ms: 30000,
+    app_error_max_retries: 2,
+    app_error_max_retries_warning: 1,
+    punctuality_max_retries: 10
   },
   airports,
   lightning: {
@@ -51,8 +55,8 @@ module.exports = {
     timeout_ms: 15000
   },
   schedule: {
-    metar_interval: "*/10 * * * *",
-    taf_interval: "*/30 * * * *",
+    metar_interval: "*/5 * * * *",
+    taf_interval: "*/10 * * * *",
     warning_interval: "*/5 * * * *",
     lightning_interval: "*/3 * * * *",
     radar_interval: "*/5 * * * *"

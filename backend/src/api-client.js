@@ -89,7 +89,8 @@ async function fetchApi(type, icao = null) {
 
       return body;
     } catch (error) {
-      if (error.nonRetryable || attempt === config.api.max_retries) {
+      const isAppError = /APPLICATION_ERROR/.test(error.message);
+      if (error.nonRetryable || isAppError || attempt === config.api.max_retries) {
         throw error;
       }
       await sleep(attempt * 2000);

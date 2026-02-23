@@ -190,6 +190,9 @@ tr.row-danger td { background: #ffe9e7; }
 .stats-table tbody tr:hover { background: #fafaf8; }
 .stats-row-warn { background: #fff8f5; }
 .stats-row-warn:hover { background: #fff2ec !important; }
+.stats-row-retry { background: #fffbf0; }
+.stats-row-retry:hover { background: #fff6e0 !important; }
+.stats-retry-text { color: #a05c00; font-weight: 600; }
 .stats-type { font-weight: 600; font-size: 0.8rem; color: var(--ink); }
 .stats-success { color: #1a7d4a; font-weight: 600; }
 .stats-failure { color: #c0392b; font-weight: 600; }

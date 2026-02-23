@@ -20,15 +20,29 @@ function ageMinutes(isoTime) {
   return Math.floor((Date.now() - new Date(isoTime).getTime()) / 60000);
 }
 
+function durationLabel(startIso, endIso) {
+  if (!startIso || !endIso) return "—";
+  const sec = Math.round((new Date(endIso) - new Date(startIso)) / 1000);
+  if (sec < 60) return `${sec}s`;
+  return `${Math.floor(sec / 60)}m ${sec % 60}s`;
+}
+
 function ageLabel(ageMin) {
   if (ageMin === null) return "—";
   if (ageMin < 60) return `${ageMin}분 전`;
   return `${Math.floor(ageMin / 60)}h${ageMin % 60}m 전`;
 }
 
-// RKSI: 30분 주기 → 40분 허용 / 그 외: 60분 주기 → 70분 허용
-const METAR_LIMIT = { RKSI: 40 };
-const METAR_DEFAULT_LIMIT = 70;
+// RKSI observes every 30 min; all others observe every hour.
+function getExpectedMetarTime(icao, now) {
+  const windowMin = (icao === "RKSI" && now.getUTCMinutes() >= 30) ? 30 : 0;
+  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), now.getUTCHours(), windowMin));
+}
+
+function isMetarStale(icao, obsTimeStr, now) {
+  if (!obsTimeStr) return true;
+  return new Date(obsTimeStr) < getExpectedMetarTime(icao, now);
+}
 
 export default function StatsPanel({ stats, metar, tz = "UTC" }) {
   if (!stats || !stats.types) return null;
@@ -67,7 +81,9 @@ export default function StatsPanel({ stats, metar, tz = "UTC" }) {
     return sorted.length > 0 ? sorted[0][0] : null;
   }
 
-  const recentRuns = (stats.recent_runs || []).slice(0, 20);
+  const allRecentRuns = stats.recent_runs || [];
+  const recentMetarTaf = allRecentRuns.filter(r => r.type === "metar" || r.type === "taf").slice(0, 20);
+  const recentOther = allRecentRuns.filter(r => r.type === "warning" || r.type === "lightning" || r.type === "radar").slice(0, 20);
 
   return (
     <section className="panel stats-panel">
@@ -176,12 +192,14 @@ export default function StatsPanel({ stats, metar, tz = "UTC" }) {
         </>
       )}
 
-      {/* 표 4: METAR 데이터 신선도 */}
+      {/* 표 4: METAR 데이터 정시성 */}
       {metar?.airports && Object.keys(metar.airports).length > 0 && (() => {
         const metarStats = stats?.types?.metar;
+        const metarRetry = stats?.retry_state?.metar || null;
+        const now = new Date();
         return (
           <>
-            <h4 className="stats-subtitle">METAR Data Freshness <span className="stats-hint">(RKSI: 40분 / 기타: 70분 초과 시 지연, SPECI 제외)</span></h4>
+            <h4 className="stats-subtitle">METAR Data Freshness <span className="stats-hint">(정시 관측 윈도우 기준 — RKSI: 매 30분 / 기타: 매 시간, SPECI 제외)</span></h4>
             <div className="stats-table-wrap">
               <table className="stats-table">
                 <thead>
@@ -192,7 +210,7 @@ export default function StatsPanel({ stats, metar, tz = "UTC" }) {
                     <th>경과</th>
                     <th>현재 상태</th>
                     <th>정상 수신</th>
-                    <th>지연</th>
+                    <th>미확보</th>
                     <th>정시율</th>
                   </tr>
                 </thead>
@@ -204,18 +222,30 @@ export default function StatsPanel({ stats, metar, tz = "UTC" }) {
                       const obsTime = data?.header?.observation_time || null;
                       const ageMin = ageMinutes(obsTime);
                       const isSpeci = reportType === "SPECI";
-                      const limit = METAR_LIMIT[icao] ?? METAR_DEFAULT_LIMIT;
-                      const late = !isSpeci && ageMin !== null && ageMin >= limit;
+                      const stale = !isSpeci && isMetarStale(icao, obsTime, now);
+                      const isRetrying = stale && metarRetry?.stale_icaos?.includes(icao);
                       const ontime = metarStats?.airport_ontime?.[icao] || 0;
                       const lateCount = metarStats?.airport_late?.[icao] || 0;
                       const totalChecked = ontime + lateCount;
+
+                      let statusCell;
+                      if (isSpeci) {
+                        statusCell = "—";
+                      } else if (isRetrying) {
+                        statusCell = `⏳ 재시도 중 (${metarRetry.attempt}/${metarRetry.max_retries})`;
+                      } else if (stale) {
+                        statusCell = "❌ 미확보";
+                      } else {
+                        statusCell = "✅ 정상";
+                      }
+
                       return (
-                        <tr key={icao} className={late ? "stats-row-warn" : ""}>
+                        <tr key={icao} className={stale && !isRetrying ? "stats-row-warn" : isRetrying ? "stats-row-retry" : ""}>
                           <td className="stats-type">{icao}</td>
                           <td className={isSpeci ? "stats-warn-text" : ""}>{reportType}</td>
                           <td className="stats-time">{formatUtc(obsTime, tz)}</td>
-                          <td className={late ? "stats-failure" : "stats-success"}>{ageLabel(ageMin)}</td>
-                          <td>{isSpeci ? "—" : late ? "❌ 지연" : "✅ 정상"}</td>
+                          <td className={stale ? "stats-failure" : "stats-success"}>{ageLabel(ageMin)}</td>
+                          <td className={isRetrying ? "stats-retry-text" : stale ? "stats-failure" : ""}>{statusCell}</td>
                           <td className="stats-success">{totalChecked ? ontime : "—"}</td>
                           <td className={lateCount ? "stats-failure" : ""}>{totalChecked ? lateCount : "—"}</td>
                           <td className={lateCount > ontime ? "stats-failure" : totalChecked ? "stats-success" : ""}>{totalChecked ? pct(ontime, totalChecked) : "—"}</td>
@@ -229,15 +259,16 @@ export default function StatsPanel({ stats, metar, tz = "UTC" }) {
         );
       })()}
 
-      {/* 표 5: 최근 수집 이력 */}
-      {recentRuns.length > 0 && (
+      {/* 표 5a: METAR / TAF 최근 수집 이력 */}
+      {recentMetarTaf.length > 0 && (
         <>
-          <h4 className="stats-subtitle">Recent Collection Runs <span className="stats-hint">(latest 20)</span></h4>
+          <h4 className="stats-subtitle">Recent Runs — METAR / TAF <span className="stats-hint">(latest 20)</span></h4>
           <div className="stats-table-wrap">
             <table className="stats-table">
               <thead>
                 <tr>
-                  <th>Time</th>
+                  <th>시작</th>
+                  <th>소요</th>
                   <th>Type</th>
                   <th>Result</th>
                   <th>Error</th>
@@ -245,9 +276,10 @@ export default function StatsPanel({ stats, metar, tz = "UTC" }) {
                 </tr>
               </thead>
               <tbody>
-                {recentRuns.map((run, i) => (
+                {recentMetarTaf.map((run, i) => (
                   <tr key={i} className={run.success ? "" : "stats-row-warn"}>
-                    <td className="stats-time">{formatUtc(run.time, tz)}</td>
+                    <td className="stats-time">{formatUtc(run.start_time || run.time, tz)}</td>
+                    <td className="stats-time">{durationLabel(run.start_time, run.time)}</td>
                     <td className="stats-type">{TYPE_LABELS[run.type] || run.type}</td>
                     <td>{run.success ? "✅" : "❌"}</td>
                     <td className="stats-error-cell">{run.error || "—"}</td>
@@ -260,7 +292,40 @@ export default function StatsPanel({ stats, metar, tz = "UTC" }) {
         </>
       )}
 
-      {recentRuns.length === 0 && (
+      {/* 표 5b: WARNING / LIGHTNING / RADAR 최근 수집 이력 */}
+      {recentOther.length > 0 && (
+        <>
+          <h4 className="stats-subtitle">Recent Runs — WARNING / LIGHTNING / RADAR <span className="stats-hint">(latest 20)</span></h4>
+          <div className="stats-table-wrap">
+            <table className="stats-table">
+              <thead>
+                <tr>
+                  <th>시작</th>
+                  <th>소요</th>
+                  <th>Type</th>
+                  <th>Result</th>
+                  <th>Error</th>
+                  <th>Failed Airports</th>
+                </tr>
+              </thead>
+              <tbody>
+                {recentOther.map((run, i) => (
+                  <tr key={i} className={run.success ? "" : "stats-row-warn"}>
+                    <td className="stats-time">{formatUtc(run.start_time || run.time, tz)}</td>
+                    <td className="stats-time">{durationLabel(run.start_time, run.time)}</td>
+                    <td className="stats-type">{TYPE_LABELS[run.type] || run.type}</td>
+                    <td>{run.success ? "✅" : "❌"}</td>
+                    <td className="stats-error-cell">{run.error || "—"}</td>
+                    <td>{run.failed_airports?.length > 0 ? run.failed_airports.join(", ") : "—"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
+
+      {recentMetarTaf.length === 0 && recentOther.length === 0 && (
         <p className="stats-empty">No collection runs recorded yet.</p>
       )}
     </section>
