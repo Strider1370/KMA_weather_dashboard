@@ -5,18 +5,18 @@ import { createRequire } from "module";
 import { fileURLToPath } from "url";
 
 const require = createRequire(import.meta.url);
-const store = require("../backend/src/store");
-const statsModule = require("../backend/src/stats");
+const store = require("./backend/src/store");
+const statsModule = require("./backend/src/stats");
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const PORT = Number(process.env.PORT || 5173);
-const ROOT = path.join(__dirname, "dist");
-const DATA_ROOT = path.resolve(__dirname, "../backend/data");
+const ROOT = path.join(__dirname, "frontend", "dist");
+const DATA_ROOT = path.resolve(__dirname, "backend/data");
 const TST1_ROOT = path.join(DATA_ROOT, "TST1");
-const SHARED_AIRPORTS = path.resolve(__dirname, "../shared/airports.js");
-const SHARED_WARNING_TYPES = path.resolve(__dirname, "../shared/warning-types.js");
-const SHARED_ALERT_DEFAULTS = path.resolve(__dirname, "../shared/alert-defaults.js");
+const SHARED_AIRPORTS = path.resolve(__dirname, "shared/airports.js");
+const SHARED_WARNING_TYPES = path.resolve(__dirname, "shared/warning-types.js");
+const SHARED_ALERT_DEFAULTS = path.resolve(__dirname, "shared/alert-defaults.js");
 
 function sendJson(res, status, payload) {
   res.writeHead(status, { "Content-Type": "application/json; charset=utf-8" });
@@ -255,13 +255,13 @@ const server = http.createServer(async (req, res) => {
       return sendJson(res, 200, alertDefaults);
     }
 
-    if (req.url === "/api/refresh" && req.method === "POST") {
-      console.log("[REFRESH] Manual refresh triggered");
-      const metarProcessor = require("../backend/src/processors/metar-processor");
-      const tafProcessor = require("../backend/src/processors/taf-processor");
-      const warningProcessor = require("../backend/src/processors/warning-processor");
-      const lightningProcessor = require("../backend/src/processors/lightning-processor");
-      const radarProcessor = require("../backend/src/processors/radar-processor");
+     if (req.url === "/api/refresh" && req.method === "POST") {
+       console.log("[REFRESH] Manual refresh triggered");
+       const metarProcessor = require("./backend/src/processors/metar-processor");
+       const tafProcessor = require("./backend/src/processors/taf-processor");
+       const warningProcessor = require("./backend/src/processors/warning-processor");
+       const lightningProcessor = require("./backend/src/processors/lightning-processor");
+       const radarProcessor = require("./backend/src/processors/radar-processor");
 
       try {
         const results = await Promise.allSettled([
@@ -310,9 +310,9 @@ const server = http.createServer(async (req, res) => {
 });
 
 server.listen(PORT, () => {
-  console.log(`Dashboard server started: http://localhost:${PORT}`);
+   console.log(`Dashboard server started: http://localhost:${PORT}`);
 
-  const scheduler = require("../backend/src/index");
+   const scheduler = require("./backend/src/index");
   scheduler.main().catch((err) => {
     console.error("Scheduler failed to start:", err);
   });

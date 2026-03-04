@@ -10,7 +10,7 @@
 1. `backend/src/index.js`
 2. `backend/src/config.js`
 3. `backend/src/store.js`
-4. `frontend/server.js`
+4. `server.js`
 5. `frontend/src/App.jsx`
 
 ### 핵심 기능
@@ -115,11 +115,14 @@ KMA_weather_dashboard/
 │   │           ├── alert-state.js
 │   │           ├── alert-dispatcher.js
 │   │           └── alert-settings.js
-│   ├── server.js                (운영 API + 정적서빙 + 스케줄러 시작)
 │   ├── vite.config.js
 │   ├── index.html
 │   ├── legacy/
 │   └── dist/
+├── scripts/
+│   ├── sliceGeoJSON.js       (빌드 전 1회: map.geojson → geo/*.geojson)
+│   ├── generate-full-radar.js (이진 자료 → 전체 그리드 고해상도 PNG 변환)
+│   └── generate-radar-tile.js (이진 자료 → 공항별 480px 오버레이 타일 생성)
 ├── shared/
 │   ├── airports.js              (runway_hdg 필드 포함)
 │   ├── warning-types.js
@@ -137,6 +140,7 @@ KMA_weather_dashboard/
 │   ├── Weather_Visualization_Mapping.md
 │   └── map.md                   (낙뢰 맵 행정동/시군구 경계 구현 문서)
 ├── map.geojson                  (전국 행정동 원본 33MB, git 제외)
+├── server.js                    (운영 API + 정적서빙 + 스케줄러 시작)
 ├── .env
 ├── .env.example
 ├── .editorconfig
@@ -158,7 +162,7 @@ KMA API (XML/텍스트/이미지)
 ### API/표출
 ```text
 frontend/src/utils/api.js
-  -> frontend/server.js (/api/*)
+  -> server.js (/api/*)
   -> store.getCached(type) [메모리]
      └─ null이면 backend/data/*/latest.json read [cold start 폴백]
   -> App.jsx state 반영
@@ -216,7 +220,7 @@ server.js
 - 실패 공항 이전값 `_stale` 병합 지원
 - `getCached(type)`: `cache[type].prev_data` 반환. `server.js`가 API 응답 시 메모리 우선 조회에 사용
 
-### frontend/server.js
+### server.js
 - `/api/metar|taf|warning|lightning|radar|stats|status|airports|warning-types|alert-defaults`
 - `/api/refresh` (5개 프로세서 `Promise.allSettled` 실행)
 - `/data/*` 정적 파일 서빙 (레이더 PNG 포함)

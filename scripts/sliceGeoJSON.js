@@ -1,10 +1,10 @@
 // 1회 실행 빌드 도구: map.geojson → frontend/public/geo/{ICAO}_admdong.geojson + {ICAO}_sigungu.geojson
-// 실행: node backend/test/sliceGeoJSON.js  (project/ 디렉토리에서)
+// 실행: node scripts/sliceGeoJSON.js  (project/ 디렉토리에서)
 const fs = require('fs');
 const path = require('path');
 const { union } = require('@turf/union');
 
-const airports = require('../../shared/airports.js');
+const airports = require('../shared/airports.js');
 const REAL_AIRPORTS = airports.filter(a => !a.mock_only || (a.lat && a.lon));
 
 const RANGE_KM = 32;
@@ -54,13 +54,13 @@ function dissolveByKey(features, keyFn) {
   return dissolved;
 }
 
-const mapPath = path.join(__dirname, '../../map.geojson');
+const mapPath = path.join(__dirname, '../map.geojson');
 if (!fs.existsSync(mapPath)) {
   console.error('map.geojson not found at:', mapPath);
   process.exit(1);
 }
 
-const outDir = path.join(__dirname, '../../frontend/public/geo');
+const outDir = path.join(__dirname, '../frontend/public/geo');
 fs.mkdirSync(outDir, { recursive: true });
 
 console.log('Loading map.geojson...');

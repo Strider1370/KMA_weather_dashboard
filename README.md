@@ -14,7 +14,7 @@ KMA API를 사용해 공항 기상(METAR, TAF, WARNING)과 낙뢰/레이더 데�
 - `backend/test/run-once.js`: 스모크 실행
 - `backend/data/`: 런타임 데이터 저장소
 - `frontend/src/`: React UI
-- `frontend/server.js`: API + 정적서빙 + 스케줄러 시작점
+- `server.js`: API + 정적서빙 + 스케줄러 시작점
 - `shared/`: 공항/경보타입/알림기본값 공유 설정
 - `docs/`: 설계 문서
 
@@ -38,7 +38,7 @@ PORT=5173
 
 ## 실행 명령
 - `npm run dev`: API 서버(`5173`) + Vite(`5174`)
-- `npm run dashboard`: 운영형 서버 실행 (`frontend/server.js`)
+- `npm run dashboard`: 운영형 서버 실행 (`server.js`)
 - `npm start`: 백엔드 스케줄러만 실행
 - `npm test`: 전체 파이프라인 1회 실행
 - `node backend/test/run-once.js metar` (또는 `taf|warning|lightning|radar|all`)
@@ -68,7 +68,7 @@ PORT=5173
 - 들여쓰기 2칸, 세미콜론 사용
 - 백엔드: CommonJS / 프론트엔드: ESM
 - 파일명: 백엔드 kebab-case, React 컴포넌트 PascalCase
-- `frontend/server.js`가 현재 실행 경로
+- `server.js`가 현재 실행 경로
 - 인증키는 `API_AUTH_KEY` 단일 사용
 
 기여 가이드는 `AGENTS.md`를 참고하세요.
@@ -93,6 +93,14 @@ npm --prefix frontend run build
 
 Bash
 pm2 restart weather-app
+
+⚠️ **주의**: `pm2 restart weather-app`는 이전 경로(`frontend/server.js`)를 참조하므로 실패할 수 있습니다. 반드시 PM2를 재등록해야 합니다:
+
+Bash
+pm2 delete weather-app
+pm2 start server.js --name weather-app
+pm2 save
+
 🔍 서버 상태 점검 명령어
 반영 후 사이트가 정상인지 확인하려면 아래 명령어를 사용하세요.
 

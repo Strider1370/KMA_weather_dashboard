@@ -4,7 +4,7 @@
 - `backend/src/`: data collection and processing (`processors/`, `parsers/`, `config.js`, `store.js`, scheduler in `index.js`).
 - `backend/test/run-once.js`: smoke runner for one-shot pipeline execution.
 - `frontend/src/`: React UI (`components/`, `utils/alerts/`, `App.jsx`).
-- `frontend/server.js`: API + static server used by `npm run dev` and `npm run dashboard`.
+- `server.js`: API + static server used by `npm run dev` and `npm run dashboard`.
 - `shared/`: shared constants (`airports.js`, `warning-types.js`, `alert-defaults.js`).
 - `docs/`: design/algorithm documents.
 - Runtime outputs: `backend/data/{metar,taf,warning,lightning,radar}/` and test overlay `backend/data/TST1/`.
@@ -13,7 +13,7 @@
 Run from the repository root.
 - `npm install` and `npm --prefix frontend install`: install root/frontend dependencies.
 - `npm run dev`: starts API server (`5173`) and Vite dev server (`5174`).
-- `npm run dashboard`: production-style server (`frontend/server.js`).
+- `npm run dashboard`: production-style server (`server.js`).
 - `npm start`: backend scheduler only.
 - `npm test`: run all collectors once (`metar/taf/warning/lightning/radar`).
 - `node backend/test/run-once.js metar` (or `taf|warning|lightning|radar|all`): targeted smoke run.
@@ -46,4 +46,4 @@ PRs should include:
 - Store secrets in `.env` (`API_AUTH_KEY`; optional URL overrides).
 - Do not commit keys or raw secret values.
 - `DATA_PATH` is resolved from project root; default is `backend/data`.
-- `frontend/server.js` is the active server entrypoint.
+- `server.js` is the active server entrypoint.

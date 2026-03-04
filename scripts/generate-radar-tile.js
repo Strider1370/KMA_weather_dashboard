@@ -12,9 +12,9 @@ const path = require('path');
 const zlib = require('zlib');
 const { PNG } = require('pngjs');
 
-const airports = require('../../shared/airports');
+const airports = require('../shared/airports');
 
-const OUT_DIR = path.join(__dirname, '../../backend/data/radar-tiles');
+const OUT_DIR = path.join(__dirname, '../backend/data/radar-tiles');
 const TILE_SIZE = 480;
 const TILE_RANGE = 45; // km (중앙에서 끝까지)
 
