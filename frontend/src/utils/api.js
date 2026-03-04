@@ -35,11 +35,3 @@ export async function loadAlertDefaults() {
 export async function fetchStats() {
   return fetchJsonOptional("/api/stats");
 }
-
-export async function triggerRefresh() {
-  const response = await fetch("/api/refresh", { method: "POST" });
-  if (!response.ok) {
-    throw new Error(`/api/refresh -> HTTP ${response.status}`);
-  }
-  return response.json();
-}

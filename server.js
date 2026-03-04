@@ -10,6 +10,23 @@ const statsModule = require("./backend/src/stats");
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+// Rate limiting (in-memory, per IP)
+const rateLimitMap = new Map();
+const RATE_LIMIT = 120;       // requests per window
+const RATE_WINDOW = 60 * 1000; // 1 minute in ms
+
+function isRateLimited(ip) {
+  const now = Date.now();
+  const entry = rateLimitMap.get(ip);
+  if (!entry || now - entry.start > RATE_WINDOW) {
+    rateLimitMap.set(ip, { count: 1, start: now });
+    return false;
+  }
+  if (entry.count >= RATE_LIMIT) return true;
+  entry.count++;
+  return false;
+}
+
 const PORT = Number(process.env.PORT || 5173);
 const ROOT = path.join(__dirname, "frontend", "dist");
 const DATA_ROOT = path.resolve(__dirname, "backend/data");
@@ -156,9 +173,9 @@ function getDataStatus(category) {
       file_count: files.length,
       latest_file: files[0]?.name || null
     };
-  } catch (error) {
-    return { exists: false, last_updated: null, file_count: 0, error: error.message };
-  }
+   } catch (error) {
+     return { exists: false, last_updated: null, file_count: 0 };
+   }
 }
 
 function contentTypeFor(filePath) {
@@ -216,6 +233,11 @@ function reloadCommonJs(modulePath) {
 
 const server = http.createServer(async (req, res) => {
   try {
+    const ip = req.socket.remoteAddress || "unknown";
+    if (isRateLimited(ip)) {
+      return sendJson(res, 429, { error: "Too Many Requests" });
+    }
+
     if (req.url === "/api/metar") {
       return sendJson(res, 200, mergeTst1(readLatest("metar"), "metar"));
     }
@@ -255,37 +277,7 @@ const server = http.createServer(async (req, res) => {
       return sendJson(res, 200, alertDefaults);
     }
 
-     if (req.url === "/api/refresh" && req.method === "POST") {
-       console.log("[REFRESH] Manual refresh triggered");
-       const metarProcessor = require("./backend/src/processors/metar-processor");
-       const tafProcessor = require("./backend/src/processors/taf-processor");
-       const warningProcessor = require("./backend/src/processors/warning-processor");
-       const lightningProcessor = require("./backend/src/processors/lightning-processor");
-       const radarProcessor = require("./backend/src/processors/radar-processor");
 
-      try {
-        const results = await Promise.allSettled([
-          metarProcessor.processAll(),
-          tafProcessor.processAll(),
-          warningProcessor.process(),
-          lightningProcessor.process(),
-          radarProcessor.process()
-        ]);
-
-        const summary = {
-          metar: results[0].status === "fulfilled" ? results[0].value : { error: results[0].reason?.message },
-          taf: results[1].status === "fulfilled" ? results[1].value : { error: results[1].reason?.message },
-          warning: results[2].status === "fulfilled" ? results[2].value : { error: results[2].reason?.message },
-          lightning: results[3].status === "fulfilled" ? results[3].value : { error: results[3].reason?.message },
-          radar: results[4].status === "fulfilled" ? results[4].value : { error: results[4].reason?.message }
-        };
-        console.log("[REFRESH] Results:", JSON.stringify(summary, null, 2));
-        return sendJson(res, 200, summary);
-      } catch (refreshErr) {
-        console.error("[REFRESH] Error:", refreshErr.message);
-        return sendJson(res, 500, { error: refreshErr.message });
-      }
-    }
 
     if (req.url === "/api/status") {
       const status = {
@@ -305,7 +297,7 @@ const server = http.createServer(async (req, res) => {
     return serveStatic(req, res);
   } catch (error) {
     console.error("[SERVER] Request error:", req.url, error.message);
-    return sendJson(res, 500, { error: error.message });
+    return sendJson(res, 500, { error: "Internal Server Error" });
   }
 });
 

@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import { loadAllData, loadAlertDefaults, triggerRefresh, fetchStats } from "./utils/api";
+import { loadAllData, loadAlertDefaults, fetchStats } from "./utils/api";
 import {
   evaluate,
   buildAlertKey,
@@ -163,17 +163,6 @@ export default function App() {
     };
   }, [alertDefaults, loadAll]);
 
-  async function handleRefresh() {
-    setLoading(true);
-    try {
-      await triggerRefresh();
-      await loadAll();
-    } catch (err) {
-      setError(err.message);
-      setLoading(false);
-    }
-  }
-
   function handleDismissAlert(id) {
     setActiveAlerts((prev) => prev.filter((a) => a.id !== id));
   }
@@ -240,7 +229,6 @@ export default function App() {
           airports={airportList}
           selectedAirport={selectedAirport}
           onAirportChange={setSelectedAirport}
-          onRefresh={handleRefresh}
           tz={timeZone}
         />
 

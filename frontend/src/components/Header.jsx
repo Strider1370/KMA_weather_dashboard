@@ -8,7 +8,6 @@ export default function Header({
   airports = [],
   selectedAirport,
   onAirportChange,
-  onRefresh,
   tz = "UTC"
 }) {
   return (
@@ -42,15 +41,6 @@ export default function Header({
                   <option key={icao} value={icao}>{icao}</option>
                 ))}
               </select>
-              <button
-                type="button"
-                className="refresh-icon-btn"
-                onClick={onRefresh}
-                title="Refresh data"
-                aria-label="Refresh data"
-              >
-                ↻
-              </button>
             </div>
           )}
           {onSettingsClick && (

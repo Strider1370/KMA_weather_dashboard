@@ -65,18 +65,6 @@ body {
 .header-controls select {
   min-width: 110px;
 }
-.refresh-icon-btn {
-  background: transparent;
-  color: var(--ink);
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  padding: 6px 9px;
-  line-height: 1;
-  font-size: 1rem;
-}
-.refresh-icon-btn:hover {
-  background: #ffffff;
-}
 
 .summary-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; }
 .tile, .panel { background: var(--paper); border: 1px solid var(--line); border-radius: 14px; box-shadow: var(--shadow); }

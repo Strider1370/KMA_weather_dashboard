@@ -1,4 +1,4 @@
-export default function Controls({ airports, selectedAirport, onAirportChange, onRefresh }) {
+export default function Controls({ airports, selectedAirport, onAirportChange }) {
   return (
     <section className="panel controls">
       <label htmlFor="airport-select">Airport</label>
@@ -11,7 +11,6 @@ export default function Controls({ airports, selectedAirport, onAirportChange, o
           <option key={icao} value={icao}>{icao}</option>
         ))}
       </select>
-      <button type="button" onClick={onRefresh}>Refresh</button>
     </section>
   );
 }
