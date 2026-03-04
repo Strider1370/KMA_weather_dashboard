@@ -61,7 +61,6 @@ PORT=5173
 - `GET /api/airports`
 - `GET /api/warning-types`
 - `GET /api/alert-defaults`
-- `POST /api/refresh`
 - `GET /data/*` (레이더 PNG 포함 정적 접근)
 
 ## 개발 규칙 요약

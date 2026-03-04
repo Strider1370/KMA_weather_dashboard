@@ -222,7 +222,6 @@ server.js
 
 ### server.js
 - `/api/metar|taf|warning|lightning|radar|stats|status|airports|warning-types|alert-defaults`
-- `/api/refresh` (5개 프로세서 `Promise.allSettled` 실행)
 - `/data/*` 정적 파일 서빙 (레이더 PNG 포함)
 - 서버 시작 시 backend scheduler 자동 기동
 - `readLatest()`, `readLightning()`: `store.getCached()`로 메모리 우선 응답, null이면 디스크 폴백

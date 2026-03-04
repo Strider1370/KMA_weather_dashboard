@@ -35,13 +35,36 @@ const SHARED_AIRPORTS = path.resolve(__dirname, "shared/airports.js");
 const SHARED_WARNING_TYPES = path.resolve(__dirname, "shared/warning-types.js");
 const SHARED_ALERT_DEFAULTS = path.resolve(__dirname, "shared/alert-defaults.js");
 
-function sendJson(res, status, payload) {
-  res.writeHead(status, { "Content-Type": "application/json; charset=utf-8" });
+function buildBaseHeaders(req) {
+  const headers = {
+    "X-Content-Type-Options": "nosniff",
+    "X-Frame-Options": "DENY",
+    "Referrer-Policy": "strict-origin-when-cross-origin",
+    "Content-Security-Policy": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'"
+  };
+
+  if (req.url.startsWith("/api/") || req.url.startsWith("/data/")) {
+    headers["Access-Control-Allow-Origin"] = "*";
+    headers["Access-Control-Allow-Methods"] = "GET, OPTIONS";
+    headers["Access-Control-Allow-Headers"] = "Content-Type";
+  }
+
+  return headers;
+}
+
+function sendJson(req, res, status, payload) {
+  res.writeHead(status, {
+    ...buildBaseHeaders(req),
+    "Content-Type": "application/json; charset=utf-8"
+  });
   res.end(JSON.stringify(payload));
 }
 
-function sendText(res, status, body, contentType = "text/plain; charset=utf-8") {
-  res.writeHead(status, { "Content-Type": contentType });
+function sendText(req, res, status, body, contentType = "text/plain; charset=utf-8") {
+  res.writeHead(status, {
+    ...buildBaseHeaders(req),
+    "Content-Type": contentType
+  });
   res.end(body);
 }
 
@@ -170,8 +193,7 @@ function getDataStatus(category) {
     return {
       exists: true,
       last_updated: lastUpdated,
-      file_count: files.length,
-      latest_file: files[0]?.name || null
+      file_count: files.length
     };
    } catch (error) {
      return { exists: false, last_updated: null, file_count: 0 };
@@ -192,16 +214,20 @@ function serveDataAsset(req, res) {
   const relative = urlPath.replace(/^\/data\//, "");
   const filePath = path.normalize(path.join(DATA_ROOT, relative));
   if (!filePath.startsWith(DATA_ROOT)) {
-    sendText(res, 403, "Forbidden");
+    sendText(req, res, 403, "Forbidden");
     return true;
   }
   if (!fs.existsSync(filePath) || fs.statSync(filePath).isDirectory()) {
-    sendText(res, 404, "Not Found");
+    sendText(req, res, 404, "Not Found");
     return true;
   }
 
   const body = fs.readFileSync(filePath);
-  res.writeHead(200, { "Content-Type": contentTypeFor(filePath), "Cache-Control": "no-cache" });
+  res.writeHead(200, {
+    ...buildBaseHeaders(req),
+    "Content-Type": contentTypeFor(filePath),
+    "Cache-Control": "no-cache"
+  });
   res.end(body);
   return true;
 }
@@ -211,17 +237,20 @@ function serveStatic(req, res) {
   const filePath = path.normalize(path.join(ROOT, target));
 
   if (!filePath.startsWith(ROOT)) {
-    sendText(res, 403, "Forbidden");
+    sendText(req, res, 403, "Forbidden");
     return;
   }
 
   if (!fs.existsSync(filePath) || fs.statSync(filePath).isDirectory()) {
-    sendText(res, 404, "Not Found");
+    sendText(req, res, 404, "Not Found");
     return;
   }
 
   const body = fs.readFileSync(filePath);
-  res.writeHead(200, { "Content-Type": contentTypeFor(filePath) });
+  res.writeHead(200, {
+    ...buildBaseHeaders(req),
+    "Content-Type": contentTypeFor(filePath)
+  });
   res.end(body);
 }
 
@@ -233,48 +262,54 @@ function reloadCommonJs(modulePath) {
 
 const server = http.createServer(async (req, res) => {
   try {
+    if (req.method === "OPTIONS") {
+      res.writeHead(204, buildBaseHeaders(req));
+      res.end();
+      return;
+    }
+
     const ip = req.socket.remoteAddress || "unknown";
     if (isRateLimited(ip)) {
-      return sendJson(res, 429, { error: "Too Many Requests" });
+      return sendJson(req, res, 429, { error: "Too Many Requests" });
     }
 
     if (req.url === "/api/metar") {
-      return sendJson(res, 200, mergeTst1(readLatest("metar"), "metar"));
+      return sendJson(req, res, 200, mergeTst1(readLatest("metar"), "metar"));
     }
 
     if (req.url === "/api/taf") {
-      return sendJson(res, 200, mergeTst1(readLatest("taf"), "taf"));
+      return sendJson(req, res, 200, mergeTst1(readLatest("taf"), "taf"));
     }
 
     if (req.url === "/api/warning") {
-      return sendJson(res, 200, mergeTst1(readLatest("warning"), "warning"));
+      return sendJson(req, res, 200, mergeTst1(readLatest("warning"), "warning"));
     }
 
     if (req.url === "/api/lightning") {
-      return sendJson(res, 200, readLightning());
+      return sendJson(req, res, 200, readLightning());
     }
 
     if (req.url === "/api/radar") {
-      return sendJson(res, 200, readRadar());
+      return sendJson(req, res, 200, readRadar());
     }
 
     if (req.url === "/api/stats") {
-      return sendJson(res, 200, statsModule.getStats());
+      return sendJson(req, res, 200, statsModule.getStats());
     }
 
     if (req.url === "/api/airports") {
       const airports = reloadCommonJs(SHARED_AIRPORTS);
-      return sendJson(res, 200, airports);
+      return sendJson(req, res, 200, airports);
     }
 
     if (req.url === "/api/warning-types") {
       const warningTypes = reloadCommonJs(SHARED_WARNING_TYPES);
-      return sendJson(res, 200, warningTypes);
+      return sendJson(req, res, 200, warningTypes);
     }
 
     if (req.url === "/api/alert-defaults") {
       const alertDefaults = reloadCommonJs(SHARED_ALERT_DEFAULTS);
-      return sendJson(res, 200, alertDefaults);
+      return sendJson(req, res, 200, alertDefaults);
     }
 
 
@@ -287,7 +322,7 @@ const server = http.createServer(async (req, res) => {
         lightning: getDataStatus("lightning"),
         radar: getDataStatus("radar")
       };
-      return sendJson(res, 200, status);
+      return sendJson(req, res, 200, status);
     }
 
     if (req.url.startsWith("/data/")) {
@@ -297,7 +332,7 @@ const server = http.createServer(async (req, res) => {
     return serveStatic(req, res);
   } catch (error) {
     console.error("[SERVER] Request error:", req.url, error.message);
-    return sendJson(res, 500, { error: "Internal Server Error" });
+    return sendJson(req, res, 500, { error: "Internal Server Error" });
   }
 });
 
