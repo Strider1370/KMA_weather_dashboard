@@ -34,7 +34,7 @@ function formatTmLabel(tm) {
   return `${hour}:${minute}`;
 }
 
-export default function RadarPanel({ radarData, selectedAirport }) {
+export default function RadarPanel({ radarData, selectedAirport, rightPanelMode = "radar", onPanelModeChange }) {
   const images = useMemo(() => radarData?.images || [], [radarData]);
   const [frameIndex, setFrameIndex] = useState(0);
   const [isPlaying, setIsPlaying] = useState(true);
@@ -81,7 +81,24 @@ export default function RadarPanel({ radarData, selectedAirport }) {
   return (
     <section className="panel radar-panel">
       <div className="radar-head">
-        <h3>Radar</h3>
+        <div className="panel-head-title">
+          <div className="panel-switch" role="tablist" aria-label="Right panel mode">
+            <button
+              type="button"
+              className={`panel-switch-btn ${rightPanelMode === "lightning" ? "active" : ""}`}
+              onClick={() => onPanelModeChange?.("lightning")}
+            >
+              Lightning
+            </button>
+            <button
+              type="button"
+              className={`panel-switch-btn ${rightPanelMode === "radar" ? "active" : ""}`}
+              onClick={() => onPanelModeChange?.("radar")}
+            >
+              Radar
+            </button>
+          </div>
+        </div>
         <div className="radar-speed-control">
           <button
             type="button"

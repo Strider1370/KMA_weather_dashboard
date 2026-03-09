@@ -44,6 +44,7 @@ export default function App() {
   const [timeZone, setTimeZone] = useState(() => localStorage.getItem("time_zone") || "KST");
   const [showRadar, setShowRadar] = useState(() => localStorage.getItem("show_radar_overlay") === "true");
   const [radarOpacity, setRadarOpacity] = useState(() => parseFloat(localStorage.getItem("radar_overlay_opacity") || "0.6"));
+  const [rightPanelMode, setRightPanelMode] = useState(() => localStorage.getItem("right_panel_mode") || "lightning");
 
   useEffect(() => {
     localStorage.setItem("metar_version", metarVersion);
@@ -56,6 +57,10 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem("time_zone", timeZone);
   }, [timeZone]);
+
+  useEffect(() => {
+    localStorage.setItem("right_panel_mode", rightPanelMode);
+  }, [rightPanelMode]);
 
   const prevDataRef = useRef(null);
   const pollingRef = useRef(null);
@@ -283,22 +288,30 @@ export default function App() {
               </div>
 
               <div className="secondary-column">
-                                  <LightningMap
-                                    lightningData={data.lightning}
-                                    selectedAirport={selectedAirport}
-                                    airports={data.airports}
-                                    boundaryLevel={boundaryLevel}
-                                    windDir={(() => {
-                                      const w = data.metar?.airports?.[selectedAirport]?.observation?.wind;
-                                      if (!w || w.calm || w.variable) return null;
-                                      return w.direction;
-                                    })()}
-                                    showRadar={showRadar}
-                                    radarOpacity={radarOpacity}
-                                  />                <RadarPanel
-                  radarData={data.radar}
-                  selectedAirport={selectedAirport}
-                />
+                {rightPanelMode === "lightning" ? (
+                  <LightningMap
+                    lightningData={data.lightning}
+                    selectedAirport={selectedAirport}
+                    airports={data.airports}
+                    boundaryLevel={boundaryLevel}
+                    windDir={(() => {
+                      const w = data.metar?.airports?.[selectedAirport]?.observation?.wind;
+                      if (!w || w.calm || w.variable) return null;
+                      return w.direction;
+                    })()}
+                    showRadar={showRadar}
+                    radarOpacity={radarOpacity}
+                    rightPanelMode={rightPanelMode}
+                    onPanelModeChange={setRightPanelMode}
+                  />
+                ) : (
+                  <RadarPanel
+                    radarData={data.radar}
+                    selectedAirport={selectedAirport}
+                    rightPanelMode={rightPanelMode}
+                    onPanelModeChange={setRightPanelMode}
+                  />
+                )}
               </div>
             </section>
           </>

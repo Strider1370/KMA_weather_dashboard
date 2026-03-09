@@ -35,7 +35,17 @@ function pickRunwayDirection(runwayHdg, windDir) {
   return diff1 <= diff2 ? opt1 : opt2;
 }
 
-export default function LightningMap({ lightningData, selectedAirport, airports, boundaryLevel = 'sigungu', windDir = null, showRadar = false, radarOpacity = 0.5 }) {
+export default function LightningMap({
+  lightningData,
+  selectedAirport,
+  airports,
+  boundaryLevel = "sigungu",
+  windDir = null,
+  showRadar = false,
+  radarOpacity = 0.5,
+  rightPanelMode = "lightning",
+  onPanelModeChange,
+}) {
   const [timeRangeMin, setTimeRangeMin] = useState(30);
   const size = 480;
   const center = size / 2;
@@ -107,7 +117,24 @@ export default function LightningMap({ lightningData, selectedAirport, airports,
   return (
     <aside className="panel lightning-panel">
       <div className="lightning-head">
-        <h3>Lightning</h3>
+        <div className="panel-head-title">
+          <div className="panel-switch" role="tablist" aria-label="Right panel mode">
+            <button
+              type="button"
+              className={`panel-switch-btn ${rightPanelMode === "lightning" ? "active" : ""}`}
+              onClick={() => onPanelModeChange?.("lightning")}
+            >
+              Lightning
+            </button>
+            <button
+              type="button"
+              className={`panel-switch-btn ${rightPanelMode === "radar" ? "active" : ""}`}
+              onClick={() => onPanelModeChange?.("radar")}
+            >
+              Radar
+            </button>
+          </div>
+        </div>
         <div className="time-range">
           {TIME_OPTIONS.map((option) => (
             <button
@@ -126,12 +153,6 @@ export default function LightningMap({ lightningData, selectedAirport, airports,
         <p className="sub">Lightning data unavailable for this airport.</p>
       ) : (
         <>
-          <div className="lightning-summary">
-            <p><strong>{summary.total}</strong> strikes in last {timeRangeMin}m</p>
-            <p>Nearest: {summary.nearest == null ? "-" : `${summary.nearest.toFixed(1)} km`}</p>
-            <p>Latest: {safe(airportData?.summary?.latest_time || summary.latest, "-")}</p>
-          </div>
-
           <svg
             className="lightning-map"
             viewBox={`0 0 ${size} ${size}`}
@@ -211,6 +232,18 @@ export default function LightningMap({ lightningData, selectedAirport, airports,
             <span className="zone-tag alert">8km {summary.byZone.alert}</span>
             <span className="zone-tag danger">16km {summary.byZone.danger}</span>
             <span className="zone-tag caution">32km {summary.byZone.caution}</span>
+          </div>
+
+          <div className="lightning-summary">
+            {summary.total === 0 ? (
+              <p>No strikes in last {timeRangeMin}m</p>
+            ) : (
+              <>
+                <p><strong>{summary.total}</strong> strikes in last {timeRangeMin}m</p>
+                <p>Nearest: {summary.nearest == null ? "-" : `${summary.nearest.toFixed(1)} km`}</p>
+                <p>Latest: {safe(airportData?.summary?.latest_time || summary.latest, "-")}</p>
+              </>
+            )}
           </div>
         </>
       )}

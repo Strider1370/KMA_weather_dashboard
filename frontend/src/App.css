@@ -98,6 +98,38 @@ button { background: var(--ink); color: #fff; border-color: var(--ink); cursor: 
   width: 100%;
 }
 
+.panel-switch {
+  display: inline-flex;
+  gap: 6px;
+  padding: 4px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #f7f2e9;
+  width: fit-content;
+}
+
+.panel-switch-btn {
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--muted);
+  padding: 6px 12px;
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+.panel-switch-btn.active {
+  background: var(--ink);
+  color: #fff;
+  border-color: var(--ink);
+}
+
+.panel-head-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .dashboard-top-row {
   display: grid;
   grid-template-columns: 1fr 1fr;
