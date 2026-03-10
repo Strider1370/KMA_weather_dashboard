@@ -1,128 +1,260 @@
-# KMA Aviation Weather Dashboard
+# KMA Weather Dashboard
 
-KMA API를 사용해 공항 기상(METAR, TAF, WARNING)과 낙뢰/레이더 데이터를 수집하고, React 대시보드와 알림 시스템으로 표출하는 프로젝트입니다.
+KMA 항공기상 수집기 + 대시보드 프로젝트입니다.
 
-## 주요 기능
-- 정기 수집: METAR, TAF, WARNING, LIGHTNING, RADAR
-- 대시보드: 공항별 현재/예보/경보 + 낙뢰 지도 + 레이더 패널
-- 알림: 8개 트리거 기반 팝업/사운드/마퀴
-- 캐시 저장: `latest.json` + 이력 파일 회전
-- 테스트 오버레이: `backend/data/TST1/*.json` 병합 지원
+이 프로젝트는 KMA 항공/기상 피드(METAR, TAF, 특보, 낙뢰, 레이더, 레이더 에코)를 주기적으로 수집하고,
+정규화된 결과를 `backend/data/`에 저장한 뒤 React 대시보드로 제공합니다.
 
-## 프로젝트 구조
-- `backend/src/`: 수집기/파서/스토어/스케줄러
-- `backend/test/run-once.js`: 스모크 실행
-- `backend/data/`: 런타임 데이터 저장소
-- `frontend/src/`: React UI
-- `server.js`: API + 정적서빙 + 스케줄러 시작점
-- `shared/`: 공항/경보타입/알림기본값 공유 설정
-- `docs/`: 설계 문서
+## 프로젝트가 하는 일
 
-자세한 구조와 의존성은 `PROJECT_ARCHITECTURE.md`를 기준으로 확인하세요.
+- 국내 주요 공항 대상 기상 소스를 수집/정규화합니다.
+- Cron 스케줄 기반으로 수집기를 실행하고, 중복 실행을 잠금으로 방지합니다.
+- 카테고리별 `latest.json`과 시각별 이력 파일을 함께 관리합니다.
+- 단일 Node 서버에서 API와 정적 데이터를 함께 제공합니다.
+- METAR/TAF/특보/낙뢰/레이더/지도 패널을 대시보드로 렌더링합니다.
 
-## 빠른 시작
+## 기술 스택
+
+- 백엔드 런타임: Node.js
+- 프론트엔드: React 18 + Vite
+- 백엔드 모듈: CommonJS (`require`/`module.exports`)
+- 프론트엔드 모듈: ESM (`import`/`export`)
+- 저장소: 파일 기반 JSON + PNG 에셋 (`backend/data`)
+
+## 시스템 아키텍처
+
+```text
+KMA APIs
+  ├─ typ02/openApi (METAR/TAF/WARNING XML)
+  ├─ typ01/url/lgt_pnt.php (낙뢰)
+  ├─ typ04/url/rdr_cmp_file.php (레이더 이미지 + 레이더 바이너리)
+  └─ typ01/url/amos.php (강수량)
+        |
+        v
+backend/src/processors/* (cron 수집기)
+        |
+        v
+backend/src/parsers/* (포맷 파싱/정규화)
+        |
+        v
+backend/src/store.js -> backend/data/<type>/*
+        |
+        v
+server.js
+  ├─ /api/*  (JSON)
+  └─ /data/* (저장된 정적 파일)
+        |
+        v
+frontend/src (React 대시보드)
+```
+
+## 프로젝트 구조 (상세)
+
+```text
+.
+├── backend/
+│   ├── data/                         # 저장 결과물(생성 파일)
+│   │   ├── metar/
+│   │   ├── taf/
+│   │   ├── warning/
+│   │   ├── lightning/
+│   │   └── radar/                    # 레이더 이미지 + echo png/meta
+│   ├── src/
+│   │   ├── processors/               # 수집 파이프라인
+│   │   │   ├── metar-processor.js
+│   │   │   ├── taf-processor.js
+│   │   │   ├── warning-processor.js
+│   │   │   ├── lightning-processor.js
+│   │   │   ├── radar-processor.js
+│   │   │   └── radar-echo-processor.js
+│   │   ├── parsers/                  # 포맷별 파서
+│   │   │   ├── metar-parser.js
+│   │   │   ├── taf-parser.js
+│   │   │   ├── warning-parser.js
+│   │   │   ├── lightning-parser.js
+│   │   │   ├── radar-echo-parser.js
+│   │   │   └── amos-parser.js
+│   │   ├── api-client.js             # XML API fetch/retry 정책
+│   │   ├── config.js                 # env + 스케줄 + 수집기 설정
+│   │   ├── store.js                  # 해시 기반 저장/회전
+│   │   ├── stats.js                  # 수집기 실행/실패 통계
+│   │   └── index.js                  # 스케줄러 진입점
+│   └── test/
+│       └── run-once.js               # 1회성 수집 테스트 러너
+├── docs/                             # 설계/참고 문서
+├── frontend/
+│   ├── src/
+│   │   ├── components/               # 대시보드 컴포넌트
+│   │   ├── utils/                    # api/helpers/alert 로직
+│   │   ├── App.jsx                   # 메인 조합
+│   │   └── App.css                   # 스타일
+│   ├── package.json
+│   └── vite.config.js
+├── shared/                           # 공항/타입/기본값 공유 데이터
+├── scripts/                          # 유틸 스크립트
+├── server.js                         # API + 정적 파일 서버
+├── package.json                      # 루트 명령/의존성
+├── AGENTS.md                         # 에이전트 작업 가이드
+└── map.geojson                       # 지도 경계 소스
+```
+
+## 수집 스케줄 매트릭스
+
+현재 스케줄 값은 `backend/src/config.js`에 정의되어 있습니다.
+
+- METAR: `*/10 * * * *`
+- TAF: `*/30 * * * *`
+- WARNING: `*/5 * * * *`
+- LIGHTNING: `*/5 * * * *`
+- RADAR: `*/5 * * * *`
+- RADAR_ECHO: `*/5 * * * *`
+
+`runWithLock` 실행 잠금으로 동일 타입 중복 실행을 방지합니다.
+
+## 데이터 저장 모델
+
+- 카테고리별 결과는 `backend/data/<type>/`에 저장됩니다.
+- 각 카테고리 `latest.json`은 항상 최신으로 갱신됩니다.
+- 시각별 JSON 이력은 회전 정책에 따라 유지됩니다.
+- 레이더 이미지/에코 에셋은 `backend/data/radar/`에 저장되며 `/data/radar/*`로 제공됩니다.
+
+예시:
+- `backend/data/metar/latest.json`
+- `backend/data/taf/latest.json`
+- `backend/data/warning/latest.json`
+- `backend/data/lightning/latest.json`
+- `backend/data/radar/latest.json`
+- `backend/data/radar/echo_meta.json`
+- `backend/data/radar/echo_RKSI.png`
+
+## API 표면 (server.js)
+
+### JSON 엔드포인트
+
+- `/api/metar`
+- `/api/taf`
+- `/api/warning`
+- `/api/lightning`
+- `/api/radar`
+- `/api/airports`
+- `/api/warning-types`
+- `/api/alert-defaults`
+- `/api/status`
+- `/api/stats`
+
+### 정적 데이터
+
+- `/data/*` -> `backend/data/*`
+
+## 사전 요구사항
+
+- Node.js 18+ (권장: 20)
+- npm 9+
+- `.env`에 유효한 `API_AUTH_KEY`
+
+## 환경 변수
+
+프로젝트 루트에 `.env` 파일 생성:
+
+```env
+API_AUTH_KEY=your_kma_key
+
+# Optional overrides
+# PORT=5173
+# DATA_PATH=backend/data
+# API_BASE_URL=https://apihub.kma.go.kr/api/typ02/openApi
+# LIGHTNING_API_URL=https://apihub.kma.go.kr/api/typ01/url/lgt_pnt.php
+# AMOS_API_URL=https://apihub.kma.go.kr/api/typ01/url/amos.php
+# RADAR_API_URL=https://apihub.kma.go.kr/api/typ04/url/rdr_cmp_file.php
+```
+
+## 설치
+
+루트에서 실행:
+
 ```bash
 npm install
 npm --prefix frontend install
 ```
 
-`.env` 파일 예시:
-```env
-API_AUTH_KEY=your_kma_api_key
-API_BASE_URL=https://apihub.kma.go.kr/api/typ02/openApi
-LIGHTNING_API_URL=https://apihub.kma.go.kr/api/typ01/url/lgt_pnt.php
-RADAR_API_URL=https://apihub.kma.go.kr/api/typ04/url/rdr_cmp_file.php
-DATA_PATH=./backend/data
-PORT=5173
+## 실행
+
+### 1) 스케줄러만 실행
+
+```bash
+npm run start
 ```
 
-## 실행 명령
-- `npm run dev`: API 서버(`5173`) + Vite(`5174`)
-- `npm run dashboard`: 운영형 서버 실행 (`server.js`)
-- `npm start`: 백엔드 스케줄러만 실행
-- `npm test`: 전체 파이프라인 1회 실행
-- `node backend/test/run-once.js metar` (또는 `taf|warning|lightning|radar|all`)
-- `npm --prefix frontend run build`: 프론트 빌드
+`backend/src/index.js`를 실행합니다(수집 cron 전용).
 
-## 데이터 수집 주기
-- METAR: `*/10 * * * *`
-- TAF: `*/30 * * * *`
-- WARNING: `*/5 * * * *`
-- LIGHTNING: `*/3 * * * *`
-- RADAR: `*/5 * * * *`
+### 2) 대시보드 서버 실행(API + 정적 파일)
 
-## API 엔드포인트
-- `GET /api/metar`
-- `GET /api/taf`
-- `GET /api/warning`
-- `GET /api/lightning`
-- `GET /api/radar`
-- `GET /api/status`
-- `GET /api/airports`
-- `GET /api/warning-types`
-- `GET /api/alert-defaults`
-- `GET /data/*` (레이더 PNG 포함 정적 접근)
+```bash
+npm run dashboard
+```
 
-## 개발 규칙 요약
-- 들여쓰기 2칸, 세미콜론 사용
-- 백엔드: CommonJS / 프론트엔드: ESM
-- 파일명: 백엔드 kebab-case, React 컴포넌트 PascalCase
-- `server.js`가 현재 실행 경로
-- 인증키는 `API_AUTH_KEY` 단일 사용
+`server.js`를 실행합니다. 서버 시작 시 스케줄러 부트스트랩도 함께 실행됩니다.
 
-기여 가이드는 `AGENTS.md`를 참고하세요.
+### 3) 로컬 개발 모드(server + Vite)
 
+```bash
+npm run dev
+```
 
+서버와 프론트 개발 서버를 동시에 실행합니다.
 
-GCP ssl에서 서버 다시 키기
-1. gcp ssl 들어가기
+## 프론트 빌드
 
-2. GitHub에서 최신 코드 가져오기
-로컬에서 올린 최신 소스 코드를 서버로 내려받습니다.
-
-Bash
-git pull origin main
-3. 프론트엔드 빌드 (화면 수정 반영)
-React/Vite 코드를 서버가 인식할 수 있는 정적 파일로 다시 만듭니다.
-
-Bash
+```bash
 npm --prefix frontend run build
-4. PM2 서버 재시작 (백엔드 로직 반영)
-수정된 내용을 실제 서비스에 적용하기 위해 프로세스를 재시작합니다.
+npm --prefix frontend run preview
+```
 
-Bash
-pm2 restart weather-app
+## 테스트
 
-⚠️ **주의**: `pm2 restart weather-app`는 이전 경로(`frontend/server.js`)를 참조하므로 실패할 수 있습니다. 반드시 PM2를 재등록해야 합니다:
+전체 수집 스모크 테스트:
 
-Bash
-pm2 delete weather-app
-pm2 start server.js --name weather-app
+```bash
+npm test
+```
+
+단일 타깃 테스트:
+
+```bash
+node backend/test/run-once.js metar
+node backend/test/run-once.js taf
+node backend/test/run-once.js warning
+node backend/test/run-once.js lightning
+node backend/test/run-once.js radar
+```
+
+## 배포 업데이트 예시
+
+```bash
+git pull --rebase origin main
+npm install
+npm --prefix frontend install
+npm --prefix frontend run build
+pm2 restart weather-app || pm2 start server.js --name weather-app
 pm2 save
+pm2 logs weather-app --lines 100
+```
 
-🔍 서버 상태 점검 명령어
-반영 후 사이트가 정상인지 확인하려면 아래 명령어를 사용하세요.
+로컬 변경 때문에 pull이 막히면:
 
-프로세스 상태 확인: pm2 list
+```bash
+git stash push -u -m "server-local-before-update"
+```
 
-실시간 로그 확인: pm2 logs weather-app
+## 트러블슈팅
 
-접속 테스트: 브라우저에서 포트 번호 없이 IP 주소만 입력
+- KMA API 401/403: `API_AUTH_KEY`와 일일 호출량 제한 확인
+- 레이더 에코 미갱신: 최신 코드 프로세스 + cron 동작 여부 확인
+- 대시보드 데이터 정체: `/api/status`, `/api/stats` 확인
+- 포트 충돌: `PORT` 환경 변수 변경 또는 기존 프로세스 종료
 
-팁: .env 파일은 서버에 그대로 남아있으므로 특별한 경우가 아니면 수정할 필요가 없습니다.
+## 기여 가이드
 
-
----
-
-### 💡 서버에 저장하는 방법 (선택 사항)
-만약 서버 안에도 이 내용을 저장해두고 싶다면, SSH 터미널에서 아래와 같이 입력하세요.
-
-1. `nano deploy.md` 입력
-2. 위 내용을 복사해서 붙여넣기
-3. `Ctrl + O` (엔터) -> `Ctrl + X` (종료)
-
-이제 언제든 서버 접속 후에 `cat deploy.md`라고 치면 이 설명서가 바로 나옵니다. 
-
-**이제 직접 수정한 코드를 반영해 보러 가실까요? 성공하시길 응원합니다!**
-
-빌드 업데이트 명령어 : deploy
+- 코딩 규칙/워크플로는 `AGENTS.md`를 따르세요.
+- 명시적 요청이 없으면 `backend/data/` 생성물은 커밋하지 마세요.
+- 변경 범위는 기능/수집기 단위로 작게 유지하세요.
