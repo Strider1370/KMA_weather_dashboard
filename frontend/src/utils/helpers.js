@@ -55,3 +55,60 @@ export function warningMeta(typeCode, warningTypes) {
   }
   return null;
 }
+
+function toKstDate(value) {
+  const d = new Date(value || Date.now());
+  if (Number.isNaN(d.getTime())) return null;
+  return new Date(d.getTime() + 9 * 60 * 60 * 1000);
+}
+
+export function computeRelativeHumidity(tempC, dewpointC) {
+  if (!Number.isFinite(tempC) || !Number.isFinite(dewpointC)) return null;
+  const es = 6.112 * Math.exp((17.67 * tempC) / (tempC + 243.5));
+  const e = 6.112 * Math.exp((17.67 * dewpointC) / (dewpointC + 243.5));
+  const rh = (e / es) * 100;
+  if (!Number.isFinite(rh)) return null;
+  return Math.max(0, Math.min(100, rh));
+}
+
+function estimateWetBulbStull(tempC, rh) {
+  const t1 = tempC * Math.atan(0.151977 * Math.sqrt(rh + 8.313659));
+  const t2 = Math.atan(tempC + rh);
+  const t3 = Math.atan(rh - 1.67633);
+  const t4 = 0.00391838 * Math.pow(rh, 1.5) * Math.atan(0.023101 * rh);
+  return t1 + t2 - t3 + t4 - 4.686035;
+}
+
+export function computeFeelsLikeC({ tempC, dewpointC, windKt, observedAt }) {
+  if (!Number.isFinite(tempC)) {
+    return { value: null, season: null };
+  }
+
+  const kst = toKstDate(observedAt);
+  if (!kst) {
+    return { value: null, season: null };
+  }
+
+  const month = kst.getUTCMonth() + 1;
+  const isSummer = month >= 5 && month <= 9;
+
+  if (isSummer) {
+    const rh = computeRelativeHumidity(tempC, dewpointC);
+    if (!Number.isFinite(rh)) {
+      return { value: null, season: "summer" };
+    }
+    const tw = estimateWetBulbStull(tempC, rh);
+    const value = -0.2442 + 0.55399 * tw + 0.45535 * tempC - 0.0022 * tw * tw + 0.00278 * tw * tempC + 3.0;
+    return { value: Number.isFinite(value) ? value : null, season: "summer" };
+  }
+
+  const windKmh = Number.isFinite(windKt) ? windKt * 1.852 : null;
+  const windMs = Number.isFinite(windKmh) ? windKmh / 3.6 : null;
+  if (!(tempC <= 10 && Number.isFinite(windMs) && windMs >= 1.3 && Number.isFinite(windKmh))) {
+    return { value: null, season: "winter" };
+  }
+
+  const v16 = Math.pow(windKmh, 0.16);
+  const value = 13.12 + 0.6215 * tempC - 11.37 * v16 + 0.3965 * v16 * tempC;
+  return { value: Number.isFinite(value) ? value : null, season: "winter" };
+}

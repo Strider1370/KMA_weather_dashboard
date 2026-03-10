@@ -658,10 +658,11 @@ tr.row-danger td { background: #ffe9e7; }
   padding: 12px;
   display: flex;
   flex-direction: column;
-  height: 250px; /* FIXED HEIGHT REDUCED */
+  min-height: 320px;
+  height: auto;
   box-sizing: border-box;
   transition: all 0.3s ease;
-  overflow: hidden;
+  overflow: visible;
 }
 .metar-v2-header { 
   display: flex; 

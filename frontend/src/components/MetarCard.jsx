@@ -1,4 +1,4 @@
-import { safe, formatUtc, getSeverityLevel } from "../utils/helpers";
+import { safe, formatUtc, getSeverityLevel, computeFeelsLikeC, computeRelativeHumidity } from "../utils/helpers";
 import WeatherIcon, { WindBarb } from "./WeatherIcon";
 import { resolveIconKey, resolveWindBarb, convertWeatherToKorean } from "../utils/visual-mapper";
 
@@ -19,14 +19,39 @@ export default function MetarCard({ metarData, icao, version = "v1", onVersionTo
   const visibility = target.observation?.visibility?.value;
   const level = getSeverityLevel({ visibility, wind: windSpeed, gust: windGust });
   const issueTime = target.header?.issue_time || target.header?.observation_time;
+  const obsTime = target.header?.observation_time || issueTime;
+  const rain1h = target.observation?.rainfall_1h || null;
+  const rainText = (rain1h?.mm == null || rain1h.mm <= 0) ? "-mm" : `${rain1h.mm.toFixed(1)} mm`;
+  const rainHourText = /^\d{12}$/.test(rain1h?.target_hour_kst || "")
+    ? `${rain1h.target_hour_kst.slice(8, 10)}:00 KST`
+    : "-";
+  const feelsLike = computeFeelsLikeC({
+    tempC: target.observation?.temperature?.air,
+    dewpointC: target.observation?.temperature?.dewpoint,
+    windKt: target.observation?.wind?.speed,
+    observedAt: obsTime,
+  });
+  const feelsLikeText = feelsLike.value == null ? "-" : `${feelsLike.value.toFixed(1)}°C`;
+  const rh = computeRelativeHumidity(
+    target.observation?.temperature?.air,
+    target.observation?.temperature?.dewpoint
+  );
+  const rhText = Number.isFinite(rh) ? `${Math.round(rh)}%` : "-";
+  const visibilityRaw = target.observation?.display?.visibility;
+  const visibilityText = (visibilityRaw == null || visibilityRaw === "//" || visibilityRaw === "-")
+    ? "-"
+    : `${visibilityRaw} m`;
 
   if (version === "v2") {
     const iconKey = resolveIconKey(target.observation, issueTime);
     const barb = resolveWindBarb(target.observation?.wind);
     const weatherKorean = convertWeatherToKorean(target.observation?.display?.weather, target.observation?.cavok);
     
-    // display.temperature (예: "05/M07")에서 M을 -로 변경
-    const tempDisplay = (target.observation?.display?.temperature || "").replaceAll('M', '-');
+    const tempC = target.observation?.temperature?.air;
+    const dewpointC = target.observation?.temperature?.dewpoint;
+    const rh = computeRelativeHumidity(tempC, dewpointC);
+    const tempDisplay = Number.isFinite(tempC) ? `${tempC.toFixed(1)}°C` : "-";
+    const rhDisplay = Number.isFinite(rh) ? `${Math.round(rh)}%` : "-";
 
     return (
       <article className="metar-v2 panel">
@@ -56,16 +81,28 @@ export default function MetarCard({ metarData, icao, version = "v1", onVersionTo
 
         <div className="metar-v2-grid">
           <div className="metar-v2-item">
-            <div className="metar-v2-label">운저고도</div>
-            <div className="metar-v2-value">{target.observation?.clouds?.[0]?.base || "-"}ft</div>
+            <div className="metar-v2-label">기온</div>
+            <div className="metar-v2-value">{tempDisplay}</div>
+          </div>
+          <div className="metar-v2-item">
+            <div className="metar-v2-label">상대습도</div>
+            <div className="metar-v2-value">{rhDisplay}</div>
+          </div>
+          <div className="metar-v2-item">
+            <div className="metar-v2-label">강수량(1시간)</div>
+            <div className="metar-v2-value">{rainText}</div>
+          </div>
+          <div className="metar-v2-item">
+            <div className="metar-v2-label">체감온도</div>
+            <div className="metar-v2-value">{feelsLikeText}</div>
           </div>
           <div className="metar-v2-item">
             <div className="metar-v2-label">시정</div>
-            <div className="metar-v2-value">{target.observation?.display?.visibility}</div>
+            <div className="metar-v2-value">{visibilityText}</div>
           </div>
           <div className="metar-v2-item">
-            <div className="metar-v2-label">기온/이슬점</div>
-            <div className="metar-v2-value">{tempDisplay || "-"}</div>
+            <div className="metar-v2-label">운고</div>
+            <div className="metar-v2-value">{target.observation?.clouds?.[0]?.base || "-"}ft</div>
           </div>
         </div>
         
@@ -84,10 +121,13 @@ export default function MetarCard({ metarData, icao, version = "v1", onVersionTo
     `Report Type: ${safe(target.header?.report_type || metarData?.type || "METAR")}`,
     `Issue Time: ${safe(formatUtc(issueTime, tz))}`,
     `Wind: ${safe(target.observation?.display?.wind)}`,
-    `Visibility: ${safe(target.observation?.display?.visibility)}`,
+    `Visibility: ${visibilityText}`,
     `Weather: ${safe(target.observation?.display?.weather)}`,
     `Clouds: ${safe(target.observation?.display?.clouds)}`,
     `Temp: ${safe(target.observation?.display?.temperature)}`,
+    `Relative Humidity: ${rhText}`,
+    `Rainfall(1h @ ${rainHourText}): ${rainText}`,
+    `Feels Like: ${feelsLikeText}`,
     `QNH: ${safe(target.observation?.display?.qnh)}`,
   ];
 

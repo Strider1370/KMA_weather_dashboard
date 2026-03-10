@@ -61,8 +61,13 @@ function isSuccessByType(type, resultCode, resultMsg) {
 
 async function fetchApi(type, icao = null) {
   const url = buildUrl(type, icao);
+  const configuredRetries = Number(config.api.max_retries);
+  const maxRetries = Math.min(
+    3,
+    Math.max(1, Number.isFinite(configuredRetries) ? configuredRetries : 1)
+  );
 
-  for (let attempt = 1; attempt <= config.api.max_retries; attempt += 1) {
+  for (let attempt = 1; attempt <= maxRetries; attempt += 1) {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), config.api.timeout_ms);
 
@@ -89,10 +94,10 @@ async function fetchApi(type, icao = null) {
 
       return body;
     } catch (error) {
-      if (error.nonRetryable || attempt === config.api.max_retries) {
+      if (error.nonRetryable || attempt === maxRetries) {
         throw error;
       }
-      await sleep(attempt * 2000);
+      await sleep(60 * 1000);
     } finally {
       clearTimeout(timeout);
     }
