@@ -97,6 +97,13 @@ export default function RadarPanel({ radarData, selectedAirport, rightPanelMode 
             >
               Radar
             </button>
+            <button
+              type="button"
+              className={`panel-switch-btn ${rightPanelMode === "map" ? "active" : ""}`}
+              onClick={() => onPanelModeChange?.("map")}
+            >
+              Map
+            </button>
           </div>
         </div>
         <div className="radar-speed-control">

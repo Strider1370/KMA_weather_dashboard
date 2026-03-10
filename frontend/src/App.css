@@ -887,3 +887,64 @@ tr.row-danger td { background: #ffe9e7; }
 .taf-v3-data-wind { height: 30px; font-size: 0.85rem; font-weight: 700; }
 .taf-v3-data-ceil { height: 30px; font-size: 0.85rem; font-weight: 600; color: var(--accent); }
 .taf-v3-data-vis { height: 30px; font-size: 0.8rem; font-weight: 600; color: var(--muted); border-bottom: none !important; }
+
+/* ── Interactive Map (Leaflet) ─────────────────────────────── */
+.interactive-map-panel .interactive-map-container {
+  height: 480px;
+  width: 100%;
+  border-radius: 14px;
+  border: 2px solid var(--line);
+  background: #131a24;
+}
+
+.interactive-map-panel .leaflet-container {
+  background: #131a24;
+  border-radius: 14px;
+}
+
+.interactive-map-panel .leaflet-control-zoom {
+  border: 1px solid rgba(255,255,255,0.2);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.interactive-map-panel .leaflet-control-zoom a {
+  background: rgba(19, 26, 36, 0.85);
+  color: #ccc;
+  border-bottom: 1px solid rgba(255,255,255,0.1);
+  width: 30px;
+  height: 30px;
+  line-height: 30px;
+  font-size: 16px;
+}
+
+.interactive-map-panel .leaflet-control-zoom a:hover {
+  background: rgba(30, 45, 61, 0.95);
+  color: #fff;
+}
+
+.leaflet-airport-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+}
+
+/* ── Radar Echo Toggle ──────────────────────────────────── */
+.echo-toggle {
+  margin-left: 6px;
+  border-left: 1px solid rgba(255,255,255,0.15);
+  padding-left: 8px;
+}
+
+.echo-toggle:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.echo-status {
+  font-size: 0.78rem;
+  color: var(--muted);
+  opacity: 0.75;
+}

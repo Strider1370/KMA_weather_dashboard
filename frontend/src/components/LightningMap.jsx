@@ -133,6 +133,13 @@ export default function LightningMap({
             >
               Radar
             </button>
+            <button
+              type="button"
+              className={`panel-switch-btn ${rightPanelMode === "map" ? "active" : ""}`}
+              onClick={() => onPanelModeChange?.("map")}
+            >
+              Map
+            </button>
           </div>
         </div>
         <div className="time-range">

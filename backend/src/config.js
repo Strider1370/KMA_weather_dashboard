@@ -50,12 +50,19 @@ module.exports = {
     interval_minutes: 5,
     timeout_ms: 15000
   },
+  radar_echo: {
+    delay_minutes: 10,
+    range_km: 100,
+    crop_size: 200,
+    timeout_ms: 30000
+  },
   schedule: {
     metar_interval: "*/10 * * * *",
     taf_interval: "*/30 * * * *",
     warning_interval: "*/5 * * * *",
     lightning_interval: "*/3 * * * *",
-    radar_interval: "*/5 * * * *"
+    radar_interval: "*/5 * * * *",
+    radar_echo_interval: "*/5 * * * *"
   },
   storage: {
     base_path: resolveDataPath(process.env.DATA_PATH),

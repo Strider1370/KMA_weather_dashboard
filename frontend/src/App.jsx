@@ -19,6 +19,7 @@ import WarningList from "./components/WarningList";
 import TafTimeline from "./components/TafTimeline";
 import LightningMap from "./components/LightningMap";
 import RadarPanel from "./components/RadarPanel";
+import InteractiveMap from "./components/InteractiveMap";
 import AlertPopup from "./components/alerts/AlertPopup";
 import AlertSound from "./components/alerts/AlertSound";
 import AlertMarquee from "./components/alerts/AlertMarquee";
@@ -304,10 +305,25 @@ export default function App() {
                     rightPanelMode={rightPanelMode}
                     onPanelModeChange={setRightPanelMode}
                   />
-                ) : (
+                ) : rightPanelMode === "radar" ? (
                   <RadarPanel
                     radarData={data.radar}
                     selectedAirport={selectedAirport}
+                    rightPanelMode={rightPanelMode}
+                    onPanelModeChange={setRightPanelMode}
+                  />
+                ) : (
+                  <InteractiveMap
+                    lightningData={data.lightning}
+                    selectedAirport={selectedAirport}
+                    airports={data.airports}
+                    boundaryLevel={boundaryLevel}
+                    windDir={(() => {
+                      const w = data.metar?.airports?.[selectedAirport]?.observation?.wind;
+                      if (!w || w.calm || w.variable) return null;
+                      return w.direction;
+                    })()}
+                    echoMeta={data.echoMeta}
                     rightPanelMode={rightPanelMode}
                     onPanelModeChange={setRightPanelMode}
                   />
