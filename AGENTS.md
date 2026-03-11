@@ -128,6 +128,7 @@ Derived from `.editorconfig` + existing source files.
 ## Data and API Conventions
 
 - API endpoints served by `server.js` under `/api/*`.
+- Snapshot polling metadata is served at `/api/snapshot-meta`.
 - Static data served under `/data/*` from `backend/data`.
 - Persisted category files generally follow:
   - `backend/data/<type>/latest.json`
@@ -158,6 +159,7 @@ Derived from `.editorconfig` + existing source files.
 - Timezone handling frequently uses KST logic in collectors.
 - Network calls use external KMA APIs; failures are expected and should degrade gracefully.
 - Some collectors are intentionally independent (not all use `api-client.js`).
+- `server.js` binds to `127.0.0.1`; expose externally via reverse proxy (nginx/LB), not direct app port.
 - In PowerShell, Korean UTF-8 files may render incorrectly with plain `Get-Content`.
 - When reading Korean text files, prefer explicit UTF-8 decoding:
   - `[Console]::OutputEncoding = [System.Text.Encoding]::UTF8`

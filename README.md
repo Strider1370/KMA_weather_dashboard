@@ -134,6 +134,7 @@ frontend/src (React 대시보드)
 - `/api/taf`
 - `/api/warning`
 - `/api/lightning`
+- `/api/snapshot-meta`
 - `/api/airports`
 - `/api/warning-types`
 - `/api/alert-defaults`

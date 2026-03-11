@@ -1,5 +1,11 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import { loadAllData, loadAlertDefaults } from "./utils/api";
+import {
+  loadAllData,
+  loadAlertDefaults,
+  loadStaticData,
+  fetchSnapshotMeta,
+  loadChangedData,
+} from "./utils/api";
 import {
   evaluate,
   buildAlertKey,
@@ -56,6 +62,8 @@ export default function App() {
 
   const prevDataRef = useRef(null);
   const pollingRef = useRef(null);
+  const pollingInFlightRef = useRef(false);
+  const snapshotHashRef = useRef({ metar: null, taf: null, warning: null, lightning: null, echo: null });
 
   // 디스패처 콜백 등록
   useEffect(() => {
@@ -65,16 +73,15 @@ export default function App() {
     return () => setAlertCallback(null);
   }, []);
 
-  const loadAll = useCallback(async () => {
+  const initialLoad = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const [result, defaults] = await Promise.all([
-        loadAllData(),
-        alertDefaults ? Promise.resolve(alertDefaults) : loadAlertDefaults(),
-      ]);
-      setData(result);
-      if (!alertDefaults) setAlertDefaults(defaults);
+      const { airports, warningTypes, alertDefaults: defaults } = await loadStaticData();
+      setAlertDefaults(defaults);
+
+      const result = await loadAllData();
+      setData((prev) => ({ ...prev, ...result, airports, warningTypes }));
 
       setSelectedAirport((prev) => {
         const available = new Set([
@@ -82,21 +89,78 @@ export default function App() {
           ...Object.keys(result.taf?.airports || {}),
           ...Object.keys(result.warning?.airports || {}),
           ...Object.keys(result.lightning?.airports || {}),
-          ...(result.airports || []).map((a) => a.icao),
+          ...(airports || []).map((a) => a.icao),
         ]);
         if (prev && available.has(prev)) return prev;
         return Array.from(available).sort()[0] || null;
       });
+
+      snapshotHashRef.current = {
+        metar: result.metar?.content_hash || null,
+        taf: result.taf?.content_hash || null,
+        warning: result.warning?.content_hash || null,
+        lightning: result.lightning?.content_hash || null,
+        echo: result.echoMeta?.tm || null,
+      };
     } catch (err) {
       setError(err.message);
     } finally {
       setLoading(false);
     }
-  }, [alertDefaults]);
+  }, []);
+
+  const pollOnce = useCallback(async () => {
+    if (pollingInFlightRef.current) return;
+    pollingInFlightRef.current = true;
+
+    try {
+      let snapshot;
+      try {
+        snapshot = await fetchSnapshotMeta();
+      } catch {
+        return;
+      }
+
+      const saved = snapshotHashRef.current;
+      const changes = {
+        metar: snapshot.metar?.hash == null || snapshot.metar.hash !== saved.metar,
+        taf: snapshot.taf?.hash == null || snapshot.taf.hash !== saved.taf,
+        warning: snapshot.warning?.hash == null || snapshot.warning.hash !== saved.warning,
+        lightning: snapshot.lightning?.hash == null || snapshot.lightning.hash !== saved.lightning,
+        echoMeta: snapshot.echo?.tm == null || snapshot.echo.tm !== saved.echo,
+      };
+
+      const anyChanged = Object.values(changes).some(Boolean);
+      if (!anyChanged) return;
+
+      const changedData = await loadChangedData(changes);
+      setData((prev) => ({ ...prev, ...changedData }));
+
+      snapshotHashRef.current = {
+        metar: changes.metar && changedData.metar?.content_hash != null
+          ? changedData.metar.content_hash
+          : (snapshot.metar?.hash ?? saved.metar),
+        taf: changes.taf && changedData.taf?.content_hash != null
+          ? changedData.taf.content_hash
+          : (snapshot.taf?.hash ?? saved.taf),
+        warning: changes.warning && changedData.warning?.content_hash != null
+          ? changedData.warning.content_hash
+          : (snapshot.warning?.hash ?? saved.warning),
+        lightning: changes.lightning && changedData.lightning?.content_hash != null
+          ? changedData.lightning.content_hash
+          : (snapshot.lightning?.hash ?? saved.lightning),
+        echo: changes.echoMeta && changedData.echoMeta?.tm != null
+          ? changedData.echoMeta.tm
+          : (snapshot.echo?.tm ?? saved.echo),
+      };
+    } finally {
+      pollingInFlightRef.current = false;
+    }
+  }, []);
 
   useEffect(() => {
-    loadAll();
-  }, [loadAll]);
+    initialLoad();
+  }, [initialLoad]);
 
   // Alert evaluation
   useEffect(() => {
@@ -150,13 +214,13 @@ export default function App() {
     if (pollingRef.current) clearInterval(pollingRef.current);
 
     pollingRef.current = setInterval(() => {
-      loadAll();
+      pollOnce();
     }, intervalSec * 1000);
 
     return () => {
       if (pollingRef.current) clearInterval(pollingRef.current);
     };
-  }, [alertDefaults, loadAll]);
+  }, [alertDefaults, pollOnce]);
 
   function handleDismissAlert(id) {
     setActiveAlerts((prev) => prev.filter((a) => a.id !== id));

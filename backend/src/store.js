@@ -91,12 +91,12 @@ function canonicalize(value) {
     const out = {};
     const keys = Object.keys(value).sort();
 
-    for (const key of keys) {
-      if (key === "fetched_at" || key === "type" || key === "_stale") {
-        continue;
-      }
-      out[key] = canonicalize(value[key]);
-    }
+     for (const key of keys) {
+       if (key === "fetched_at" || key === "type" || key === "_stale" || key === "content_hash") {
+         continue;
+       }
+       out[key] = canonicalize(value[key]);
+     }
 
     return out;
   }
@@ -176,8 +176,10 @@ function save(type, data) {
     if (fs.existsSync(latestPath)) {
       const latest = JSON.parse(fs.readFileSync(latestPath, "utf8"));
       latest.fetched_at = data.fetched_at || new Date().toISOString();
+      latest.content_hash = decision.hash;
       writeJson(latestPath, latest);
     }
+    data.content_hash = decision.hash;
     updateCache(type, data, decision.hash);
     return { saved: false, reason: "unchanged" };
   }
@@ -189,6 +191,7 @@ function save(type, data) {
     filename = `${prefix}_${formatFileTimestamp()}_${attempt}.json`;
     attempt += 1;
   }
+  data.content_hash = decision.hash;
   const filePath = saveAndUpdateLatest(dir, filename, data);
   updateCache(type, data, decision.hash);
 

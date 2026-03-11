@@ -84,6 +84,21 @@ function readLatest(category) {
   return JSON.parse(fs.readFileSync(file, "utf8"));
 }
 
+function readSnapshotHash(category) {
+  const cached = store.getCached(category);
+  if (cached?.content_hash) return cached.content_hash;
+
+  const file = path.join(DATA_ROOT, category, "latest.json");
+  if (!fs.existsSync(file)) return null;
+
+  try {
+    const latest = JSON.parse(fs.readFileSync(file, "utf8"));
+    return latest?.content_hash || null;
+  } catch {
+    return null;
+  }
+}
+
 function readTst1Override(category) {
   const file = path.join(TST1_ROOT, `${category}.json`);
   if (!fs.existsSync(file)) return null;
@@ -265,7 +280,25 @@ const server = http.createServer(async (req, res) => {
       return sendJson(req, res, 200, alertDefaults);
     }
 
-
+    if (req.url === "/api/snapshot-meta") {
+      const echoMetaPath = path.join(DATA_ROOT, "radar", "echo_meta.json");
+      let echoTm = null;
+      try {
+        if (fs.existsSync(echoMetaPath)) {
+          const echoMeta = JSON.parse(fs.readFileSync(echoMetaPath, "utf8"));
+          echoTm = echoMeta.tm || null;
+        }
+      } catch {
+        echoTm = null;
+      }
+      return sendJson(req, res, 200, {
+        metar: { hash: readSnapshotHash("metar") },
+        taf: { hash: readSnapshotHash("taf") },
+        warning: { hash: readSnapshotHash("warning") },
+        lightning: { hash: readSnapshotHash("lightning") },
+        echo: echoTm != null ? { tm: echoTm } : null,
+      });
+    }
 
     if (req.url.startsWith("/data/")) {
       return serveDataAsset(req, res);
@@ -278,10 +311,10 @@ const server = http.createServer(async (req, res) => {
   }
 });
 
-server.listen(PORT, () => {
-   console.log(`Dashboard server started: http://localhost:${PORT}`);
+server.listen(PORT, "127.0.0.1", () => {
+  console.log(`Dashboard server started: http://localhost:${PORT}`);
 
-   const scheduler = require("./backend/src/index");
+  const scheduler = require("./backend/src/index");
   scheduler.main().catch((err) => {
     console.error("Scheduler failed to start:", err);
   });
