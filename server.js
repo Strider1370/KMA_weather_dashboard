@@ -11,7 +11,7 @@ const __dirname = path.dirname(__filename);
 
 // Rate limiting (in-memory, per IP)
 const rateLimitMap = new Map();
-const RATE_LIMIT = 120;       // requests per window
+const RATE_LIMIT = 300;       // requests per window
 const RATE_WINDOW = 60 * 1000; // 1 minute in ms
 
 function isRateLimited(ip) {
@@ -24,6 +24,14 @@ function isRateLimited(ip) {
   if (entry.count >= RATE_LIMIT) return true;
   entry.count++;
   return false;
+}
+
+function getClientIp(req) {
+  const forwardedFor = req.headers["x-forwarded-for"];
+  if (typeof forwardedFor === "string" && forwardedFor.trim()) {
+    return forwardedFor.split(",")[0].trim();
+  }
+  return req.socket.remoteAddress || "unknown";
 }
 
 const PORT = Number(process.env.PORT || 5173);
@@ -167,10 +175,14 @@ function serveDataAsset(req, res) {
   }
 
   const body = fs.readFileSync(filePath);
+  const radarFramePattern = /[\\/]radar[\\/]echo_korea_\d{12}\.png$/;
+  const cacheControl = radarFramePattern.test(filePath)
+    ? "public, max-age=31536000, immutable"
+    : "no-cache";
   res.writeHead(200, {
     ...buildBaseHeaders(req),
     "Content-Type": contentTypeFor(filePath),
-    "Cache-Control": "no-cache"
+    "Cache-Control": cacheControl
   });
   res.end(body);
   return true;
@@ -212,8 +224,8 @@ const server = http.createServer(async (req, res) => {
       return;
     }
 
-    const ip = req.socket.remoteAddress || "unknown";
-    if (isRateLimited(ip)) {
+    const ip = getClientIp(req);
+    if (req.url.startsWith("/api/") && isRateLimited(ip)) {
       return sendJson(req, res, 429, { error: "Too Many Requests" });
     }
 

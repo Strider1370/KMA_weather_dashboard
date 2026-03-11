@@ -194,6 +194,26 @@ export default function InteractiveMap({
     return () => clearInterval(timer);
   }, [echoFrames.length, isPlaying, playbackMs]);
 
+  useEffect(() => {
+    if (!echoFrames.length) return undefined;
+
+    const imageRefs = echoFrames
+      .map((frame) => {
+        if (!frame?.path) return null;
+        const img = new Image();
+        img.decoding = "async";
+        img.src = frame.path;
+        return img;
+      })
+      .filter(Boolean);
+
+    return () => {
+      imageRefs.forEach((img) => {
+        img.src = "";
+      });
+    };
+  }, [echoFrames]);
+
   function changePlaybackSpeed(delta) {
     setPlaybackMs((prev) => {
       const next = prev + delta;
@@ -203,8 +223,11 @@ export default function InteractiveMap({
 
   const echoInfo = useMemo(() => {
     if (!currentFrame?.path || !currentFrame?.bounds) return null;
+    const isVersionedFrame = /echo_korea_\d{12}\.png$/.test(currentFrame.path);
     return {
-      url: currentFrame.path + "?t=" + (currentFrame.tm || echoMeta?.tm || Date.now()),
+      url: isVersionedFrame
+        ? currentFrame.path
+        : currentFrame.path + "?t=" + (currentFrame.tm || echoMeta?.tm || Date.now()),
       bounds: currentFrame.bounds,
       echoCount: currentFrame.echoCount || 0,
       tm: currentFrame.tm || echoMeta?.tm || null,

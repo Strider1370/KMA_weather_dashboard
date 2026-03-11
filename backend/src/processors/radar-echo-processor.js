@@ -146,19 +146,13 @@ function writeMeta(radarDir, latestTm, frameTms, existingFrames) {
     meta.nationwide = frames[frames.length - 1];
   }
 
-  if (meta.nationwide) {
-    const latestFramePath = path.join(radarDir, path.basename(meta.nationwide.path));
-    if (fs.existsSync(latestFramePath)) {
-      fs.copyFileSync(latestFramePath, path.join(radarDir, "echo_korea.png"));
-    }
-  }
-
-  const validNames = new Set([
-    "echo_korea.png",
-    ...frames.map((frame) => path.basename(frame.path)),
-  ]);
+  const validNames = new Set(frames.map((frame) => path.basename(frame.path)));
 
   for (const filename of fs.readdirSync(radarDir)) {
+    if (filename === "echo_korea.png") {
+      fs.unlinkSync(path.join(radarDir, filename));
+      continue;
+    }
     if (/^echo_korea_\d{12}\.png$/.test(filename) && !validNames.has(filename)) {
       fs.unlinkSync(path.join(radarDir, filename));
     }
