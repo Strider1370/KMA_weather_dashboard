@@ -183,13 +183,13 @@ async function cropAirportEcho(refl, lat, lon, rangeKm = 100, cropSize = 200) {
   const pngBuffer = await sharp(buf, {
     raw: { width: cropSize, height: cropSize, channels: 4 },
   })
-    .png({ compressionLevel: 6 })
+    .png({ compressionLevel: 3 })
     .toBuffer();
 
   return { pngBuffer, bounds, echoCount, width: cropSize, height: cropSize };
 }
 
-async function renderNationwideEcho(refl, scale = 3) {
+async function renderNationwideEcho(refl, scale = 1) {
   const outW = Math.ceil(NX / scale);
   const outH = Math.ceil(NY / scale);
   const buf = Buffer.alloc(outW * outH * 4);
@@ -238,7 +238,7 @@ async function renderNationwideEcho(refl, scale = 3) {
   const pngBuffer = await sharp(buf, {
     raw: { width: outW, height: outH, channels: 4 },
   })
-    .png({ compressionLevel: 6 })
+    .png({ compressionLevel: 3 })
     .toBuffer();
 
   return { pngBuffer, bounds, echoCount, width: outW, height: outH, scale };

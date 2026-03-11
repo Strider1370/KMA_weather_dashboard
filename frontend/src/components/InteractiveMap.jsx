@@ -2,7 +2,6 @@ import { useState, useEffect, useMemo } from "react";
 import { MapContainer, GeoJSON, CircleMarker, Circle, Marker, Pane, ImageOverlay, useMap } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
-import { safe } from "../utils/helpers";
 
 const ZONE_RADII = [
   { zone: "caution", km: 32, color: "#FFD700", label: "32km" },
@@ -21,7 +20,11 @@ const BOUNDARY_STYLE = {
 const DEFAULT_CENTER = [36.5, 127.5];
 const DEFAULT_ZOOM = 10;
 const NATIONWIDE_CENTER = [36.2, 127.8];
-const NATIONWIDE_ZOOM = 7;
+const NATIONWIDE_ZOOM = 6;
+const DEFAULT_FRAME_MS = 500;
+const MIN_FRAME_MS = 100;
+const MAX_FRAME_MS = 2000;
+const FRAME_MS_STEP = 100;
 
 function getStrikeColor(strikeTimeIso) {
   const elapsedMin = (Date.now() - new Date(strikeTimeIso).getTime()) / 60000;
@@ -43,47 +46,54 @@ function pickRunwayDirection(runwayHdg, windDir) {
   return diff1 <= diff2 ? opt1 : opt2;
 }
 
-function MapRecenter({ center, zoom }) {
+function MapRecenter({ center, zoom, recenterKey }) {
   const map = useMap();
   useEffect(() => {
     if (center) map.setView(center, zoom);
-  }, [center, zoom, map]);
+  }, [map, recenterKey]);
   return null;
+}
+
+function formatTmLabel(tm) {
+  if (!tm || !/^\d{12}$/.test(tm)) return "-";
+  return `${tm.slice(8, 10)}:${tm.slice(10, 12)}`;
+}
+
+function formatLightningSummary(summary, isNationwide) {
+  if (summary.total === 0) return "No recent strikes";
+  if (!isNationwide && summary.nearest != null) {
+    return `${summary.total} recent strikes · nearest ${summary.nearest.toFixed(1)} km`;
+  }
+  return `${summary.total} recent strikes`;
 }
 
 export default function InteractiveMap({
   lightningData,
   selectedAirport,
   airports,
-  boundaryLevel = "sigungu",
   windDir = null,
   echoMeta = null,
+  radarOpacity = 0.6,
   mapTheme = "dark",
-  rightPanelMode = "map",
-  onPanelModeChange,
 }) {
   const [mapScope, setMapScope] = useState("airport");
   const [geoData, setGeoData] = useState(null);
   const [showEcho, setShowEcho] = useState(true);
-  const [echoOpacity, setEchoOpacity] = useState(0.7);
+  const [showLightning, setShowLightning] = useState(true);
+  const [frameIndex, setFrameIndex] = useState(0);
+  const [isPlaying, setIsPlaying] = useState(true);
+  const [playbackMs, setPlaybackMs] = useState(DEFAULT_FRAME_MS);
+  const [recenterKey, setRecenterKey] = useState(0);
   const isNationwide = mapScope === "nationwide";
-  const timeRangeMin = 120;
+  const timeRangeMin = 30;
 
   useEffect(() => {
     setGeoData(null);
-    const geoPath = isNationwide
-      ? "/geo/korea_sido.geojson"
-      : selectedAirport
-        ? `/geo/${selectedAirport}_${boundaryLevel}.geojson`
-        : null;
-
-    if (!geoPath) return;
-
-    fetch(geoPath)
+    fetch("/geo/korea_sido.geojson")
       .then((r) => r.json())
       .then(setGeoData)
       .catch(() => {});
-  }, [selectedAirport, boundaryLevel, isNationwide]);
+  }, []);
 
   const airportMeta = airports?.find((a) => a.icao === selectedAirport) || null;
   const runwayHdg = airportMeta?.runway_hdg ?? 0;
@@ -143,11 +153,6 @@ export default function InteractiveMap({
     return { byZone, total: visibleStrikes.length, nearest, latest };
   }, [visibleStrikes]);
 
-  const nationwideAirportMarkers = useMemo(() => {
-    if (!isNationwide) return [];
-    return (airports || []).filter((airport) => Number.isFinite(airport.lat) && Number.isFinite(airport.lon));
-  }, [airports, isNationwide]);
-
   const boundaryStyle = useMemo(() => (
     mapTheme === "light"
       ? {
@@ -160,64 +165,85 @@ export default function InteractiveMap({
       : BOUNDARY_STYLE
   ), [mapTheme]);
 
+  const echoFrames = useMemo(() => echoMeta?.frames || [], [echoMeta]);
+  const currentFrame = echoFrames[frameIndex] || echoMeta?.nationwide || null;
+  const maxIndex = Math.max(echoFrames.length - 1, 0);
+  const progressRatio = maxIndex > 0 ? (frameIndex / maxIndex) : 0;
+  const canDecrementSpeed = playbackMs > MIN_FRAME_MS;
+  const canIncrementSpeed = playbackMs < MAX_FRAME_MS;
+
+  useEffect(() => {
+    if (!echoFrames.length) {
+      setFrameIndex(0);
+      return;
+    }
+
+    if (isPlaying) {
+      setFrameIndex((prev) => prev % echoFrames.length);
+      return;
+    }
+
+    setFrameIndex(echoFrames.length - 1);
+  }, [echoFrames, isPlaying]);
+
+  useEffect(() => {
+    if (!isPlaying || echoFrames.length <= 1) return undefined;
+    const timer = setInterval(() => {
+      setFrameIndex((prev) => (prev + 1) % echoFrames.length);
+    }, playbackMs);
+    return () => clearInterval(timer);
+  }, [echoFrames.length, isPlaying, playbackMs]);
+
+  function changePlaybackSpeed(delta) {
+    setPlaybackMs((prev) => {
+      const next = prev + delta;
+      return Math.min(MAX_FRAME_MS, Math.max(MIN_FRAME_MS, next));
+    });
+  }
+
   const echoInfo = useMemo(() => {
-    const info = isNationwide
-      ? echoMeta?.nationwide
-      : echoMeta?.airports?.[selectedAirport];
-    if (!info?.path || !info?.bounds) return null;
+    if (!currentFrame?.path || !currentFrame?.bounds) return null;
     return {
-      url: info.path + "?t=" + (echoMeta.tm || Date.now()),
-      bounds: info.bounds,
-      echoCount: info.echoCount || 0,
-      tm: echoMeta.tm || null,
+      url: currentFrame.path + "?t=" + (currentFrame.tm || echoMeta?.tm || Date.now()),
+      bounds: currentFrame.bounds,
+      echoCount: currentFrame.echoCount || 0,
+      tm: currentFrame.tm || echoMeta?.tm || null,
     };
-  }, [echoMeta, isNationwide, selectedAirport]);
+  }, [currentFrame, echoMeta]);
 
   return (
     <aside className="panel lightning-panel interactive-map-panel">
       <div className="lightning-head">
-        <div className="panel-head-title">
-          <div className="panel-switch" role="tablist" aria-label="Right panel mode">
-            <button
-              type="button"
-              className={`panel-switch-btn ${rightPanelMode === "lightning" ? "active" : ""}`}
-              onClick={() => onPanelModeChange?.("lightning")}
-            >
-              Lightning
-            </button>
-            <button
-              type="button"
-              className={`panel-switch-btn ${rightPanelMode === "radar" ? "active" : ""}`}
-              onClick={() => onPanelModeChange?.("radar")}
-            >
-              Radar
-            </button>
-            <button
-              type="button"
-              className={`panel-switch-btn ${rightPanelMode === "map" ? "active" : ""}`}
-              onClick={() => onPanelModeChange?.("map")}
-            >
-              Map
-            </button>
-          </div>
-          <div className="panel-switch map-scope-switch" role="tablist" aria-label="Map scope">
-            <button
-              type="button"
-              className={`panel-switch-btn ${!isNationwide ? "active" : ""}`}
-              onClick={() => setMapScope("airport")}
-            >
-              Airport
-            </button>
-            <button
-              type="button"
-              className={`panel-switch-btn ${isNationwide ? "active" : ""}`}
-              onClick={() => setMapScope("nationwide")}
-            >
-              Korea
-            </button>
-          </div>
+        <div className="panel-switch map-scope-switch" role="tablist" aria-label="Map scope">
+          <button
+            type="button"
+            className={`panel-switch-btn ${!isNationwide ? "active" : ""}`}
+            onClick={() => {
+              setMapScope("airport");
+              setRecenterKey((prev) => prev + 1);
+            }}
+          >
+            Airport
+          </button>
+          <button
+            type="button"
+            className={`panel-switch-btn ${isNationwide ? "active" : ""}`}
+            onClick={() => {
+              setMapScope("nationwide");
+              setRecenterKey((prev) => prev + 1);
+            }}
+          >
+            Korea
+          </button>
         </div>
         <div className="time-range">
+          <button
+            type="button"
+            className={`range-btn ${showLightning ? "active" : ""}`}
+            onClick={() => setShowLightning((v) => !v)}
+          >
+            Lightning
+          </button>
           <button
             type="button"
             className={`range-btn echo-toggle ${showEcho ? "active" : ""}`}
@@ -235,8 +261,15 @@ export default function InteractiveMap({
       ) : (
         <>
           <div className={`interactive-map-shell interactive-map-shell--${mapTheme}`}>
+            {showLightning && (
+              <div className="interactive-map-legend">
+                <span className="zone-tag alert">8km {summary.byZone.alert}</span>
+                <span className="zone-tag danger">16km {summary.byZone.danger}</span>
+                <span className="zone-tag caution">32km {summary.byZone.caution}</span>
+              </div>
+            )}
             <MapContainer
-              key={`interactive-map-${mapTheme}`}
+              key={`interactive-map-${mapTheme}-${mapScope}`}
               center={center}
               zoom={mapZoom}
               scrollWheelZoom={true}
@@ -244,12 +277,12 @@ export default function InteractiveMap({
               attributionControl={false}
               className="interactive-map-container"
             >
-              <MapRecenter center={center} zoom={mapZoom} />
+              <MapRecenter center={center} zoom={mapZoom} recenterKey={recenterKey} />
 
             <Pane name="boundary-pane" style={{ zIndex: 350 }}>
               {geoData && (
                 <GeoJSON
-                  key={`${selectedAirport}-${boundaryLevel}`}
+                  key="korea-sido-boundary"
                   data={geoData}
                   style={() => boundaryStyle}
                 />
@@ -261,13 +294,13 @@ export default function InteractiveMap({
                 <ImageOverlay
                   url={echoInfo.url}
                   bounds={echoInfo.bounds}
-                  opacity={echoOpacity}
+                  opacity={radarOpacity}
                 />
               </Pane>
             )}
 
             <Pane name="overlay-pane" style={{ zIndex: 450 }}>
-              {!isNationwide && ZONE_RADII.map((zone) => (
+              {showLightning && !isNationwide && ZONE_RADII.map((zone) => (
                 <Circle
                   key={zone.zone}
                   center={center}
@@ -285,26 +318,25 @@ export default function InteractiveMap({
 
             <Pane name="airport-pane" style={{ zIndex: 650 }}>
               {isNationwide ? (
-                nationwideAirportMarkers.map((airport) => (
+                arp && (
                   <CircleMarker
-                    key={airport.icao}
-                    center={[airport.lat, airport.lon]}
-                    radius={airport.icao === selectedAirport ? 7 : 5}
+                    center={[arp.lat, arp.lon]}
+                    radius={7}
                     pathOptions={{
-                      color: airport.icao === selectedAirport ? "#ffd166" : "#ffffff",
-                      weight: airport.icao === selectedAirport ? 2.5 : 1.5,
-                      fillColor: airport.icao === selectedAirport ? "#1f7ae0" : mapTheme === "light" ? "#111111" : "#24425f",
+                      color: "#ffd166",
+                      weight: 2.5,
+                      fillColor: "#1f7ae0",
                       fillOpacity: 0.9,
                     }}
                   />
-                ))
+                )
               ) : (
                 <Marker position={center} icon={airportIcon} />
               )}
             </Pane>
 
             <Pane name="strike-pane" style={{ zIndex: 500 }}>
-              {visibleStrikes.map((strike, idx) => {
+              {showLightning && visibleStrikes.map((strike, idx) => {
                 const { color, opacity } = getStrikeColor(strike.time);
                 return (
                   <CircleMarker
@@ -325,30 +357,68 @@ export default function InteractiveMap({
             </MapContainer>
           </div>
 
-          <div className="lightning-legend">
-            <span className="zone-tag alert">8km {summary.byZone.alert}</span>
-            <span className="zone-tag danger">16km {summary.byZone.danger}</span>
-            <span className="zone-tag caution">32km {summary.byZone.caution}</span>
-          </div>
-
-          <div className="lightning-summary">
-            {summary.total === 0 ? (
-              <p>No recent strikes</p>
-            ) : (
-              <>
-                <p><strong>{summary.total}</strong> recent strikes</p>
-                {!isNationwide && (
-                  <p>Nearest: {summary.nearest == null ? "-" : `${summary.nearest.toFixed(1)} km`}</p>
+          {echoFrames.length > 0 && (
+            <div className="radar-timeline">
+              <div className="radar-controls">
+                <div className="radar-speed-control">
+                  <button
+                    type="button"
+                    className="radar-speed-step"
+                    onClick={() => changePlaybackSpeed(-FRAME_MS_STEP)}
+                    disabled={!canDecrementSpeed}
+                    aria-label="재생시간 감소"
+                  >
+                    -
+                  </button>
+                  <span className="radar-speed-chip">재생시간 {(playbackMs / 1000).toFixed(1)}초</span>
+                  <button
+                    type="button"
+                    className="radar-speed-step"
+                    onClick={() => changePlaybackSpeed(FRAME_MS_STEP)}
+                    disabled={!canIncrementSpeed}
+                    aria-label="재생시간 증가"
+                  >
+                    +
+                  </button>
+                </div>
+                {showLightning && (
+                  <span className="radar-lightning-summary">
+                    {formatLightningSummary(summary, isNationwide)}
+                  </span>
                 )}
-                <p>Latest: {safe(isNationwide ? summary.latest : airportData?.summary?.latest_time || summary.latest, "-")}</p>
-              </>
-            )}
-            {showEcho && echoInfo && (
-              <p className="echo-status">
-                Radar: {echoInfo.tm ? `${echoInfo.tm.slice(4, 6)}/${echoInfo.tm.slice(6, 8)} ${echoInfo.tm.slice(8, 10)}:${echoInfo.tm.slice(10, 12)} KST` : "-"}
-              </p>
-            )}
-          </div>
+              </div>
+              <div className="radar-seek-wrap">
+                <button
+                  type="button"
+                  className="radar-icon-btn radar-icon-inline"
+                  onClick={() => setIsPlaying((prev) => !prev)}
+                  disabled={echoFrames.length <= 1}
+                  aria-label={isPlaying ? "Pause radar playback" : "Play radar playback"}
+                  title={isPlaying ? "일시정지" : "재생"}
+                >
+                  {isPlaying ? "❚❚" : "▶"}
+                </button>
+                <input
+                  className="radar-seek"
+                  type="range"
+                  min={0}
+                  max={maxIndex}
+                  step={1}
+                  value={Math.min(frameIndex, maxIndex)}
+                  onChange={(event) => setFrameIndex(Number(event.target.value))}
+                  aria-label="Radar timeline"
+                />
+                <div className="radar-time-row">
+                  <span
+                    className="radar-current-time"
+                    style={{ "--radar-progress": progressRatio }}
+                  >
+                    {formatTmLabel(currentFrame?.tm)}
+                  </span>
+                </div>
+              </div>
+            </div>
+          )}
         </>
       )}
     </aside>

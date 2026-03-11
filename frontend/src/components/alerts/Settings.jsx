@@ -36,9 +36,7 @@ export default function Settings({ defaults, onClose, onSettingsChange, timeZone
   // UI Version states (local to settings modal)
   const [metarVersion, setMetarVersion] = useState(() => localStorage.getItem("metar_version") || "v1");
   const [tafVersion, setTafVersion] = useState(() => localStorage.getItem("taf_version") || "v1");
-  const [lightningBoundary, setLightningBoundary] = useState(() => localStorage.getItem("lightning_boundary") || "sigungu");
   const [localTimeZone, setLocalTimeZone] = useState(timeZone || "KST");
-  const [showRadar, setShowRadar] = useState(() => localStorage.getItem("show_radar_overlay") === "true");
   const [radarOpacity, setRadarOpacity] = useState(() => parseFloat(localStorage.getItem("radar_overlay_opacity") || "0.6"));
   const [localMapTheme, setLocalMapTheme] = useState(mapTheme || localStorage.getItem("map_theme") || "dark");
   const [activeTab, setActiveTab] = useState("general");
@@ -89,9 +87,7 @@ export default function Settings({ defaults, onClose, onSettingsChange, timeZone
     // Save UI versions to localStorage
     localStorage.setItem("metar_version", metarVersion);
     localStorage.setItem("taf_version", tafVersion);
-    localStorage.setItem("lightning_boundary", lightningBoundary);
     localStorage.setItem("time_zone", localTimeZone);
-    localStorage.setItem("show_radar_overlay", showRadar);
     localStorage.setItem("radar_overlay_opacity", radarOpacity);
     localStorage.setItem("map_theme", localMapTheme);
     setTimeZone?.(localTimeZone);
@@ -105,9 +101,7 @@ export default function Settings({ defaults, onClose, onSettingsChange, timeZone
     clearPersonalSettings();
     localStorage.removeItem("metar_version");
     localStorage.removeItem("taf_version");
-    localStorage.removeItem("lightning_boundary");
     localStorage.removeItem("time_zone");
-    localStorage.removeItem("show_radar_overlay");
     localStorage.removeItem("radar_overlay_opacity");
     localStorage.removeItem("map_theme");
     setTimeZone?.("KST");
@@ -162,22 +156,11 @@ export default function Settings({ defaults, onClose, onSettingsChange, timeZone
                   </select>
                 </label>
                 <label className="alert-settings-row">
-                  <span>낙뢰 지도 경계</span>
-                  <select value={lightningBoundary} onChange={(e) => setLightningBoundary(e.target.value)}>
-                    <option value="sigungu">시군구 (기본)</option>
-                    <option value="admdong">행정동 (상세)</option>
-                  </select>
-                </label>
-                <label className="alert-settings-row">
                   <span>시간대 표시</span>
                   <select value={localTimeZone} onChange={(e) => setLocalTimeZone(e.target.value)}>
                     <option value="UTC">UTC (협정 세계시)</option>
                     <option value="KST">KST (한국 표준시, UTC+9)</option>
                   </select>
-                </label>
-                <label className="alert-settings-row">
-                  <span>낙뢰 지도 레이더 오버레이</span>
-                  <input type="checkbox" checked={showRadar} onChange={(e) => setShowRadar(e.target.checked)} />
                 </label>
                 <label className="alert-settings-row">
                   <span>지도 테마</span>
@@ -186,12 +169,10 @@ export default function Settings({ defaults, onClose, onSettingsChange, timeZone
                     <option value="light">화이트</option>
                   </select>
                 </label>
-                {showRadar && (
-                  <label className="alert-settings-row alert-settings-sub">
-                    <span>레이더 투명도 ({Math.round(radarOpacity * 100)}%)</span>
-                    <input type="range" min={0.1} max={0.9} step={0.1} value={radarOpacity} onChange={(e) => setRadarOpacity(parseFloat(e.target.value))} />
-                  </label>
-                )}
+                <label className="alert-settings-row alert-settings-sub">
+                  <span>레이더 투명도 ({Math.round(radarOpacity * 100)}%)</span>
+                  <input type="range" min={0.1} max={0.9} step={0.1} value={radarOpacity} onChange={(e) => setRadarOpacity(parseFloat(e.target.value))} />
+                </label>
               </fieldset>
             )}
 

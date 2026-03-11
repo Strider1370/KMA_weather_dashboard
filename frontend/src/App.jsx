@@ -15,8 +15,6 @@ import Header from "./components/Header";
 import MetarCard from "./components/MetarCard";
 import WarningList from "./components/WarningList";
 import TafTimeline from "./components/TafTimeline";
-import LightningMap from "./components/LightningMap";
-import RadarPanel from "./components/RadarPanel";
 import InteractiveMap from "./components/InteractiveMap";
 import AlertPopup from "./components/alerts/AlertPopup";
 import AlertSound from "./components/alerts/AlertSound";
@@ -36,11 +34,8 @@ export default function App() {
   // UI Version states
   const [metarVersion, setMetarVersion] = useState(() => localStorage.getItem("metar_version") || "v1");
   const [tafVersion, setTafVersion] = useState(() => localStorage.getItem("taf_version") || "v1");
-  const [boundaryLevel, setBoundaryLevel] = useState(() => localStorage.getItem("lightning_boundary") || "sigungu");
   const [timeZone, setTimeZone] = useState(() => localStorage.getItem("time_zone") || "KST");
-  const [showRadar, setShowRadar] = useState(() => localStorage.getItem("show_radar_overlay") === "true");
   const [radarOpacity, setRadarOpacity] = useState(() => parseFloat(localStorage.getItem("radar_overlay_opacity") || "0.6"));
-  const [rightPanelMode, setRightPanelMode] = useState(() => localStorage.getItem("right_panel_mode") || "lightning");
   const [mapTheme, setMapTheme] = useState(() => localStorage.getItem("map_theme") || "dark");
 
   useEffect(() => {
@@ -54,10 +49,6 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem("time_zone", timeZone);
   }, [timeZone]);
-
-  useEffect(() => {
-    localStorage.setItem("right_panel_mode", rightPanelMode);
-  }, [rightPanelMode]);
 
   useEffect(() => {
     localStorage.setItem("map_theme", mapTheme);
@@ -178,9 +169,7 @@ export default function App() {
     // UI 버전 상태도 localStorage에서 다시 읽어옴
     setMetarVersion(localStorage.getItem("metar_version") || "v1");
     setTafVersion(localStorage.getItem("taf_version") || "v1");
-    setBoundaryLevel(localStorage.getItem("lightning_boundary") || "sigungu");
     setTimeZone(localStorage.getItem("time_zone") || "KST");
-    setShowRadar(localStorage.getItem("show_radar_overlay") === "true");
     setRadarOpacity(parseFloat(localStorage.getItem("radar_overlay_opacity") || "0.6"));
     setMapTheme(localStorage.getItem("map_theme") || "dark");
   }
@@ -274,47 +263,19 @@ export default function App() {
               </div>
 
               <div className="secondary-column">
-                {rightPanelMode === "lightning" ? (
-                  <LightningMap
-                    lightningData={data.lightning}
-                    selectedAirport={selectedAirport}
-                    airports={data.airports}
-                    boundaryLevel={boundaryLevel}
-                    windDir={(() => {
-                      const w = data.metar?.airports?.[selectedAirport]?.observation?.wind;
-                      if (!w || w.calm || w.variable) return null;
-                      return w.direction;
-                    })()}
-                    showRadar={showRadar}
-                    radarOpacity={radarOpacity}
-                    mapTheme={mapTheme}
-                    rightPanelMode={rightPanelMode}
-                    onPanelModeChange={setRightPanelMode}
-                  />
-                ) : rightPanelMode === "radar" ? (
-                  <RadarPanel
-                    radarData={data.radar}
-                    selectedAirport={selectedAirport}
-                    rightPanelMode={rightPanelMode}
-                    onPanelModeChange={setRightPanelMode}
-                  />
-                ) : (
-                  <InteractiveMap
-                    lightningData={data.lightning}
-                    selectedAirport={selectedAirport}
-                    airports={data.airports}
-                    boundaryLevel={boundaryLevel}
-                    windDir={(() => {
-                      const w = data.metar?.airports?.[selectedAirport]?.observation?.wind;
-                      if (!w || w.calm || w.variable) return null;
-                      return w.direction;
-                    })()}
-                    echoMeta={data.echoMeta}
-                    mapTheme={mapTheme}
-                    rightPanelMode={rightPanelMode}
-                    onPanelModeChange={setRightPanelMode}
-                  />
-                )}
+                <InteractiveMap
+                  lightningData={data.lightning}
+                  selectedAirport={selectedAirport}
+                  airports={data.airports}
+                  windDir={(() => {
+                    const w = data.metar?.airports?.[selectedAirport]?.observation?.wind;
+                    if (!w || w.calm || w.variable) return null;
+                    return w.direction;
+                  })()}
+                  echoMeta={data.echoMeta}
+                  radarOpacity={radarOpacity}
+                  mapTheme={mapTheme}
+                />
               </div>
             </section>
           </>

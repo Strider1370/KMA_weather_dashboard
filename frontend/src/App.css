@@ -238,10 +238,10 @@ tr.row-danger td { background: #ffe9e7; }
 .radar-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
 .radar-head .sub { margin: 0; font-size: 0.78rem; }
 .radar-controls {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 8px;
+  display: flex;
+  justify-content: space-between;
   align-items: center;
+  gap: 12px;
 }
 .radar-icon-btn {
   width: 36px;
@@ -899,6 +899,7 @@ tr.row-danger td { background: #ffe9e7; }
 }
 
 .interactive-map-panel .interactive-map-shell {
+  position: relative;
   border-radius: 14px;
   background: #131a24;
 }
@@ -974,4 +975,37 @@ tr.row-danger td { background: #ffe9e7; }
 
 .map-scope-switch {
   margin-top: 8px;
+}
+
+.interactive-map-legend {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  z-index: 700;
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  max-width: calc(100% - 24px);
+}
+
+.interactive-map-panel .leaflet-top.leaflet-left {
+  left: auto;
+  right: 10px;
+}
+
+.interactive-map-panel .leaflet-top.leaflet-right {
+  right: 10px;
+}
+
+.radar-lightning-summary {
+  margin-left: auto;
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+@media (max-width: 900px) {
+  .lightning-head { flex-wrap: wrap; }
+  .radar-controls { flex-wrap: wrap; }
 }

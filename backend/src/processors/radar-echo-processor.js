@@ -1,7 +1,9 @@
 const fs = require("fs");
 const path = require("path");
 const config = require("../config");
-const { parseRadarBinary, cropAirportEcho, renderNationwideEcho } = require("../parsers/radar-echo-parser");
+const { parseRadarBinary, renderNationwideEcho } = require("../parsers/radar-echo-parser");
+
+let backgroundFillRunning = false;
 
 function ensureRadarDir() {
   const radarDir = path.join(config.storage.base_path, "radar");
@@ -16,17 +18,6 @@ function formatKstTm(dateKst) {
   const h = String(dateKst.getUTCHours()).padStart(2, "0");
   const mi = String(dateKst.getUTCMinutes()).padStart(2, "0");
   return `${y}${m}${d}${h}${mi}`;
-}
-
-function getLatestTm(delayMinutes = config.radar_echo.delay_minutes) {
-  const nowUtc = new Date();
-  const nowKst = new Date(nowUtc.getTime() + 9 * 60 * 60 * 1000);
-  nowKst.setUTCMinutes(nowKst.getUTCMinutes() - delayMinutes);
-
-  const minute = Math.floor(nowKst.getUTCMinutes() / 5) * 5;
-  nowKst.setUTCMinutes(minute, 0, 0);
-
-  return formatKstTm(nowKst);
 }
 
 function getCandidateTms(delayMinutes = config.radar_echo.delay_minutes) {
@@ -84,30 +75,138 @@ async function fetchRadarBinary(tm) {
   }
 }
 
+function loadExistingMeta(radarDir) {
+  const metaPath = path.join(radarDir, "echo_meta.json");
+  if (!fs.existsSync(metaPath)) return null;
+
+  try {
+    return JSON.parse(fs.readFileSync(metaPath, "utf8"));
+  } catch (error) {
+    return null;
+  }
+}
+
+function buildFrameTms(latestTm, frameCount) {
+  const frameTms = [];
+  const latestDate = new Date(Date.UTC(
+    Number(latestTm.slice(0, 4)),
+    Number(latestTm.slice(4, 6)) - 1,
+    Number(latestTm.slice(6, 8)),
+    Number(latestTm.slice(8, 10)) - 9,
+    Number(latestTm.slice(10, 12)),
+    0,
+    0
+  ));
+
+  for (let i = frameCount - 1; i >= 0; i--) {
+    const frameDate = new Date(latestDate.getTime() - i * 5 * 60 * 1000);
+    const frameKst = new Date(frameDate.getTime() + 9 * 60 * 60 * 1000);
+    frameTms.push(formatKstTm(frameKst));
+  }
+
+  return frameTms;
+}
+
+async function renderFrame(radarDir, tm) {
+  const filename = `echo_korea_${tm}.png`;
+  const filePath = path.join(radarDir, filename);
+  const gzBuffer = await fetchRadarBinary(tm);
+  if (!gzBuffer) return null;
+
+  const { refl } = parseRadarBinary(gzBuffer);
+  const nationwide = await renderNationwideEcho(refl);
+  fs.writeFileSync(filePath, nationwide.pngBuffer);
+
+  return {
+    tm,
+    path: `/data/radar/${filename}`,
+    bounds: nationwide.bounds,
+    width: nationwide.width,
+    height: nationwide.height,
+    echoCount: nationwide.echoCount,
+    scale: nationwide.scale,
+  };
+}
+
+function writeMeta(radarDir, latestTm, frameTms, existingFrames) {
+  const frames = frameTms
+    .map((tm) => existingFrames.get(tm))
+    .filter(Boolean)
+    .sort((a, b) => a.tm.localeCompare(b.tm));
+
+  const meta = {
+    type: "RADAR_ECHO",
+    updated_at: new Date().toISOString(),
+    tm: latestTm,
+    nationwide: frames.find((frame) => frame.tm === latestTm) || null,
+    frames,
+  };
+
+  if (!meta.nationwide && frames.length) {
+    meta.nationwide = frames[frames.length - 1];
+  }
+
+  if (meta.nationwide) {
+    const latestFramePath = path.join(radarDir, path.basename(meta.nationwide.path));
+    if (fs.existsSync(latestFramePath)) {
+      fs.copyFileSync(latestFramePath, path.join(radarDir, "echo_korea.png"));
+    }
+  }
+
+  const validNames = new Set([
+    "echo_korea.png",
+    ...frames.map((frame) => path.basename(frame.path)),
+  ]);
+
+  for (const filename of fs.readdirSync(radarDir)) {
+    if (/^echo_korea_\d{12}\.png$/.test(filename) && !validNames.has(filename)) {
+      fs.unlinkSync(path.join(radarDir, filename));
+    }
+  }
+
+  const metaPath = path.join(radarDir, "echo_meta.json");
+  fs.writeFileSync(metaPath, `${JSON.stringify(meta, null, 2)}\n`, "utf8");
+  return meta;
+}
+
+function scheduleBackgroundFill(radarDir, pendingTms, existingFrames, latestTm, frameTms) {
+  if (!pendingTms.length || backgroundFillRunning) return;
+
+  backgroundFillRunning = true;
+  setTimeout(async () => {
+    try {
+      for (const tm of pendingTms) {
+        const filename = `echo_korea_${tm}.png`;
+        const filePath = path.join(radarDir, filename);
+        if (fs.existsSync(filePath) && existingFrames.get(tm)) continue;
+
+        try {
+          const frameInfo = await renderFrame(radarDir, tm);
+          if (frameInfo) {
+            existingFrames.set(tm, frameInfo);
+            writeMeta(radarDir, latestTm, frameTms, existingFrames);
+          }
+        } catch (err) {
+          console.warn(`radar_echo: failed background frame ${tm}:`, err.message);
+        }
+      }
+    } finally {
+      backgroundFillRunning = false;
+    }
+  }, 0);
+}
+
 async function process() {
   if (!config.api.auth_key) {
     throw new Error("Radar echo auth key missing (set API_AUTH_KEY)");
   }
 
   const radarDir = ensureRadarDir();
-  const rangeKm = config.radar_echo.range_km;
-  const cropSize = config.radar_echo.crop_size;
+  const frameCount = config.radar.max_images || 36;
   const candidates = getCandidateTms();
+  const latestTm = candidates[0] || null;
 
-  // Try candidates from newest to oldest
-  let gzBuffer = null;
-  let usedTm = null;
-
-  for (const tm of candidates) {
-    gzBuffer = await fetchRadarBinary(tm);
-    if (gzBuffer) {
-      usedTm = tm;
-      break;
-    }
-  }
-
-  if (!gzBuffer) {
-    console.warn("radar_echo: no binary available for any candidate timestamp");
+  if (!latestTm) {
     return {
       type: "radar_echo",
       saved: false,
@@ -115,75 +214,46 @@ async function process() {
     };
   }
 
-  // Parse full grid
-  const { refl } = parseRadarBinary(gzBuffer);
+  const frameTms = buildFrameTms(latestTm, frameCount);
 
-  // Crop per airport and save transparent PNGs
-  const airports = config.airports;
-  const meta = {
-    type: "RADAR_ECHO",
-    updated_at: new Date().toISOString(),
-    tm: usedTm,
-    range_km: rangeKm,
-    nationwide: null,
-    airports: {},
-  };
+  const existingMeta = loadExistingMeta(radarDir);
+  const existingFrames = new Map(
+    (existingMeta?.frames || []).map((frame) => [frame.tm, frame])
+  );
+  const missingTms = frameTms.filter((tm) => {
+    const filename = `echo_korea_${tm}.png`;
+    const filePath = path.join(radarDir, filename);
+    return !(fs.existsSync(filePath) && existingFrames.get(tm));
+  });
 
-  let savedCount = 0;
+  let immediateTms = missingTms;
+  let deferredTms = [];
 
-  try {
-    const nationwide = await renderNationwideEcho(refl);
-    const nationwideFilename = "echo_korea.png";
-    fs.writeFileSync(path.join(radarDir, nationwideFilename), nationwide.pngBuffer);
-    meta.nationwide = {
-      path: `/data/radar/${nationwideFilename}`,
-      bounds: nationwide.bounds,
-      width: nationwide.width,
-      height: nationwide.height,
-      echoCount: nationwide.echoCount,
-      scale: nationwide.scale,
-    };
-  } catch (err) {
-    console.warn("radar_echo: failed to render nationwide overlay:", err.message);
+  if (missingTms.length > 4) {
+    const immediateCount = Math.max(1, Math.ceil(missingTms.length / 4));
+    immediateTms = missingTms.slice(-immediateCount);
+    deferredTms = missingTms.slice(0, -immediateCount);
   }
 
-  for (const airport of airports) {
+  for (const tm of immediateTms) {
     try {
-      const result = await cropAirportEcho(
-        refl,
-        airport.lat,
-        airport.lon,
-        rangeKm,
-        cropSize
-      );
-
-      const filename = `echo_${airport.icao}.png`;
-      const filePath = path.join(radarDir, filename);
-      fs.writeFileSync(filePath, result.pngBuffer);
-
-      meta.airports[airport.icao] = {
-        path: `/data/radar/${filename}`,
-        bounds: result.bounds,
-        width: result.width,
-        height: result.height,
-        echoCount: result.echoCount,
-      };
-
-      savedCount++;
+      const frameInfo = await renderFrame(radarDir, tm);
+      if (frameInfo) existingFrames.set(tm, frameInfo);
     } catch (err) {
-      console.warn(`radar_echo: failed to crop ${airport.icao}:`, err.message);
+      console.warn(`radar_echo: failed to render nationwide frame ${tm}:`, err.message);
     }
   }
 
-  // Write echo_meta.json
-  const metaPath = path.join(radarDir, "echo_meta.json");
-  fs.writeFileSync(metaPath, `${JSON.stringify(meta, null, 2)}\n`, "utf8");
+  const meta = writeMeta(radarDir, latestTm, frameTms, existingFrames);
+  scheduleBackgroundFill(radarDir, deferredTms, existingFrames, latestTm, frameTms);
 
   return {
     type: "radar_echo",
-    saved: savedCount > 0,
-    airportCount: savedCount,
-    tm: usedTm,
+    saved: immediateTms.length > 0 || meta.frames.length > 0,
+    frameCount: meta.frames.length,
+    tm: meta.tm,
+    deferredCount: deferredTms.length,
+    backgroundFillRunning,
   };
 }
 

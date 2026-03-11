@@ -125,7 +125,7 @@ frontend/src (React 대시보드)
 - `backend/data/lightning/latest.json`
 - `backend/data/radar/latest.json`
 - `backend/data/radar/echo_meta.json`
-- `backend/data/radar/echo_RKSI.png`
+- `backend/data/radar/echo_korea.png`
 
 ## API 표면 (server.js)
 
