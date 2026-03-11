@@ -78,6 +78,7 @@ export default function InteractiveMap({
 }) {
   const [mapScope, setMapScope] = useState("airport");
   const [geoData, setGeoData] = useState(null);
+  const [neighborGeoData, setNeighborGeoData] = useState(null);
   const [showEcho, setShowEcho] = useState(true);
   const [showLightning, setShowLightning] = useState(true);
   const [frameIndex, setFrameIndex] = useState(0);
@@ -92,6 +93,22 @@ export default function InteractiveMap({
     fetch("/geo/korea_sido.geojson")
       .then((r) => r.json())
       .then(setGeoData)
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    setNeighborGeoData(null);
+    fetch("/geo/korea_neighbors_masked.geojson")
+      .then((r) => r.json())
+      .then((data) => {
+        const features = (data?.features || []).filter(
+          (feature) => feature?.properties?.layer === "neighbors"
+        );
+        setNeighborGeoData({
+          type: "FeatureCollection",
+          features,
+        });
+      })
       .catch(() => {});
   }, []);
 
@@ -307,6 +324,13 @@ export default function InteractiveMap({
                 <GeoJSON
                   key="korea-sido-boundary"
                   data={geoData}
+                  style={() => boundaryStyle}
+                />
+              )}
+              {neighborGeoData && (
+                <GeoJSON
+                  key="neighbors-boundary"
+                  data={neighborGeoData}
                   style={() => boundaryStyle}
                 />
               )}

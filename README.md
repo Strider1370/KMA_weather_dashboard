@@ -11,7 +11,7 @@ KMA 항공기상 수집기 + 대시보드 프로젝트입니다.
 - Cron 스케줄 기반으로 수집기를 실행하고, 중복 실행을 잠금으로 방지합니다.
 - 카테고리별 `latest.json`과 시각별 이력 파일을 함께 관리합니다.
 - 단일 Node 서버에서 API와 정적 데이터를 함께 제공합니다.
-- METAR/TAF/특보/낙뢰/레이더 에코/지도 패널을 대시보드로 렌더링합니다.
+- METAR/TAF/특보/낙뢰/레이더 에코를 단일 인터랙티브 지도 패널과 함께 렌더링합니다.
 
 ## 기술 스택
 
@@ -87,6 +87,7 @@ frontend/src (React 대시보드)
 │   │   ├── utils/                    # api/helpers/alert 로직
 │   │   ├── App.jsx                   # 메인 조합
 │   │   └── App.css                   # 스타일
+│   ├── public/geo/                   # 전국 시도경계 + 주변국 보조선 GeoJSON
 │   ├── package.json
 │   └── vite.config.js
 ├── shared/                           # 공항/타입/기본값 공유 데이터
@@ -115,6 +116,7 @@ frontend/src (React 대시보드)
 - 각 카테고리 `latest.json`은 항상 최신으로 갱신됩니다.
 - 시각별 JSON 이력은 회전 정책에 따라 유지됩니다.
 - 레이더 이미지/에코 에셋은 `backend/data/radar/`에 저장되며 `/data/radar/*`로 제공됩니다.
+- 지도 경계는 `frontend/public/geo/korea_sido.geojson`과 `frontend/public/geo/korea_neighbors_masked.geojson`을 사용합니다.
 
 예시:
 - `backend/data/metar/latest.json`
