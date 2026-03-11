@@ -6,10 +6,9 @@ const metarProcessor = require("./processors/metar-processor");
 const tafProcessor = require("./processors/taf-processor");
 const warningProcessor = require("./processors/warning-processor");
 const lightningProcessor = require("./processors/lightning-processor");
-const radarProcessor = require("./processors/radar-processor");
 const radarEchoProcessor = require("./processors/radar-echo-processor");
 
-const locks = { metar: false, taf: false, warning: false, lightning: false, radar: false, radar_echo: false };
+const locks = { metar: false, taf: false, warning: false, lightning: false, radar_echo: false };
 
 async function runWithLock(type, job) {
   if (locks[type]) {
@@ -41,7 +40,6 @@ async function main() {
   cron.schedule(config.schedule.taf_interval, () => runWithLock("taf", tafProcessor.processAll));
   cron.schedule(config.schedule.warning_interval, () => runWithLock("warning", warningProcessor.process));
   cron.schedule(config.schedule.lightning_interval, () => runWithLock("lightning", lightningProcessor.process));
-  cron.schedule(config.schedule.radar_interval, () => runWithLock("radar", radarProcessor.process));
   cron.schedule(config.schedule.radar_echo_interval, () => runWithLock("radar_echo", radarEchoProcessor.process));
 
   // 서버 시작 직후 1회 즉시 수집
@@ -51,7 +49,6 @@ async function main() {
     runWithLock("taf", tafProcessor.processAll),
     runWithLock("warning", warningProcessor.process),
     runWithLock("lightning", lightningProcessor.process),
-    runWithLock("radar", radarProcessor.process),
     runWithLock("radar_echo", radarEchoProcessor.process),
   ]);
   console.log("Initial data collection complete.");

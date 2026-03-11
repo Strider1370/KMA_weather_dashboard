@@ -53,7 +53,7 @@ Use repo root unless noted.
   - `node backend/test/run-once.js taf`
   - `node backend/test/run-once.js warning`
   - `node backend/test/run-once.js lightning`
-  - `node backend/test/run-once.js radar`
+  - `node backend/test/run-once.js radar-echo`
 - Valid target values are enforced in `backend/test/run-once.js`.
 
 ### Lint / Format

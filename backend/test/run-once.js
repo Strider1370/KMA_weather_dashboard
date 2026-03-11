@@ -4,14 +4,14 @@ const metarProcessor = require("../src/processors/metar-processor");
 const tafProcessor = require("../src/processors/taf-processor");
 const warningProcessor = require("../src/processors/warning-processor");
 const lightningProcessor = require("../src/processors/lightning-processor");
-const radarProcessor = require("../src/processors/radar-processor");
+const radarEchoProcessor = require("../src/processors/radar-echo-processor");
 
 async function main() {
   const target = (process.argv[2] || "all").toLowerCase();
-  const allowed = new Set(["metar", "taf", "warning", "lightning", "radar", "all"]);
+  const allowed = new Set(["metar", "taf", "warning", "lightning", "radar-echo", "all"]);
 
   if (!allowed.has(target)) {
-    console.error("Usage: node backend/test/run-once.js [metar|taf|warning|lightning|radar|all]");
+    console.error("Usage: node backend/test/run-once.js [metar|taf|warning|lightning|radar-echo|all]");
     process.exit(1);
   }
 
@@ -44,8 +44,8 @@ async function main() {
     await execute("lightning", () => lightningProcessor.process());
   }
 
-  if (target === "radar" || target === "all") {
-    await execute("radar", () => radarProcessor.process());
+  if (target === "radar-echo" || target === "all") {
+    await execute("radar-echo", () => radarEchoProcessor.process());
   }
 
   console.log(JSON.stringify({ target, results }, null, 2));

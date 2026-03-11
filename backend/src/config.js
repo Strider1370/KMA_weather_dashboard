@@ -49,15 +49,9 @@ module.exports = {
     timeout_ms: 12000,
     stale_tolerance_minutes: 60
   },
-  radar: {
-    cmp: "cmb",
-    delay_minutes: 10,
-    max_images: 36,
-    interval_minutes: 5,
-    timeout_ms: 15000
-  },
   radar_echo: {
     delay_minutes: 10,
+    max_images: 36,
     range_km: 100,
     crop_size: 200,
     timeout_ms: 30000
@@ -67,7 +61,6 @@ module.exports = {
     taf_interval: "*/30 * * * *",
     warning_interval: "*/5 * * * *",
     lightning_interval: "*/5 * * * *",
-    radar_interval: "*/5 * * * *",
     radar_echo_interval: "*/5 * * * *"
   },
   storage: {

@@ -185,7 +185,7 @@ export default function App() {
   }
   const airportList = Array.from(airportSet).sort();
 
-  const lastUpdated = [data.metar?.fetched_at, data.taf?.fetched_at, data.warning?.fetched_at, data.lightning?.fetched_at, data.radar?.updated_at]
+  const lastUpdated = [data.metar?.fetched_at, data.taf?.fetched_at, data.warning?.fetched_at, data.lightning?.fetched_at, data.echoMeta?.updated_at]
     .filter(Boolean)
     .sort()
     .pop() || null;

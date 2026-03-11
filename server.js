@@ -144,24 +144,6 @@ function readLightning() {
   return mergeTst1(payload, "lightning");
 }
 
-function readRadar() {
-  const radarDir = path.join(DATA_ROOT, "radar");
-  const latestFile = path.join(radarDir, "latest.json");
-  if (!fs.existsSync(latestFile)) {
-    return {
-      type: "RADAR",
-      updated_at: null,
-      image_count: 0,
-      interval_minutes: 5,
-      images: []
-    };
-  }
-
-  const payload = JSON.parse(fs.readFileSync(latestFile, "utf8"));
-  payload.images = Array.isArray(payload.images) ? payload.images : [];
-  return payload;
-}
-
 function contentTypeFor(filePath) {
   if (filePath.endsWith(".html")) return "text/html; charset=utf-8";
   if (filePath.endsWith(".css")) return "text/css; charset=utf-8";
@@ -249,10 +231,6 @@ const server = http.createServer(async (req, res) => {
 
     if (req.url === "/api/lightning") {
       return sendJson(req, res, 200, readLightning());
-    }
-
-    if (req.url === "/api/radar") {
-      return sendJson(req, res, 200, readRadar());
     }
 
     if (req.url === "/api/airports") {

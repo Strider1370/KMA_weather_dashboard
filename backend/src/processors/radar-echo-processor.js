@@ -202,7 +202,7 @@ async function process() {
   }
 
   const radarDir = ensureRadarDir();
-  const frameCount = config.radar.max_images || 36;
+  const frameCount = config.radar_echo.max_images || 36;
   const candidates = getCandidateTms();
   const latestTm = candidates[0] || null;
 

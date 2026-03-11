@@ -11,7 +11,7 @@ KMA 항공기상 수집기 + 대시보드 프로젝트입니다.
 - Cron 스케줄 기반으로 수집기를 실행하고, 중복 실행을 잠금으로 방지합니다.
 - 카테고리별 `latest.json`과 시각별 이력 파일을 함께 관리합니다.
 - 단일 Node 서버에서 API와 정적 데이터를 함께 제공합니다.
-- METAR/TAF/특보/낙뢰/레이더/지도 패널을 대시보드로 렌더링합니다.
+- METAR/TAF/특보/낙뢰/레이더 에코/지도 패널을 대시보드로 렌더링합니다.
 
 ## 기술 스택
 
@@ -27,7 +27,7 @@ KMA 항공기상 수집기 + 대시보드 프로젝트입니다.
 KMA APIs
   ├─ typ02/openApi (METAR/TAF/WARNING XML)
   ├─ typ01/url/lgt_pnt.php (낙뢰)
-  ├─ typ04/url/rdr_cmp_file.php (레이더 이미지 + 레이더 바이너리)
+  ├─ typ04/url/rdr_cmp_file.php (레이더 바이너리 / 에코 생성용)
   └─ typ01/url/amos.php (강수량)
         |
         v
@@ -65,7 +65,6 @@ frontend/src (React 대시보드)
 │   │   │   ├── taf-processor.js
 │   │   │   ├── warning-processor.js
 │   │   │   ├── lightning-processor.js
-│   │   │   ├── radar-processor.js
 │   │   │   └── radar-echo-processor.js
 │   │   ├── parsers/                  # 포맷별 파서
 │   │   │   ├── metar-parser.js
@@ -106,7 +105,6 @@ frontend/src (React 대시보드)
 - TAF: `*/30 * * * *`
 - WARNING: `*/5 * * * *`
 - LIGHTNING: `*/5 * * * *`
-- RADAR: `*/5 * * * *`
 - RADAR_ECHO: `*/5 * * * *`
 
 `runWithLock` 실행 잠금으로 동일 타입 중복 실행을 방지합니다.
@@ -123,7 +121,6 @@ frontend/src (React 대시보드)
 - `backend/data/taf/latest.json`
 - `backend/data/warning/latest.json`
 - `backend/data/lightning/latest.json`
-- `backend/data/radar/latest.json`
 - `backend/data/radar/echo_meta.json`
 - `backend/data/radar/echo_korea.png`
 
@@ -135,7 +132,6 @@ frontend/src (React 대시보드)
 - `/api/taf`
 - `/api/warning`
 - `/api/lightning`
-- `/api/radar`
 - `/api/airports`
 - `/api/warning-types`
 - `/api/alert-defaults`
@@ -223,7 +219,7 @@ node backend/test/run-once.js metar
 node backend/test/run-once.js taf
 node backend/test/run-once.js warning
 node backend/test/run-once.js lightning
-node backend/test/run-once.js radar
+node backend/test/run-once.js radar-echo
 ```
 
 ## 배포 업데이트 예시
