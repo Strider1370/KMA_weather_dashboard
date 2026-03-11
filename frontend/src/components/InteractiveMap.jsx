@@ -90,7 +90,7 @@ export default function InteractiveMap({
 
   useEffect(() => {
     setGeoData(null);
-    fetch("/geo/korea_sido.geojson")
+    fetch("/geo/korea_sido.v1.geojson")
       .then((r) => r.json())
       .then(setGeoData)
       .catch(() => {});
@@ -98,7 +98,7 @@ export default function InteractiveMap({
 
   useEffect(() => {
     setNeighborGeoData(null);
-    fetch("/geo/korea_neighbors_masked.geojson")
+    fetch("/geo/korea_neighbors_masked.v1.geojson")
       .then((r) => r.json())
       .then((data) => {
         const features = (data?.features || []).filter(

@@ -116,7 +116,7 @@ frontend/src (React 대시보드)
 - 각 카테고리 `latest.json`은 항상 최신으로 갱신됩니다.
 - 시각별 JSON 이력은 회전 정책에 따라 유지됩니다.
 - 레이더 이미지/에코 에셋은 `backend/data/radar/`에 저장되며 `/data/radar/*`로 제공됩니다.
-- 지도 경계는 `frontend/public/geo/korea_sido.geojson`과 `frontend/public/geo/korea_neighbors_masked.geojson`을 사용합니다.
+- 지도 경계는 `frontend/public/geo/korea_sido.v1.geojson`과 `frontend/public/geo/korea_neighbors_masked.v1.geojson`을 사용합니다.
 
 예시:
 - `backend/data/metar/latest.json`

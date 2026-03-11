@@ -203,9 +203,14 @@ function serveStatic(req, res) {
   }
 
   const body = fs.readFileSync(filePath);
+  const versionedGeoPattern = /[\\/]geo[\\/].+\.v\d+\.geojson$/;
+  const cacheControl = versionedGeoPattern.test(filePath)
+    ? "public, max-age=31536000, immutable"
+    : "no-cache";
   res.writeHead(200, {
     ...buildBaseHeaders(req),
-    "Content-Type": contentTypeFor(filePath)
+    "Content-Type": contentTypeFor(filePath),
+    "Cache-Control": cacheControl
   });
   res.end(body);
 }
