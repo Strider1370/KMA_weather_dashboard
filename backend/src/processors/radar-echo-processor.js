@@ -1,7 +1,7 @@
 const fs = require("fs");
 const path = require("path");
 const config = require("../config");
-const { parseRadarBinary, cropAirportEcho } = require("../parsers/radar-echo-parser");
+const { parseRadarBinary, cropAirportEcho, renderNationwideEcho } = require("../parsers/radar-echo-parser");
 
 function ensureRadarDir() {
   const radarDir = path.join(config.storage.base_path, "radar");
@@ -125,10 +125,27 @@ async function process() {
     updated_at: new Date().toISOString(),
     tm: usedTm,
     range_km: rangeKm,
+    nationwide: null,
     airports: {},
   };
 
   let savedCount = 0;
+
+  try {
+    const nationwide = await renderNationwideEcho(refl);
+    const nationwideFilename = "echo_korea.png";
+    fs.writeFileSync(path.join(radarDir, nationwideFilename), nationwide.pngBuffer);
+    meta.nationwide = {
+      path: `/data/radar/${nationwideFilename}`,
+      bounds: nationwide.bounds,
+      width: nationwide.width,
+      height: nationwide.height,
+      echoCount: nationwide.echoCount,
+      scale: nationwide.scale,
+    };
+  } catch (err) {
+    console.warn("radar_echo: failed to render nationwide overlay:", err.message);
+  }
 
   for (const airport of airports) {
     try {

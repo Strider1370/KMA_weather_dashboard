@@ -39,6 +39,23 @@ function latLonToGrid(latDeg, lonDeg) {
   };
 }
 
+function gridToLatLon(x, y) {
+  const xKm = (x - GRID_X0) * DXY;
+  const yKm = (y - GRID_Y0) * DXY;
+  const rhoX = xKm;
+  const rhoY = _rho0 - yKm;
+  const rho = Math.sqrt(rhoX * rhoX + rhoY * rhoY);
+  const theta = Math.atan2(rhoX, rhoY);
+
+  const lat = 2 * Math.atan(Math.pow((RE_KM * _F) / rho, 1 / _n)) - Math.PI / 2;
+  const lon = LAM0 + theta / _n;
+
+  return {
+    lat: lat / DEG2RAD,
+    lon: lon / DEG2RAD,
+  };
+}
+
 /* ── Radar Color Scale (dBZ → RGBA) ──────────────────────── */
 function dBZtoRGBA(dBZ) {
   if (dBZ < 5)  return null;
@@ -172,9 +189,66 @@ async function cropAirportEcho(refl, lat, lon, rangeKm = 100, cropSize = 200) {
   return { pngBuffer, bounds, echoCount, width: cropSize, height: cropSize };
 }
 
+async function renderNationwideEcho(refl, scale = 3) {
+  const outW = Math.ceil(NX / scale);
+  const outH = Math.ceil(NY / scale);
+  const buf = Buffer.alloc(outW * outH * 4);
+  let echoCount = 0;
+
+  for (let gy = 0; gy < NY; gy++) {
+    const imgRow = Math.floor((NY - 1 - gy) / scale);
+    if (imgRow < 0 || imgRow >= outH) continue;
+
+    for (let gx = 0; gx < NX; gx++) {
+      const imgCol = Math.floor(gx / scale);
+      if (imgCol < 0 || imgCol >= outW) continue;
+
+      const v = refl[gy * NX + gx];
+      if (v <= -25000) continue;
+
+      const dBZ = v / 100;
+      const c = dBZtoRGBA(dBZ);
+      if (!c) continue;
+
+      echoCount++;
+      const o = (imgRow * outW + imgCol) * 4;
+      if (buf[o + 3] === 0 || c[3] > buf[o + 3]) {
+        buf[o] = c[0];
+        buf[o + 1] = c[1];
+        buf[o + 2] = c[2];
+        buf[o + 3] = c[3];
+      }
+    }
+  }
+
+  // Use raster outer edges, not pixel centers, for ImageOverlay bounds.
+  const corners = [
+    gridToLatLon(-0.5, -0.5),
+    gridToLatLon(NX - 0.5, -0.5),
+    gridToLatLon(-0.5, NY - 0.5),
+    gridToLatLon(NX - 0.5, NY - 0.5),
+  ];
+  const lats = corners.map((corner) => corner.lat);
+  const lons = corners.map((corner) => corner.lon);
+  const bounds = [
+    [Math.min(...lats), Math.min(...lons)],
+    [Math.max(...lats), Math.max(...lons)],
+  ];
+
+  const pngBuffer = await sharp(buf, {
+    raw: { width: outW, height: outH, channels: 4 },
+  })
+    .png({ compressionLevel: 6 })
+    .toBuffer();
+
+  return { pngBuffer, bounds, echoCount, width: outW, height: outH, scale };
+}
+
 module.exports = {
   parseRadarBinary,
   cropAirportEcho,
+  renderNationwideEcho,
   latLonToGrid,
+  gridToLatLon,
   dBZtoRGBA,
 };

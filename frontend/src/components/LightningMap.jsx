@@ -43,6 +43,7 @@ export default function LightningMap({
   windDir = null,
   showRadar = false,
   radarOpacity = 0.5,
+  mapTheme = "dark",
   rightPanelMode = "lightning",
   onPanelModeChange,
 }) {
@@ -114,6 +115,22 @@ export default function LightningMap({
     };
   }, [visibleStrikes]);
 
+  const mapPalette = mapTheme === "light"
+    ? {
+        background: "#ffffff",
+        boundaryFill: "#ffffff",
+        boundaryStroke: "#111111",
+        boundaryOpacity: "0.55",
+        airportFill: "#111111",
+      }
+    : {
+        background: "#131a24",
+        boundaryFill: "#1e2d3d",
+        boundaryStroke: "#00cc66",
+        boundaryOpacity: "0.4",
+        airportFill: "#ffffff",
+      };
+
   return (
     <aside className="panel lightning-panel">
       <div className="lightning-head">
@@ -171,11 +188,18 @@ export default function LightningMap({
                 <rect x="0" y="0" width={size} height={size} rx="14" />
               </clipPath>
             </defs>
-            <rect x="0" y="0" width={size} height={size} rx="14" fill="#131a24" />
+            <rect x="0" y="0" width={size} height={size} rx="14" fill={mapPalette.background} />
             {admDong && arp && (
               <g clipPath={`url(#map-clip-${selectedAirport})`}>
                 {geoToSVGPaths(admDong, arp, size, currentRangeKm).map(({ key, d }) => (
-                  <path key={key} d={d} fill="#1e2d3d" stroke="#00cc66" strokeWidth="0.6" strokeOpacity="0.4" />
+                  <path
+                    key={key}
+                    d={d}
+                    fill={mapPalette.boundaryFill}
+                    stroke={mapPalette.boundaryStroke}
+                    strokeWidth="0.6"
+                    strokeOpacity={mapPalette.boundaryOpacity}
+                  />
                 ))}
               </g>
             )}
@@ -217,7 +241,7 @@ export default function LightningMap({
               textAnchor="middle"
               dominantBaseline="central"
               fontSize="18"
-              fill="#ffffff"
+              fill={mapPalette.airportFill}
               transform={`rotate(${effectiveHdg - 90}, ${center}, ${center})`}
             >
               ✈

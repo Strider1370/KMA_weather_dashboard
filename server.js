@@ -6,7 +6,6 @@ import { fileURLToPath } from "url";
 
 const require = createRequire(import.meta.url);
 const store = require("./backend/src/store");
-const statsModule = require("./backend/src/stats");
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
@@ -163,43 +162,6 @@ function readRadar() {
   return payload;
 }
 
-function getDataStatus(category) {
-  try {
-    const dir = path.join(DATA_ROOT, category);
-    if (!fs.existsSync(dir)) {
-      return { exists: false, last_updated: null, file_count: 0 };
-    }
-
-    const filePattern = category === "radar"
-      ? (name) => /^RDR_\d{12}\.png$/.test(name)
-      : (name) => name.endsWith(".json") && name !== "latest.json";
-
-    const files = fs.readdirSync(dir)
-      .filter(filePattern)
-      .map((name) => {
-        const fullPath = path.join(dir, name);
-        const stats = fs.statSync(fullPath);
-        return { name, mtime: stats.mtime };
-      })
-      .sort((a, b) => b.mtime - a.mtime);
-
-    let lastUpdated = null;
-    const latestFile = path.join(dir, "latest.json");
-    if (fs.existsSync(latestFile)) {
-      const data = JSON.parse(fs.readFileSync(latestFile, "utf8"));
-      lastUpdated = data.fetched_at || data.updated_at || null;
-    }
-
-    return {
-      exists: true,
-      last_updated: lastUpdated,
-      file_count: files.length
-    };
-   } catch (error) {
-     return { exists: false, last_updated: null, file_count: 0 };
-   }
-}
-
 function contentTypeFor(filePath) {
   if (filePath.endsWith(".html")) return "text/html; charset=utf-8";
   if (filePath.endsWith(".css")) return "text/css; charset=utf-8";
@@ -293,10 +255,6 @@ const server = http.createServer(async (req, res) => {
       return sendJson(req, res, 200, readRadar());
     }
 
-    if (req.url === "/api/stats") {
-      return sendJson(req, res, 200, statsModule.getStats());
-    }
-
     if (req.url === "/api/airports") {
       const airports = reloadCommonJs(SHARED_AIRPORTS);
       return sendJson(req, res, 200, airports);
@@ -313,17 +271,6 @@ const server = http.createServer(async (req, res) => {
     }
 
 
-
-    if (req.url === "/api/status") {
-      const status = {
-        metar: getDataStatus("metar"),
-        taf: getDataStatus("taf"),
-        warning: getDataStatus("warning"),
-        lightning: getDataStatus("lightning"),
-        radar: getDataStatus("radar")
-      };
-      return sendJson(req, res, 200, status);
-    }
 
     if (req.url.startsWith("/data/")) {
       return serveDataAsset(req, res);

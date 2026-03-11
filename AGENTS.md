@@ -158,6 +158,10 @@ Derived from `.editorconfig` + existing source files.
 - Timezone handling frequently uses KST logic in collectors.
 - Network calls use external KMA APIs; failures are expected and should degrade gracefully.
 - Some collectors are intentionally independent (not all use `api-client.js`).
+- In PowerShell, Korean UTF-8 files may render incorrectly with plain `Get-Content`.
+- When reading Korean text files, prefer explicit UTF-8 decoding:
+  - `[Console]::OutputEncoding = [System.Text.Encoding]::UTF8`
+  - `[System.IO.File]::ReadAllText("PATH", [System.Text.Encoding]::UTF8)`
 
 ## Quick Checklist Before Finalizing
 

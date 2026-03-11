@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import { loadAllData, loadAlertDefaults, fetchStats } from "./utils/api";
+import { loadAllData, loadAlertDefaults } from "./utils/api";
 import {
   evaluate,
   buildAlertKey,
@@ -12,8 +12,6 @@ import {
   setAlertCallback,
 } from "./utils/alerts";
 import Header from "./components/Header";
-import SummaryGrid from "./components/SummaryGrid";
-import StatusPanel from "./components/StatusPanel";
 import MetarCard from "./components/MetarCard";
 import WarningList from "./components/WarningList";
 import TafTimeline from "./components/TafTimeline";
@@ -24,7 +22,6 @@ import AlertPopup from "./components/alerts/AlertPopup";
 import AlertSound from "./components/alerts/AlertSound";
 import AlertMarquee from "./components/alerts/AlertMarquee";
 import Settings from "./components/alerts/Settings";
-import StatsPanel from "./components/StatsPanel";
 import "./App.css";
 
 export default function App() {
@@ -32,11 +29,9 @@ export default function App() {
   const [selectedAirport, setSelectedAirport] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [detailsOpen, setDetailsOpen] = useState(false);
   const [alertDefaults, setAlertDefaults] = useState(null);
   const [activeAlerts, setActiveAlerts] = useState([]);
   const [showSettings, setShowSettings] = useState(false);
-  const [statsData, setStatsData] = useState(null);
 
   // UI Version states
   const [metarVersion, setMetarVersion] = useState(() => localStorage.getItem("metar_version") || "v1");
@@ -46,6 +41,7 @@ export default function App() {
   const [showRadar, setShowRadar] = useState(() => localStorage.getItem("show_radar_overlay") === "true");
   const [radarOpacity, setRadarOpacity] = useState(() => parseFloat(localStorage.getItem("radar_overlay_opacity") || "0.6"));
   const [rightPanelMode, setRightPanelMode] = useState(() => localStorage.getItem("right_panel_mode") || "lightning");
+  const [mapTheme, setMapTheme] = useState(() => localStorage.getItem("map_theme") || "dark");
 
   useEffect(() => {
     localStorage.setItem("metar_version", metarVersion);
@@ -63,6 +59,10 @@ export default function App() {
     localStorage.setItem("right_panel_mode", rightPanelMode);
   }, [rightPanelMode]);
 
+  useEffect(() => {
+    localStorage.setItem("map_theme", mapTheme);
+  }, [mapTheme]);
+
   const prevDataRef = useRef(null);
   const pollingRef = useRef(null);
 
@@ -78,13 +78,11 @@ export default function App() {
     setLoading(true);
     setError(null);
     try {
-      const [result, defaults, stats] = await Promise.all([
+      const [result, defaults] = await Promise.all([
         loadAllData(),
         alertDefaults ? Promise.resolve(alertDefaults) : loadAlertDefaults(),
-        fetchStats(),
       ]);
       setData(result);
-      if (stats) setStatsData(stats);
       if (!alertDefaults) setAlertDefaults(defaults);
 
       setSelectedAirport((prev) => {
@@ -184,6 +182,7 @@ export default function App() {
     setTimeZone(localStorage.getItem("time_zone") || "KST");
     setShowRadar(localStorage.getItem("show_radar_overlay") === "true");
     setRadarOpacity(parseFloat(localStorage.getItem("radar_overlay_opacity") || "0.6"));
+    setMapTheme(localStorage.getItem("map_theme") || "dark");
   }
 
   const settings = alertDefaults ? resolveSettings(alertDefaults) : null;
@@ -230,8 +229,6 @@ export default function App() {
         <Header
           lastUpdated={lastUpdated}
           onSettingsClick={() => setShowSettings(true)}
-          detailsOpen={detailsOpen}
-          onToggleDetails={() => setDetailsOpen((prev) => !prev)}
           airports={airportList}
           selectedAirport={selectedAirport}
           onAirportChange={setSelectedAirport}
@@ -248,18 +245,6 @@ export default function App() {
 
         {data.metar && (
           <>
-            {detailsOpen && (
-              <>
-              <SummaryGrid
-                metar={data.metar}
-                taf={data.taf}
-                warning={data.warning}
-                lightning={data.lightning}
-              />
-              <StatusPanel status={data.status} tz={timeZone} />
-              <StatsPanel stats={statsData} metar={data.metar} tz={timeZone} />
-              </>
-            )}
             <section className="dashboard-layout">
               <div className="primary-column">
                 <div className="dashboard-top-row">
@@ -302,6 +287,7 @@ export default function App() {
                     })()}
                     showRadar={showRadar}
                     radarOpacity={radarOpacity}
+                    mapTheme={mapTheme}
                     rightPanelMode={rightPanelMode}
                     onPanelModeChange={setRightPanelMode}
                   />
@@ -324,6 +310,7 @@ export default function App() {
                       return w.direction;
                     })()}
                     echoMeta={data.echoMeta}
+                    mapTheme={mapTheme}
                     rightPanelMode={rightPanelMode}
                     onPanelModeChange={setRightPanelMode}
                   />
@@ -341,6 +328,8 @@ export default function App() {
           onSettingsChange={handleSettingsChange}
           timeZone={timeZone}
           setTimeZone={setTimeZone}
+          mapTheme={mapTheme}
+          setMapTheme={setMapTheme}
         />
       )}
     </>

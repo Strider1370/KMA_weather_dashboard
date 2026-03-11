@@ -4,13 +4,6 @@ import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { safe } from "../utils/helpers";
 
-const TIME_OPTIONS = [
-  { label: "10m", value: 10 },
-  { label: "30m", value: 30 },
-  { label: "1h", value: 60 },
-  { label: "2h", value: 120 },
-];
-
 const ZONE_RADII = [
   { zone: "caution", km: 32, color: "#FFD700", label: "32km" },
   { zone: "danger", km: 16, color: "#FF8800", label: "16km" },
@@ -27,6 +20,8 @@ const BOUNDARY_STYLE = {
 
 const DEFAULT_CENTER = [36.5, 127.5];
 const DEFAULT_ZOOM = 10;
+const NATIONWIDE_CENTER = [36.2, 127.8];
+const NATIONWIDE_ZOOM = 7;
 
 function getStrikeColor(strikeTimeIso) {
   const elapsedMin = (Date.now() - new Date(strikeTimeIso).getTime()) / 60000;
@@ -63,22 +58,32 @@ export default function InteractiveMap({
   boundaryLevel = "sigungu",
   windDir = null,
   echoMeta = null,
+  mapTheme = "dark",
   rightPanelMode = "map",
   onPanelModeChange,
 }) {
-  const [timeRangeMin, setTimeRangeMin] = useState(30);
+  const [mapScope, setMapScope] = useState("airport");
   const [geoData, setGeoData] = useState(null);
   const [showEcho, setShowEcho] = useState(true);
   const [echoOpacity, setEchoOpacity] = useState(0.7);
+  const isNationwide = mapScope === "nationwide";
+  const timeRangeMin = 120;
 
   useEffect(() => {
-    if (!selectedAirport) return;
     setGeoData(null);
-    fetch(`/geo/${selectedAirport}_${boundaryLevel}.geojson`)
+    const geoPath = isNationwide
+      ? "/geo/korea_sido.geojson"
+      : selectedAirport
+        ? `/geo/${selectedAirport}_${boundaryLevel}.geojson`
+        : null;
+
+    if (!geoPath) return;
+
+    fetch(geoPath)
       .then((r) => r.json())
       .then(setGeoData)
       .catch(() => {});
-  }, [selectedAirport, boundaryLevel]);
+  }, [selectedAirport, boundaryLevel, isNationwide]);
 
   const airportMeta = airports?.find((a) => a.icao === selectedAirport) || null;
   const runwayHdg = airportMeta?.runway_hdg ?? 0;
@@ -87,25 +92,40 @@ export default function InteractiveMap({
   const arp = airportData?.arp || (airportMeta ? { lat: airportMeta.lat, lon: airportMeta.lon } : null);
   const strikes = airportData?.strikes || [];
 
-  const center = arp ? [arp.lat, arp.lon] : DEFAULT_CENTER;
+  const center = isNationwide
+    ? NATIONWIDE_CENTER
+    : arp
+      ? [arp.lat, arp.lon]
+      : DEFAULT_CENTER;
+  const mapZoom = isNationwide ? NATIONWIDE_ZOOM : DEFAULT_ZOOM;
 
   const airportIcon = useMemo(() => {
     const rotation = effectiveHdg - 90;
+    const iconColor = mapTheme === "light" ? "#111111" : "#ffffff";
+    const iconShadow = mapTheme === "light"
+      ? "0 0 6px rgba(255,255,255,0.95)"
+      : "0 0 6px rgba(31,122,224,0.95)";
     return L.divIcon({
       className: "leaflet-airport-icon",
-      html: `<span style="display:inline-block;transform:rotate(${rotation}deg);font-size:20px;line-height:1;color:#ffffff;text-shadow:0 0 6px rgba(31,122,224,0.95)">✈</span>`,
+      html: `<span style="display:inline-block;transform:rotate(${rotation}deg);font-size:20px;line-height:1;color:${iconColor};text-shadow:${iconShadow}">✈</span>`,
       iconSize: [24, 24],
       iconAnchor: [12, 12],
     });
-  }, [effectiveHdg]);
+  }, [effectiveHdg, mapTheme]);
 
   const visibleStrikes = useMemo(() => {
     const cutoff = Date.now() - timeRangeMin * 60 * 1000;
-    return strikes.filter((s) => {
+    const sourceStrikes = isNationwide
+      ? Object.entries(lightningData?.airports || {}).flatMap(([icao, data]) =>
+          (data?.strikes || []).map((strike) => ({ ...strike, airport: icao }))
+        )
+      : strikes;
+
+    return sourceStrikes.filter((s) => {
       const t = new Date(s.time).getTime();
       return Number.isFinite(t) && t >= cutoff;
     });
-  }, [strikes, timeRangeMin]);
+  }, [isNationwide, lightningData, strikes, timeRangeMin]);
 
   const summary = useMemo(() => {
     const byZone = { alert: 0, danger: 0, caution: 0 };
@@ -123,9 +143,27 @@ export default function InteractiveMap({
     return { byZone, total: visibleStrikes.length, nearest, latest };
   }, [visibleStrikes]);
 
+  const nationwideAirportMarkers = useMemo(() => {
+    if (!isNationwide) return [];
+    return (airports || []).filter((airport) => Number.isFinite(airport.lat) && Number.isFinite(airport.lon));
+  }, [airports, isNationwide]);
+
+  const boundaryStyle = useMemo(() => (
+    mapTheme === "light"
+      ? {
+          fillColor: "#ffffff",
+          color: "#111111",
+          weight: 0.8,
+          opacity: 0.55,
+          fillOpacity: 0.9,
+        }
+      : BOUNDARY_STYLE
+  ), [mapTheme]);
+
   const echoInfo = useMemo(() => {
-    if (!echoMeta?.airports || !selectedAirport) return null;
-    const info = echoMeta.airports[selectedAirport];
+    const info = isNationwide
+      ? echoMeta?.nationwide
+      : echoMeta?.airports?.[selectedAirport];
     if (!info?.path || !info?.bounds) return null;
     return {
       url: info.path + "?t=" + (echoMeta.tm || Date.now()),
@@ -133,7 +171,7 @@ export default function InteractiveMap({
       echoCount: info.echoCount || 0,
       tm: echoMeta.tm || null,
     };
-  }, [echoMeta, selectedAirport]);
+  }, [echoMeta, isNationwide, selectedAirport]);
 
   return (
     <aside className="panel lightning-panel interactive-map-panel">
@@ -162,23 +200,29 @@ export default function InteractiveMap({
               Map
             </button>
           </div>
+          <div className="panel-switch map-scope-switch" role="tablist" aria-label="Map scope">
+            <button
+              type="button"
+              className={`panel-switch-btn ${!isNationwide ? "active" : ""}`}
+              onClick={() => setMapScope("airport")}
+            >
+              Airport
+            </button>
+            <button
+              type="button"
+              className={`panel-switch-btn ${isNationwide ? "active" : ""}`}
+              onClick={() => setMapScope("nationwide")}
+            >
+              Korea
+            </button>
+          </div>
         </div>
         <div className="time-range">
-          {TIME_OPTIONS.map((opt) => (
-            <button
-              key={opt.value}
-              type="button"
-              className={opt.value === timeRangeMin ? "range-btn active" : "range-btn"}
-              onClick={() => setTimeRangeMin(opt.value)}
-            >
-              {opt.label}
-            </button>
-          ))}
           <button
             type="button"
             className={`range-btn echo-toggle ${showEcho ? "active" : ""}`}
             onClick={() => setShowEcho((v) => !v)}
-            title={echoInfo ? `Radar echo (${echoInfo.echoCount} px)` : "Radar echo unavailable"}
+            title={echoInfo ? `Radar echo (${echoInfo.echoCount} px)` : isNationwide ? "Nationwide radar overlay unavailable" : "Radar echo unavailable"}
             disabled={!echoInfo}
           >
             RDR
@@ -186,26 +230,28 @@ export default function InteractiveMap({
         </div>
       </div>
 
-      {!arp ? (
+      {!isNationwide && !arp ? (
         <p className="sub">Lightning data unavailable for this airport.</p>
       ) : (
         <>
-          <MapContainer
-            center={center}
-            zoom={DEFAULT_ZOOM}
-            scrollWheelZoom={true}
-            zoomControl={true}
-            attributionControl={false}
-            className="interactive-map-container"
-          >
-            <MapRecenter center={center} zoom={DEFAULT_ZOOM} />
+          <div className={`interactive-map-shell interactive-map-shell--${mapTheme}`}>
+            <MapContainer
+              key={`interactive-map-${mapTheme}`}
+              center={center}
+              zoom={mapZoom}
+              scrollWheelZoom={true}
+              zoomControl={true}
+              attributionControl={false}
+              className="interactive-map-container"
+            >
+              <MapRecenter center={center} zoom={mapZoom} />
 
             <Pane name="boundary-pane" style={{ zIndex: 350 }}>
               {geoData && (
                 <GeoJSON
                   key={`${selectedAirport}-${boundaryLevel}`}
                   data={geoData}
-                  style={() => BOUNDARY_STYLE}
+                  style={() => boundaryStyle}
                 />
               )}
             </Pane>
@@ -221,7 +267,7 @@ export default function InteractiveMap({
             )}
 
             <Pane name="overlay-pane" style={{ zIndex: 450 }}>
-              {ZONE_RADII.map((zone) => (
+              {!isNationwide && ZONE_RADII.map((zone) => (
                 <Circle
                   key={zone.zone}
                   center={center}
@@ -238,7 +284,23 @@ export default function InteractiveMap({
             </Pane>
 
             <Pane name="airport-pane" style={{ zIndex: 650 }}>
-              <Marker position={center} icon={airportIcon} />
+              {isNationwide ? (
+                nationwideAirportMarkers.map((airport) => (
+                  <CircleMarker
+                    key={airport.icao}
+                    center={[airport.lat, airport.lon]}
+                    radius={airport.icao === selectedAirport ? 7 : 5}
+                    pathOptions={{
+                      color: airport.icao === selectedAirport ? "#ffd166" : "#ffffff",
+                      weight: airport.icao === selectedAirport ? 2.5 : 1.5,
+                      fillColor: airport.icao === selectedAirport ? "#1f7ae0" : mapTheme === "light" ? "#111111" : "#24425f",
+                      fillOpacity: 0.9,
+                    }}
+                  />
+                ))
+              ) : (
+                <Marker position={center} icon={airportIcon} />
+              )}
             </Pane>
 
             <Pane name="strike-pane" style={{ zIndex: 500 }}>
@@ -260,7 +322,8 @@ export default function InteractiveMap({
                 );
               })}
             </Pane>
-          </MapContainer>
+            </MapContainer>
+          </div>
 
           <div className="lightning-legend">
             <span className="zone-tag alert">8km {summary.byZone.alert}</span>
@@ -270,12 +333,14 @@ export default function InteractiveMap({
 
           <div className="lightning-summary">
             {summary.total === 0 ? (
-              <p>No strikes in last {timeRangeMin}m</p>
+              <p>No recent strikes</p>
             ) : (
               <>
-                <p><strong>{summary.total}</strong> strikes in last {timeRangeMin}m</p>
-                <p>Nearest: {summary.nearest == null ? "-" : `${summary.nearest.toFixed(1)} km`}</p>
-                <p>Latest: {safe(airportData?.summary?.latest_time || summary.latest, "-")}</p>
+                <p><strong>{summary.total}</strong> recent strikes</p>
+                {!isNationwide && (
+                  <p>Nearest: {summary.nearest == null ? "-" : `${summary.nearest.toFixed(1)} km`}</p>
+                )}
+                <p>Latest: {safe(isNationwide ? summary.latest : airportData?.summary?.latest_time || summary.latest, "-")}</p>
               </>
             )}
             {showEcho && echoInfo && (

@@ -3,8 +3,6 @@ import { formatUtc } from "../utils/helpers";
 export default function Header({
   lastUpdated,
   onSettingsClick,
-  detailsOpen,
-  onToggleDetails,
   airports = [],
   selectedAirport,
   onAirportChange,
@@ -14,20 +12,7 @@ export default function Header({
     <header className="hero">
       <p className="eyebrow">Operational Snapshot</p>
       <div className="hero-top">
-        <h1 className="dashboard-title">
-          KMA Aviation Weather Dashboard
-          {onToggleDetails && (
-            <button
-              type="button"
-              className="dashboard-toggle-btn"
-              onClick={onToggleDetails}
-              aria-label={detailsOpen ? "Hide dashboard details" : "Show dashboard details"}
-              title={detailsOpen ? "Hide dashboard details" : "Show dashboard details"}
-            >
-              {detailsOpen ? "v" : ">"}
-            </button>
-          )}
-        </h1>
+        <h1 className="dashboard-title">KMA Aviation Weather Dashboard</h1>
         <div className="hero-actions">
           {airports.length > 0 && onAirportChange && (
             <div className="header-controls">

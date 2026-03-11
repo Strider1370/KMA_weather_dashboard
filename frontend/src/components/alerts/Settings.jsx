@@ -17,7 +17,7 @@ const TRIGGER_LABELS = {
   lightning_detected: "낙뢰 감지",
 };
 
-export default function Settings({ defaults, onClose, onSettingsChange, timeZone, setTimeZone }) {
+export default function Settings({ defaults, onClose, onSettingsChange, timeZone, setTimeZone, mapTheme, setMapTheme }) {
   const current = resolveSettings(defaults);
   const personal = loadPersonalSettings() || {};
 
@@ -40,6 +40,7 @@ export default function Settings({ defaults, onClose, onSettingsChange, timeZone
   const [localTimeZone, setLocalTimeZone] = useState(timeZone || "KST");
   const [showRadar, setShowRadar] = useState(() => localStorage.getItem("show_radar_overlay") === "true");
   const [radarOpacity, setRadarOpacity] = useState(() => parseFloat(localStorage.getItem("radar_overlay_opacity") || "0.6"));
+  const [localMapTheme, setLocalMapTheme] = useState(mapTheme || localStorage.getItem("map_theme") || "dark");
   const [activeTab, setActiveTab] = useState("general");
 
   const [triggers, setTriggers] = useState(() => {
@@ -92,7 +93,9 @@ export default function Settings({ defaults, onClose, onSettingsChange, timeZone
     localStorage.setItem("time_zone", localTimeZone);
     localStorage.setItem("show_radar_overlay", showRadar);
     localStorage.setItem("radar_overlay_opacity", radarOpacity);
+    localStorage.setItem("map_theme", localMapTheme);
     setTimeZone?.(localTimeZone);
+    setMapTheme?.(localMapTheme);
     
     onSettingsChange?.(overrides);
     onClose();
@@ -106,7 +109,9 @@ export default function Settings({ defaults, onClose, onSettingsChange, timeZone
     localStorage.removeItem("time_zone");
     localStorage.removeItem("show_radar_overlay");
     localStorage.removeItem("radar_overlay_opacity");
+    localStorage.removeItem("map_theme");
     setTimeZone?.("KST");
+    setMapTheme?.("dark");
     onSettingsChange?.(null);
     onClose();
   }
@@ -173,6 +178,13 @@ export default function Settings({ defaults, onClose, onSettingsChange, timeZone
                 <label className="alert-settings-row">
                   <span>낙뢰 지도 레이더 오버레이</span>
                   <input type="checkbox" checked={showRadar} onChange={(e) => setShowRadar(e.target.checked)} />
+                </label>
+                <label className="alert-settings-row">
+                  <span>지도 테마</span>
+                  <select value={localMapTheme} onChange={(e) => setLocalMapTheme(e.target.value)}>
+                    <option value="dark">다크 (현재)</option>
+                    <option value="light">화이트</option>
+                  </select>
                 </label>
                 {showRadar && (
                   <label className="alert-settings-row alert-settings-sub">

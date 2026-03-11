@@ -139,8 +139,6 @@ frontend/src (React 대시보드)
 - `/api/airports`
 - `/api/warning-types`
 - `/api/alert-defaults`
-- `/api/status`
-- `/api/stats`
 
 ### 정적 데이터
 
@@ -250,7 +248,7 @@ git stash push -u -m "server-local-before-update"
 
 - KMA API 401/403: `API_AUTH_KEY`와 일일 호출량 제한 확인
 - 레이더 에코 미갱신: 최신 코드 프로세스 + cron 동작 여부 확인
-- 대시보드 데이터 정체: `/api/status`, `/api/stats` 확인
+- 대시보드 데이터 정체: 각 `backend/data/<type>/latest.json` 갱신 여부와 서버 로그 확인
 - 포트 충돌: `PORT` 환경 변수 변경 또는 기존 프로세스 종료
 
 ## 기여 가이드
