@@ -119,7 +119,7 @@ frontend/src (React 대시보드)
 - 각 카테고리 `latest.json`은 항상 최신으로 갱신됩니다.
 - 레이더 이미지/에코 에셋은 `backend/data/radar/`에 저장되며 `/data/radar/*`로 제공됩니다.
 - ADS-B 현재 위치 스냅샷은 `backend/data/adsb/latest.json`에 저장되며 `/api/adsb`로 제공됩니다.
-- 지도 경계는 `frontend/public/geo/korea_sido.v1.geojson`과 `frontend/public/geo/korea_neighbors_masked.v1.geojson`을 사용합니다.
+- 지도 경계는 `frontend/public/geo/korea_boundaries.v1.topojson`(시도/시군구 통합)과 `frontend/public/geo/korea_neighbors_masked.v1.geojson`을 사용합니다.
 
 예시:
 
@@ -130,6 +130,7 @@ frontend/src (React 대시보드)
 - `backend/data/adsb/latest.json`
 - `backend/data/radar/echo_meta.json`
 - `backend/data/radar/echo_korea_<tm>.png`
+- `frontend/public/geo/korea_boundaries.v1.topojson`
 
 ## API 표면
 
@@ -219,6 +220,11 @@ npm run dev
 ```bash
 npm --prefix frontend run build
 npm --prefix frontend run preview
+
+# Boundary build tools
+npm run geo:sido
+npm run geo:sigungu
+npm run geo:topo
 ```
 
 ## 테스트
@@ -283,7 +289,7 @@ git stash push -u -m "server-local-before-update"
 
 배포에서 nginx가 `frontend/dist` 정적 파일을 직접 서빙한다면 아래 두 가지를 같이 적용하는 편이 좋습니다.
 
-1. `.geojson` MIME 타입 지정
+1. `.geojson` / `.topojson` MIME 타입 지정
 2. `gzip` 또는 `brotli` 압축 활성화
 
 예시:
@@ -301,14 +307,16 @@ gzip_types
   application/javascript
   text/javascript
   application/geo+json
+  application/topo+json
   image/svg+xml;
 
 types {
   application/geo+json geojson;
+  application/topo+json topojson;
 }
 ```
 
-`server.js`도 `.geojson`에 대해 `application/geo+json; charset=utf-8`을 반환하도록 맞춰져 있습니다.
+`server.js`도 `.geojson` / `.topojson`에 대해 각각 `application/geo+json; charset=utf-8`, `application/topo+json; charset=utf-8`을 반환하도록 맞춰져 있습니다.
 
 ## 트러블슈팅
 

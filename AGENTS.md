@@ -166,6 +166,7 @@ Derived from `.editorconfig` + existing source files.
 - ADS-B uses OpenSky `states/all` with bounding-box filtering and has a TLS fallback path for environments that surface `SELF_SIGNED_CERT_IN_CHAIN`.
 - `server.js` binds to `127.0.0.1`; expose externally via reverse proxy (nginx/LB), not direct app port.
 - If nginx serves `frontend/dist` directly, keep `.geojson` MIME handling correct (`application/geo+json`) and enable gzip/brotli for `.geojson`, `.json`, `.js`, and `.css` to reduce first-load payload size.
+- If nginx serves `frontend/dist` directly, keep both `.geojson` (`application/geo+json`) and `.topojson` (`application/topo+json`) MIME handling correct and enable gzip/brotli for `.geojson`, `.topojson`, `.json`, `.js`, and `.css`.
 - In PowerShell, Korean UTF-8 files may render incorrectly with plain `Get-Content`.
 - When reading Korean text files, prefer explicit UTF-8 decoding:
   - `[Console]::OutputEncoding = [System.Text.Encoding]::UTF8`
