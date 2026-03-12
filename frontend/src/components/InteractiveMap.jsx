@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
-import { MapContainer, GeoJSON, CircleMarker, Circle, Marker, Pane, ImageOverlay, useMap } from "react-leaflet";
+import { MapContainer, GeoJSON, CircleMarker, Circle, Marker, Pane, ImageOverlay, Tooltip, useMap } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 
@@ -25,6 +25,7 @@ const DEFAULT_FRAME_MS = 500;
 const MIN_FRAME_MS = 100;
 const MAX_FRAME_MS = 2000;
 const FRAME_MS_STEP = 100;
+const AIRCRAFT_AIRPORT_RANGE_KM = 120;
 
 function getStrikeColor(strikeTimeIso) {
   const elapsedMin = (Date.now() - new Date(strikeTimeIso).getTime()) / 60000;
@@ -50,8 +51,53 @@ function MapRecenter({ center, zoom, recenterKey }) {
   const map = useMap();
   useEffect(() => {
     if (center) map.setView(center, zoom);
-  }, [map, recenterKey]);
+  }, [map, center, zoom, recenterKey]);
   return null;
+}
+
+function toKnots(metersPerSecond) {
+  if (typeof metersPerSecond !== "number" || !Number.isFinite(metersPerSecond)) return null;
+  return metersPerSecond * 1.94384;
+}
+
+function haversineKm(a, b) {
+  if (!a || !b) return Infinity;
+  const toRad = (deg) => (deg * Math.PI) / 180;
+  const lat1 = toRad(a.lat);
+  const lat2 = toRad(b.lat);
+  const dLat = toRad(b.lat - a.lat);
+  const dLon = toRad(b.lon - a.lon);
+  const sinLat = Math.sin(dLat / 2);
+  const sinLon = Math.sin(dLon / 2);
+  const x = sinLat * sinLat + Math.cos(lat1) * Math.cos(lat2) * sinLon * sinLon;
+  return 6371 * 2 * Math.atan2(Math.sqrt(x), Math.sqrt(1 - x));
+}
+
+function createAircraftIcon(track = 0, mapTheme = "dark") {
+  const rotation = (track || 0) - 90;
+  const color = mapTheme === "light" ? "#0f1720" : "#ffffff";
+  const glow = mapTheme === "light"
+    ? "0 0 8px rgba(255,255,255,0.95)"
+    : "0 0 8px rgba(15,23,32,0.45)";
+  const size = 20;
+  return L.divIcon({
+    className: "leaflet-aircraft-icon",
+    html: `<span style="display:inline-block;transform:rotate(${rotation}deg);color:${color};text-shadow:${glow};font-size:${size}px">&#9992;</span>`,
+    iconSize: [size + 2, size + 2],
+    iconAnchor: [(size + 2) / 2, (size + 2) / 2],
+  });
+}
+
+function formatFlightLevel(aircraft) {
+  const altitudeMeters = aircraft.geo_altitude ?? aircraft.baro_altitude;
+  if (typeof altitudeMeters !== "number" || !Number.isFinite(altitudeMeters)) return "FL---";
+  const altitudeFeet = altitudeMeters * 3.28084;
+  return `FL${String(Math.round(altitudeFeet / 100)).padStart(3, "0")}`;
+}
+
+function formatHeading(track) {
+  if (typeof track !== "number" || !Number.isFinite(track)) return "HDG ---";
+  return `HDG ${String(Math.round(track)).padStart(3, "0")}`;
 }
 
 function formatTmLabel(tm) {
@@ -69,6 +115,7 @@ function formatLightningSummary(summary, isNationwide) {
 
 export default function InteractiveMap({
   lightningData,
+  adsbData = null,
   selectedAirport,
   airports,
   windDir = null,
@@ -81,8 +128,9 @@ export default function InteractiveMap({
   const [neighborGeoData, setNeighborGeoData] = useState(null);
   const [showEcho, setShowEcho] = useState(true);
   const [showLightning, setShowLightning] = useState(true);
+  const [showTraffic, setShowTraffic] = useState(false);
   const [frameIndex, setFrameIndex] = useState(0);
-  const [isPlaying, setIsPlaying] = useState(true);
+  const [isPlaying, setIsPlaying] = useState(false);
   const [playbackMs, setPlaybackMs] = useState(DEFAULT_FRAME_MS);
   const [recenterKey, setRecenterKey] = useState(0);
   const isNationwide = mapScope === "nationwide";
@@ -154,6 +202,23 @@ export default function InteractiveMap({
     });
   }, [isNationwide, lightningData, strikes, timeRangeMin]);
 
+  const aircraft = useMemo(() => {
+    return (adsbData?.aircraft || []).filter((item) => (
+      typeof item?.lat === "number" &&
+      typeof item?.lon === "number" &&
+      item.on_ground !== true
+    ));
+  }, [adsbData]);
+
+  const visibleAircraft = useMemo(() => {
+    if (isNationwide) return aircraft;
+    if (!arp) return [];
+    return aircraft.filter((item) => haversineKm(
+      { lat: arp.lat, lon: arp.lon },
+      { lat: item.lat, lon: item.lon }
+    ) <= AIRCRAFT_AIRPORT_RANGE_KM);
+  }, [aircraft, arp, isNationwide]);
+
   const summary = useMemo(() => {
     const byZone = { alert: 0, danger: 0, caution: 0 };
     let latest = null;
@@ -181,7 +246,6 @@ export default function InteractiveMap({
         }
       : BOUNDARY_STYLE
   ), [mapTheme]);
-
   const echoFrames = useMemo(() => echoMeta?.frames || [], [echoMeta]);
   const currentFrame = echoFrames[frameIndex] || echoMeta?.nationwide || null;
   const maxIndex = Math.max(echoFrames.length - 1, 0);
@@ -293,6 +357,15 @@ export default function InteractiveMap({
           >
             RDR
           </button>
+          <button
+            type="button"
+            className={`range-btn ${showTraffic ? "active" : ""}`}
+            onClick={() => setShowTraffic((v) => !v)}
+            title={adsbData ? `ADS-B traffic (${visibleAircraft.length})` : "Traffic layer unavailable"}
+            disabled={!adsbData}
+          >
+            Traffic
+          </button>
         </div>
       </div>
 
@@ -306,6 +379,9 @@ export default function InteractiveMap({
                 <span className="zone-tag alert">8km {summary.byZone.alert}</span>
                 <span className="zone-tag danger">16km {summary.byZone.danger}</span>
                 <span className="zone-tag caution">32km {summary.byZone.caution}</span>
+                {showTraffic && adsbData && (
+                  <span className="zone-tag traffic">ACFT {visibleAircraft.length}</span>
+                )}
               </div>
             )}
             <MapContainer
@@ -400,6 +476,24 @@ export default function InteractiveMap({
                   />
                 );
               })}
+            </Pane>
+
+            <Pane name="traffic-pane" style={{ zIndex: 620 }}>
+              {showTraffic && visibleAircraft.map((item) => (
+                <Marker
+                  key={item.icao24}
+                  position={[item.lat, item.lon]}
+                  icon={createAircraftIcon(item.true_track, mapTheme)}
+                >
+                  <Tooltip direction="top" offset={[0, -10]} opacity={0.95}>
+                    <div className="aircraft-tooltip">
+                      <strong>{item.callsign || item.icao24}</strong>
+                      <div>{formatFlightLevel(item)}  {Math.round(toKnots(item.velocity) || 0)}kt</div>
+                      <div>{formatHeading(item.true_track)}</div>
+                    </div>
+                  </Tooltip>
+                </Marker>
+              ))}
             </Pane>
             </MapContainer>
           </div>

@@ -3,7 +3,6 @@ import {
   resolveSettings,
   savePersonalSettings,
   clearPersonalSettings,
-  loadPersonalSettings,
 } from "../../utils/alerts";
 
 const TRIGGER_LABELS = {
@@ -17,9 +16,16 @@ const TRIGGER_LABELS = {
   lightning_detected: "낙뢰 감지",
 };
 
-export default function Settings({ defaults, onClose, onSettingsChange, timeZone, setTimeZone, mapTheme, setMapTheme }) {
+export default function Settings({
+  defaults,
+  onClose,
+  onSettingsChange,
+  timeZone,
+  setTimeZone,
+  mapTheme,
+  setMapTheme,
+}) {
   const current = resolveSettings(defaults);
-  const personal = loadPersonalSettings() || {};
 
   const [globalEnabled, setGlobalEnabled] = useState(current.global.alerts_enabled);
   const [cooldown, setCooldown] = useState(current.global.cooldown_seconds);
@@ -33,20 +39,19 @@ export default function Settings({ defaults, onClose, onSettingsChange, timeZone
   const [volume, setVolume] = useState(current.dispatchers.sound.volume);
   const [marqueeEnabled, setMarqueeEnabled] = useState(current.dispatchers.marquee.enabled);
 
-  // UI Version states (local to settings modal)
   const [metarVersion, setMetarVersion] = useState(() => localStorage.getItem("metar_version") || "v1");
   const [tafVersion, setTafVersion] = useState(() => localStorage.getItem("taf_version") || "v1");
   const [localTimeZone, setLocalTimeZone] = useState(timeZone || "KST");
   const [radarOpacity, setRadarOpacity] = useState(() => parseFloat(localStorage.getItem("radar_overlay_opacity") || "0.6"));
-  const [localMapTheme, setLocalMapTheme] = useState(mapTheme || localStorage.getItem("map_theme") || "dark");
+  const [localMapTheme, setLocalMapTheme] = useState(mapTheme || localStorage.getItem("map_theme") || "light");
   const [activeTab, setActiveTab] = useState("general");
 
   const [triggers, setTriggers] = useState(() => {
-    const t = {};
+    const nextTriggers = {};
     for (const [id, cfg] of Object.entries(current.triggers)) {
-      t[id] = { enabled: cfg.enabled, params: { ...cfg.params } };
+      nextTriggers[id] = { enabled: cfg.enabled, params: { ...cfg.params } };
     }
-    return t;
+    return nextTriggers;
   });
 
   function toggleTrigger(id) {
@@ -72,8 +77,7 @@ export default function Settings({ defaults, onClose, onSettingsChange, timeZone
         alerts_enabled: globalEnabled,
         cooldown_seconds: Number(cooldown),
         poll_interval_seconds: Number(pollInterval),
-        quiet_hours:
-          quietStart && quietEnd ? { start: quietStart, end: quietEnd } : null,
+        quiet_hours: quietStart && quietEnd ? { start: quietStart, end: quietEnd } : null,
       },
       dispatchers: {
         popup: { enabled: popupEnabled, auto_dismiss_seconds: Number(autoDismiss) },
@@ -82,9 +86,8 @@ export default function Settings({ defaults, onClose, onSettingsChange, timeZone
       },
       triggers,
     };
+
     savePersonalSettings(overrides);
-    
-    // Save UI versions to localStorage
     localStorage.setItem("metar_version", metarVersion);
     localStorage.setItem("taf_version", tafVersion);
     localStorage.setItem("time_zone", localTimeZone);
@@ -92,7 +95,7 @@ export default function Settings({ defaults, onClose, onSettingsChange, timeZone
     localStorage.setItem("map_theme", localMapTheme);
     setTimeZone?.(localTimeZone);
     setMapTheme?.(localMapTheme);
-    
+
     onSettingsChange?.(overrides);
     onClose();
   }
@@ -105,7 +108,7 @@ export default function Settings({ defaults, onClose, onSettingsChange, timeZone
     localStorage.removeItem("radar_overlay_opacity");
     localStorage.removeItem("map_theme");
     setTimeZone?.("KST");
-    setMapTheme?.("dark");
+    setMapTheme?.("light");
     onSettingsChange?.(null);
     onClose();
   }
@@ -119,7 +122,6 @@ export default function Settings({ defaults, onClose, onSettingsChange, timeZone
         </div>
 
         <div className="alert-settings-layout">
-          {/* 좌측 탭 사이드바 */}
           <div className="alert-settings-tabs">
             <button
               className={`alert-settings-tab-btn${activeTab === "general" ? " active" : ""}`}
@@ -131,47 +133,53 @@ export default function Settings({ defaults, onClose, onSettingsChange, timeZone
               className={`alert-settings-tab-btn${activeTab === "alert" ? " active" : ""}`}
               onClick={() => setActiveTab("alert")}
             >
-              알람
+              알림
             </button>
           </div>
 
-          {/* 우측 콘텐츠 */}
           <div className="alert-settings-body">
             {activeTab === "general" && (
               <fieldset className="alert-settings-section">
-                <legend>디스플레이 설정</legend>
+                <legend>표시 설정</legend>
                 <label className="alert-settings-row">
                   <span>METAR 표시 모드</span>
                   <select value={metarVersion} onChange={(e) => setMetarVersion(e.target.value)}>
                     <option value="v1">텍스트 리스트 (기본)</option>
-                    <option value="v2">사이드바 요약 (시각화)</option>
+                    <option value="v2">사이드바 요약</option>
                   </select>
                 </label>
                 <label className="alert-settings-row">
                   <span>TAF 표시 모드</span>
                   <select value={tafVersion} onChange={(e) => setTafVersion(e.target.value)}>
                     <option value="v1">상세 테이블 (기본)</option>
-                    <option value="v2">심각도 타임라인 (컬러 바)</option>
-                    <option value="v3">시간별 상세 그리드 (아이콘)</option>
+                    <option value="v2">시간 막대 타임라인</option>
+                    <option value="v3">시간별 상세 그리드</option>
                   </select>
                 </label>
                 <label className="alert-settings-row">
                   <span>시간대 표시</span>
                   <select value={localTimeZone} onChange={(e) => setLocalTimeZone(e.target.value)}>
-                    <option value="UTC">UTC (협정 세계시)</option>
+                    <option value="UTC">UTC (국제 표준시)</option>
                     <option value="KST">KST (한국 표준시, UTC+9)</option>
                   </select>
                 </label>
                 <label className="alert-settings-row">
-                  <span>지도 테마</span>
+                  <span>맵 모드</span>
                   <select value={localMapTheme} onChange={(e) => setLocalMapTheme(e.target.value)}>
-                    <option value="dark">다크 (현재)</option>
-                    <option value="light">화이트</option>
+                    <option value="light">화이트(기본)</option>
+                    <option value="dark">다크</option>
                   </select>
                 </label>
                 <label className="alert-settings-row alert-settings-sub">
                   <span>레이더 투명도 ({Math.round(radarOpacity * 100)}%)</span>
-                  <input type="range" min={0.1} max={0.9} step={0.1} value={radarOpacity} onChange={(e) => setRadarOpacity(parseFloat(e.target.value))} />
+                  <input
+                    type="range"
+                    min={0.1}
+                    max={0.9}
+                    step={0.1}
+                    value={radarOpacity}
+                    onChange={(e) => setRadarOpacity(parseFloat(e.target.value))}
+                  />
                 </label>
               </fieldset>
             )}
@@ -193,11 +201,11 @@ export default function Settings({ defaults, onClose, onSettingsChange, timeZone
                     <input type="number" min={0} max={3600} value={cooldown} onChange={(e) => setCooldown(e.target.value)} />
                   </label>
                   <label className="alert-settings-row">
-                    <span>조용 시간 시작</span>
+                    <span>조용한 시간 시작</span>
                     <input type="time" value={quietStart} onChange={(e) => setQuietStart(e.target.value)} />
                   </label>
                   <label className="alert-settings-row">
-                    <span>조용 시간 종료</span>
+                    <span>조용한 시간 종료</span>
                     <input type="time" value={quietEnd} onChange={(e) => setQuietEnd(e.target.value)} />
                   </label>
                 </fieldset>
@@ -221,7 +229,7 @@ export default function Settings({ defaults, onClose, onSettingsChange, timeZone
                     <input type="range" min={0} max={100} value={volume} onChange={(e) => setVolume(Number(e.target.value))} />
                   </label>
                   <label className="alert-settings-row">
-                    <span>마퀴 (하단 바)</span>
+                    <span>마퀴(하단 바)</span>
                     <input type="checkbox" checked={marqueeEnabled} onChange={(e) => setMarqueeEnabled(e.target.checked)} />
                   </label>
                 </fieldset>
@@ -237,36 +245,64 @@ export default function Settings({ defaults, onClose, onSettingsChange, timeZone
                       {cfg.enabled && id === "low_visibility" && (
                         <label className="alert-settings-row alert-settings-sub">
                           <span>시정 임계값 (m)</span>
-                          <input type="number" min={100} max={10000} step={100} value={cfg.params.threshold}
-                            onChange={(e) => updateTriggerParam(id, "threshold", Number(e.target.value))} />
+                          <input
+                            type="number"
+                            min={100}
+                            max={10000}
+                            step={100}
+                            value={cfg.params.threshold}
+                            onChange={(e) => updateTriggerParam(id, "threshold", Number(e.target.value))}
+                          />
                         </label>
                       )}
                       {cfg.enabled && id === "high_wind" && (
                         <>
                           <label className="alert-settings-row alert-settings-sub">
                             <span>풍속 임계값 (kt)</span>
-                            <input type="number" min={10} max={100} value={cfg.params.speed_threshold}
-                              onChange={(e) => updateTriggerParam(id, "speed_threshold", Number(e.target.value))} />
+                            <input
+                              type="number"
+                              min={10}
+                              max={100}
+                              value={cfg.params.speed_threshold}
+                              onChange={(e) => updateTriggerParam(id, "speed_threshold", Number(e.target.value))}
+                            />
                           </label>
                           <label className="alert-settings-row alert-settings-sub">
                             <span>돌풍 임계값 (kt)</span>
-                            <input type="number" min={10} max={100} value={cfg.params.gust_threshold}
-                              onChange={(e) => updateTriggerParam(id, "gust_threshold", Number(e.target.value))} />
+                            <input
+                              type="number"
+                              min={10}
+                              max={100}
+                              value={cfg.params.gust_threshold}
+                              onChange={(e) => updateTriggerParam(id, "gust_threshold", Number(e.target.value))}
+                            />
                           </label>
                         </>
                       )}
                       {cfg.enabled && id === "low_ceiling" && (
                         <label className="alert-settings-row alert-settings-sub">
                           <span>운고 임계값 (ft)</span>
-                          <input type="number" min={100} max={5000} step={100} value={cfg.params.threshold}
-                            onChange={(e) => updateTriggerParam(id, "threshold", Number(e.target.value))} />
+                          <input
+                            type="number"
+                            min={100}
+                            max={5000}
+                            step={100}
+                            value={cfg.params.threshold}
+                            onChange={(e) => updateTriggerParam(id, "threshold", Number(e.target.value))}
+                          />
                         </label>
                       )}
                       {cfg.enabled && id === "taf_adverse_weather" && (
                         <label className="alert-settings-row alert-settings-sub">
                           <span>예보 시정 임계값 (m)</span>
-                          <input type="number" min={500} max={10000} step={500} value={cfg.params.vis_threshold}
-                            onChange={(e) => updateTriggerParam(id, "vis_threshold", Number(e.target.value))} />
+                          <input
+                            type="number"
+                            min={500}
+                            max={10000}
+                            step={500}
+                            value={cfg.params.vis_threshold}
+                            onChange={(e) => updateTriggerParam(id, "vis_threshold", Number(e.target.value))}
+                          />
                         </label>
                       )}
                     </div>

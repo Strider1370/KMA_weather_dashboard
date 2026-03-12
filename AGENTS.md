@@ -11,6 +11,7 @@ Follow it as the repo-local source of truth.
   - `server.js` (serves frontend + API passthrough endpoints).
   - `backend/src/index.js` (cron scheduler + data collection jobs).
 - Data is persisted under `backend/data/` and served via `/data/*`.
+- Additional current feeds include ADS-B aircraft positions (`backend/data/adsb/latest.json`).
 
 ## Rule Files Check
 
@@ -54,6 +55,7 @@ Use repo root unless noted.
   - `node backend/test/run-once.js warning`
   - `node backend/test/run-once.js lightning`
   - `node backend/test/run-once.js radar-echo`
+  - `node backend/test/run-once.js adsb`
 - Valid target values are enforced in `backend/test/run-once.js`.
 
 ### Lint / Format
@@ -129,11 +131,13 @@ Derived from `.editorconfig` + existing source files.
 
 - API endpoints served by `server.js` under `/api/*`.
 - Snapshot polling metadata is served at `/api/snapshot-meta`.
+- `server.js` also serves SPA entry points for both `/` and `/test`.
 - Static data served under `/data/*` from `backend/data`.
 - Persisted category files generally follow:
   - `backend/data/<type>/latest.json`
   - historical JSON files with prefixed timestamps.
 - Radar echo uses image/meta outputs in `backend/data/radar/`.
+- ADS-B latest aircraft state is stored at `backend/data/adsb/latest.json` and exposed at `/api/adsb`.
 
 ## Agent Workflow Guidance
 
@@ -159,7 +163,9 @@ Derived from `.editorconfig` + existing source files.
 - Timezone handling frequently uses KST logic in collectors.
 - Network calls use external KMA APIs; failures are expected and should degrade gracefully.
 - Some collectors are intentionally independent (not all use `api-client.js`).
+- ADS-B uses OpenSky `states/all` with bounding-box filtering and has a TLS fallback path for environments that surface `SELF_SIGNED_CERT_IN_CHAIN`.
 - `server.js` binds to `127.0.0.1`; expose externally via reverse proxy (nginx/LB), not direct app port.
+- If nginx serves `frontend/dist` directly, keep `.geojson` MIME handling correct (`application/geo+json`) and enable gzip/brotli for `.geojson`, `.json`, `.js`, and `.css` to reduce first-load payload size.
 - In PowerShell, Korean UTF-8 files may render incorrectly with plain `Get-Content`.
 - When reading Korean text files, prefer explicit UTF-8 decoding:
   - `[Console]::OutputEncoding = [System.Text.Encoding]::UTF8`

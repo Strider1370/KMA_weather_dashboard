@@ -15,7 +15,7 @@ export async function fetchJsonOptional(url) {
 }
 
 export async function loadAllData() {
-  const [metar, taf, warning, airports, warningTypes, lightning, echoMeta] = await Promise.all([
+  const [metar, taf, warning, airports, warningTypes, lightning, echoMeta, adsb] = await Promise.all([
     fetchJson("/api/metar"),
     fetchJson("/api/taf"),
     fetchJson("/api/warning"),
@@ -23,8 +23,9 @@ export async function loadAllData() {
     fetchJson("/api/warning-types"),
     fetchJsonOptional("/api/lightning"),
     fetchJsonOptional("/data/radar/echo_meta.json"),
+    fetchJsonOptional("/api/adsb"),
   ]);
-  return { metar, taf, warning, airports, warningTypes, lightning, echoMeta };
+  return { metar, taf, warning, airports, warningTypes, lightning, echoMeta, adsb };
 }
 
 export async function loadAlertDefaults() {
@@ -52,6 +53,7 @@ export async function loadChangedData(changes) {
   if (changes.taf) { fetches.push(fetchJson("/api/taf")); keys.push("taf"); }
   if (changes.warning) { fetches.push(fetchJson("/api/warning")); keys.push("warning"); }
   if (changes.lightning) { fetches.push(fetchJsonOptional("/api/lightning")); keys.push("lightning"); }
+  if (changes.adsb) { fetches.push(fetchJsonOptional("/api/adsb")); keys.push("adsb"); }
   if (changes.echoMeta) { fetches.push(fetchJsonOptional("/data/radar/echo_meta.json")); keys.push("echoMeta"); }
 
   const results = await Promise.all(fetches);

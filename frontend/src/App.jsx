@@ -29,8 +29,13 @@ import Settings from "./components/alerts/Settings";
 import "./App.css";
 
 export default function App() {
+  const pathname = typeof window !== "undefined" ? window.location.pathname : "/";
+  const isTestPage = pathname === "/test";
+  const defaultAirport = isTestPage ? "TST1" : "RKSI";
+  const selectedAirportKey = isTestPage ? "selected_airport_test" : "selected_airport_main";
+
   const [data, setData] = useState({});
-  const [selectedAirport, setSelectedAirport] = useState(null);
+  const [selectedAirport, setSelectedAirport] = useState(() => localStorage.getItem(selectedAirportKey) || defaultAirport);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [alertDefaults, setAlertDefaults] = useState(null);
@@ -42,7 +47,7 @@ export default function App() {
   const [tafVersion, setTafVersion] = useState(() => localStorage.getItem("taf_version") || "v1");
   const [timeZone, setTimeZone] = useState(() => localStorage.getItem("time_zone") || "KST");
   const [radarOpacity, setRadarOpacity] = useState(() => parseFloat(localStorage.getItem("radar_overlay_opacity") || "0.6"));
-  const [mapTheme, setMapTheme] = useState(() => localStorage.getItem("map_theme") || "dark");
+  const [mapTheme, setMapTheme] = useState(() => localStorage.getItem("map_theme") || "light");
 
   useEffect(() => {
     localStorage.setItem("metar_version", metarVersion);
@@ -60,10 +65,16 @@ export default function App() {
     localStorage.setItem("map_theme", mapTheme);
   }, [mapTheme]);
 
+  useEffect(() => {
+    if (selectedAirport) {
+      localStorage.setItem(selectedAirportKey, selectedAirport);
+    }
+  }, [selectedAirport, selectedAirportKey]);
+
   const prevDataRef = useRef(null);
   const pollingRef = useRef(null);
   const pollingInFlightRef = useRef(false);
-  const snapshotHashRef = useRef({ metar: null, taf: null, warning: null, lightning: null, echo: null });
+  const snapshotHashRef = useRef({ metar: null, taf: null, warning: null, lightning: null, adsb: null, echo: null });
 
   // 디스패처 콜백 등록
   useEffect(() => {
@@ -89,10 +100,13 @@ export default function App() {
           ...Object.keys(result.taf?.airports || {}),
           ...Object.keys(result.warning?.airports || {}),
           ...Object.keys(result.lightning?.airports || {}),
-          ...(airports || []).map((a) => a.icao),
+          ...(airports || [])
+            .filter((airport) => isTestPage || airport.icao !== "TST1")
+            .map((a) => a.icao),
         ]);
         if (prev && available.has(prev)) return prev;
-        return Array.from(available).sort()[0] || null;
+        if (available.has(defaultAirport)) return defaultAirport;
+        return Array.from(available)[0] || null;
       });
 
       snapshotHashRef.current = {
@@ -100,6 +114,7 @@ export default function App() {
         taf: result.taf?.content_hash || null,
         warning: result.warning?.content_hash || null,
         lightning: result.lightning?.content_hash || null,
+        adsb: result.adsb?.content_hash || null,
         echo: result.echoMeta?.tm || null,
       };
     } catch (err) {
@@ -107,7 +122,7 @@ export default function App() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [defaultAirport, isTestPage]);
 
   const pollOnce = useCallback(async () => {
     if (pollingInFlightRef.current) return;
@@ -127,6 +142,7 @@ export default function App() {
         taf: snapshot.taf?.hash == null || snapshot.taf.hash !== saved.taf,
         warning: snapshot.warning?.hash == null || snapshot.warning.hash !== saved.warning,
         lightning: snapshot.lightning?.hash == null || snapshot.lightning.hash !== saved.lightning,
+        adsb: snapshot.adsb?.hash == null || snapshot.adsb.hash !== saved.adsb,
         echoMeta: snapshot.echo?.tm == null || snapshot.echo.tm !== saved.echo,
       };
 
@@ -149,6 +165,9 @@ export default function App() {
         lightning: changes.lightning && changedData.lightning?.content_hash != null
           ? changedData.lightning.content_hash
           : (snapshot.lightning?.hash ?? saved.lightning),
+        adsb: changes.adsb && changedData.adsb?.content_hash != null
+          ? changedData.adsb.content_hash
+          : (snapshot.adsb?.hash ?? saved.adsb),
         echo: changes.echoMeta && changedData.echoMeta?.tm != null
           ? changedData.echoMeta.tm
           : (snapshot.echo?.tm ?? saved.echo),
@@ -235,7 +254,7 @@ export default function App() {
     setTafVersion(localStorage.getItem("taf_version") || "v1");
     setTimeZone(localStorage.getItem("time_zone") || "KST");
     setRadarOpacity(parseFloat(localStorage.getItem("radar_overlay_opacity") || "0.6"));
-    setMapTheme(localStorage.getItem("map_theme") || "dark");
+    setMapTheme(localStorage.getItem("map_theme") || "light");
   }
 
   const settings = alertDefaults ? resolveSettings(alertDefaults) : null;
@@ -245,11 +264,20 @@ export default function App() {
     ...Object.keys(data.lightning?.airports || {}),
   ]);
   if (data.airports) {
-    data.airports.forEach((a) => airportSet.add(a.icao));
+    data.airports
+      .filter((airport) => isTestPage || airport.icao !== "TST1")
+      .forEach((a) => airportSet.add(a.icao));
   }
-  const airportList = Array.from(airportSet).sort();
+  const orderedAirports = (data.airports || [])
+    .filter((airport) => isTestPage || airport.icao !== "TST1")
+    .map((airport) => airport.icao)
+    .filter((icao) => airportSet.has(icao));
+  const remainingAirports = Array.from(airportSet)
+    .filter((icao) => !orderedAirports.includes(icao))
+    .sort();
+  const airportList = [...orderedAirports, ...remainingAirports];
 
-  const lastUpdated = [data.metar?.fetched_at, data.taf?.fetched_at, data.warning?.fetched_at, data.lightning?.fetched_at, data.echoMeta?.updated_at]
+  const lastUpdated = [data.metar?.fetched_at, data.taf?.fetched_at, data.warning?.fetched_at, data.lightning?.fetched_at, data.adsb?.updated_at, data.echoMeta?.updated_at]
     .filter(Boolean)
     .sort()
     .pop() || null;
@@ -329,6 +357,7 @@ export default function App() {
               <div className="secondary-column">
                 <InteractiveMap
                   lightningData={data.lightning}
+                  adsbData={data.adsb}
                   selectedAirport={selectedAirport}
                   airports={data.airports}
                   windDir={(() => {

@@ -56,12 +56,24 @@ module.exports = {
     crop_size: 200,
     timeout_ms: 30000
   },
+  adsb: {
+    url: process.env.ADSB_API_URL || "https://opensky-network.org/api/states/all",
+    timeout_ms: 20000,
+    max_history_frames: 36,
+    bounds: {
+      lamin: Number(process.env.ADSB_LAMIN || 33),
+      lamax: Number(process.env.ADSB_LAMAX || 39),
+      lomin: Number(process.env.ADSB_LOMIN || 124),
+      lomax: Number(process.env.ADSB_LOMAX || 132)
+    }
+  },
   schedule: {
     metar_interval: "*/10 * * * *",
     taf_interval: "*/30 * * * *",
     warning_interval: "*/5 * * * *",
     lightning_interval: "*/5 * * * *",
-    radar_echo_interval: "*/5 * * * *"
+    radar_echo_interval: "*/5 * * * *",
+    adsb_interval: "*/5 * * * *"
   },
   storage: {
     base_path: resolveDataPath(process.env.DATA_PATH),

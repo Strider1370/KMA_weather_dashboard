@@ -172,6 +172,7 @@ function contentTypeFor(filePath) {
   if (filePath.endsWith(".css")) return "text/css; charset=utf-8";
   if (filePath.endsWith(".js")) return "application/javascript; charset=utf-8";
   if (filePath.endsWith(".json")) return "application/json; charset=utf-8";
+  if (filePath.endsWith(".geojson")) return "application/geo+json; charset=utf-8";
   if (filePath.endsWith(".png")) return "image/png";
   return "text/plain; charset=utf-8";
 }
@@ -204,7 +205,8 @@ function serveDataAsset(req, res) {
 }
 
 function serveStatic(req, res) {
-  const target = req.url === "/" ? "/index.html" : req.url;
+  const pathname = req.url.split("?")[0];
+  const target = pathname === "/" || pathname === "/test" ? "/index.html" : pathname;
   const filePath = path.normalize(path.join(ROOT, target));
 
   if (!filePath.startsWith(ROOT)) {
@@ -265,6 +267,10 @@ const server = http.createServer(async (req, res) => {
       return sendJson(req, res, 200, readLightning());
     }
 
+    if (req.url === "/api/adsb") {
+      return sendJson(req, res, 200, readLatest("adsb"));
+    }
+
     if (req.url === "/api/airports") {
       const airports = reloadCommonJs(SHARED_AIRPORTS);
       return sendJson(req, res, 200, airports);
@@ -296,6 +302,7 @@ const server = http.createServer(async (req, res) => {
         taf: { hash: readSnapshotHash("taf") },
         warning: { hash: readSnapshotHash("warning") },
         lightning: { hash: readSnapshotHash("lightning") },
+        adsb: { hash: readSnapshotHash("adsb") },
         echo: echoTm != null ? { tm: echoTm } : null,
       });
     }

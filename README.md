@@ -2,8 +2,7 @@
 
 KMA 항공기상 수집기 + 대시보드 프로젝트입니다.
 
-이 프로젝트는 KMA 항공/기상 피드(METAR, TAF, 특보, 낙뢰, 레이더, 레이더 에코)를 주기적으로 수집하고,
-정규화된 결과를 `backend/data/`에 저장한 뒤 React 대시보드로 제공합니다.
+이 프로젝트는 KMA 항공/기상 피드(METAR, TAF, 특보, 낙뢰, 레이더, 레이더 에코)와 OpenSky ADS-B 항공기 위치를 주기적으로 수집하고, 정규화된 결과를 `backend/data/`에 저장한 뒤 React 대시보드로 제공합니다.
 
 ## 프로젝트가 하는 일
 
@@ -12,6 +11,8 @@ KMA 항공기상 수집기 + 대시보드 프로젝트입니다.
 - 카테고리별 `latest.json`과 시각별 이력 파일을 함께 관리합니다.
 - 단일 Node 서버에서 API와 정적 데이터를 함께 제공합니다.
 - METAR/TAF/특보/낙뢰/레이더 에코를 단일 인터랙티브 지도 패널과 함께 렌더링합니다.
+- ADS-B `Traffic` 레이어로 한국 주변 상공 항공기 현재 위치를 지도에 표시합니다.
+- `/test` 경로에서는 `TST1` 테스트 공항을 선택할 수 있고, 메인 `/`에서는 `TST1`을 숨깁니다.
 
 ## 기술 스택
 
@@ -29,6 +30,9 @@ KMA APIs
   ├─ typ01/url/lgt_pnt.php (낙뢰)
   ├─ typ04/url/rdr_cmp_file.php (레이더 바이너리 / 에코 생성용)
   └─ typ01/url/amos.php (강수량)
+
+OpenSky Network
+  └─ states/all (ADS-B 현재 항공기 위치)
         |
         v
 backend/src/processors/* (cron 수집기)
@@ -42,13 +46,14 @@ backend/src/store.js -> backend/data/<type>/*
         v
 server.js
   ├─ /api/*  (JSON)
-  └─ /data/* (저장된 정적 파일)
+  ├─ /data/* (저장된 정적 파일)
+  └─ /, /test (SPA 엔트리)
         |
         v
 frontend/src (React 대시보드)
 ```
 
-## 프로젝트 구조 (상세)
+## 프로젝트 구조
 
 ```text
 .
@@ -58,47 +63,44 @@ frontend/src (React 대시보드)
 │   │   ├── taf/
 │   │   ├── warning/
 │   │   ├── lightning/
+│   │   ├── adsb/
 │   │   └── radar/                    # 레이더 이미지 + echo png/meta
 │   ├── src/
-│   │   ├── processors/               # 수집 파이프라인
+│   │   ├── processors/
 │   │   │   ├── metar-processor.js
 │   │   │   ├── taf-processor.js
 │   │   │   ├── warning-processor.js
 │   │   │   ├── lightning-processor.js
-│   │   │   └── radar-echo-processor.js
-│   │   ├── parsers/                  # 포맷별 파서
-│   │   │   ├── metar-parser.js
-│   │   │   ├── taf-parser.js
-│   │   │   ├── warning-parser.js
-│   │   │   ├── lightning-parser.js
-│   │   │   ├── radar-echo-parser.js
-│   │   │   └── amos-parser.js
-│   │   ├── api-client.js             # XML API fetch/retry 정책
-│   │   ├── config.js                 # env + 스케줄 + 수집기 설정
-│   │   ├── store.js                  # 해시 기반 저장/회전
-│   │   ├── stats.js                  # 수집기 실행/실패 통계
-│   │   └── index.js                  # 스케줄러 진입점
+│   │   │   ├── radar-echo-processor.js
+│   │   │   └── adsb-processor.js
+│   │   ├── parsers/
+│   │   ├── api-client.js
+│   │   ├── config.js
+│   │   ├── store.js
+│   │   ├── stats.js
+│   │   └── index.js
 │   └── test/
-│       └── run-once.js               # 1회성 수집 테스트 러너
-├── docs/                             # 설계/참고 문서
+│       └── run-once.js
+├── docs/
+│   └── ads-b.md
 ├── frontend/
+│   ├── public/geo/
 │   ├── src/
-│   │   ├── components/               # 대시보드 컴포넌트
-│   │   ├── utils/                    # api/helpers/alert 로직
-│   │   ├── App.jsx                   # 메인 조합
-│   │   └── App.css                   # 스타일
-│   ├── public/geo/                   # 전국 시도경계 + 주변국 보조선 GeoJSON
+│   │   ├── components/
+│   │   ├── utils/
+│   │   ├── App.jsx
+│   │   └── App.css
 │   ├── package.json
 │   └── vite.config.js
-├── shared/                           # 공항/타입/기본값 공유 데이터
-├── scripts/                          # 유틸 스크립트
-├── server.js                         # API + 정적 파일 서버
-├── package.json                      # 루트 명령/의존성
-├── AGENTS.md                         # 에이전트 작업 가이드
-└── map.geojson                       # 지도 경계 소스
+├── shared/
+├── scripts/
+├── server.js
+├── package.json
+├── AGENTS.md
+└── map.geojson
 ```
 
-## 수집 스케줄 매트릭스
+## 수집 스케줄
 
 현재 스케줄 값은 `backend/src/config.js`에 정의되어 있습니다.
 
@@ -107,6 +109,7 @@ frontend/src (React 대시보드)
 - WARNING: `*/5 * * * *`
 - LIGHTNING: `*/5 * * * *`
 - RADAR_ECHO: `*/5 * * * *`
+- ADSB: `*/5 * * * *`
 
 `runWithLock` 실행 잠금으로 동일 타입 중복 실행을 방지합니다.
 
@@ -114,19 +117,21 @@ frontend/src (React 대시보드)
 
 - 카테고리별 결과는 `backend/data/<type>/`에 저장됩니다.
 - 각 카테고리 `latest.json`은 항상 최신으로 갱신됩니다.
-- 시각별 JSON 이력은 회전 정책에 따라 유지됩니다.
 - 레이더 이미지/에코 에셋은 `backend/data/radar/`에 저장되며 `/data/radar/*`로 제공됩니다.
+- ADS-B 현재 위치 스냅샷은 `backend/data/adsb/latest.json`에 저장되며 `/api/adsb`로 제공됩니다.
 - 지도 경계는 `frontend/public/geo/korea_sido.v1.geojson`과 `frontend/public/geo/korea_neighbors_masked.v1.geojson`을 사용합니다.
 
 예시:
+
 - `backend/data/metar/latest.json`
 - `backend/data/taf/latest.json`
 - `backend/data/warning/latest.json`
 - `backend/data/lightning/latest.json`
+- `backend/data/adsb/latest.json`
 - `backend/data/radar/echo_meta.json`
 - `backend/data/radar/echo_korea_<tm>.png`
 
-## API 표면 (server.js)
+## API 표면
 
 ### JSON 엔드포인트
 
@@ -134,6 +139,7 @@ frontend/src (React 대시보드)
 - `/api/taf`
 - `/api/warning`
 - `/api/lightning`
+- `/api/adsb`
 - `/api/snapshot-meta`
 - `/api/airports`
 - `/api/warning-types`
@@ -163,6 +169,11 @@ API_AUTH_KEY=your_kma_key
 # LIGHTNING_API_URL=https://apihub.kma.go.kr/api/typ01/url/lgt_pnt.php
 # AMOS_API_URL=https://apihub.kma.go.kr/api/typ01/url/amos.php
 # RADAR_API_URL=https://apihub.kma.go.kr/api/typ04/url/rdr_cmp_file.php
+# ADSB_API_URL=https://opensky-network.org/api/states/all
+# ADSB_LAMIN=33
+# ADSB_LAMAX=39
+# ADSB_LOMIN=124
+# ADSB_LOMAX=132
 ```
 
 ## 설치
@@ -182,7 +193,7 @@ npm --prefix frontend install
 npm run start
 ```
 
-`backend/src/index.js`를 실행합니다(수집 cron 전용).
+`backend/src/index.js`를 실행합니다.
 
 ### 2) 대시보드 서버 실행(API + 정적 파일)
 
@@ -192,13 +203,16 @@ npm run dashboard
 
 `server.js`를 실행합니다. 서버 시작 시 스케줄러 부트스트랩도 함께 실행됩니다.
 
+주의:
+
+- 앱 서버는 `127.0.0.1`에 바인딩됩니다.
+- 외부 공개는 nginx 같은 리버스 프록시 뒤에서 운영하는 구성을 전제로 합니다.
+
 ### 3) 로컬 개발 모드(server + Vite)
 
 ```bash
 npm run dev
 ```
-
-서버와 프론트 개발 서버를 동시에 실행합니다.
 
 ## 프론트 빌드
 
@@ -223,7 +237,29 @@ node backend/test/run-once.js taf
 node backend/test/run-once.js warning
 node backend/test/run-once.js lightning
 node backend/test/run-once.js radar-echo
+node backend/test/run-once.js adsb
 ```
+
+TLS 인증서 체인 문제로 외부 API 호출이 실패하는 환경에서는 임시로 다음처럼 실행할 수 있습니다.
+
+```powershell
+$env:NODE_TLS_REJECT_UNAUTHORIZED="0"; npm test
+```
+
+ADS-B만 단건 확인:
+
+```powershell
+$env:NODE_TLS_REJECT_UNAUTHORIZED="0"; node backend/test/run-once.js adsb
+```
+
+## 프론트 동작 메모
+
+- 기본 맵 테마는 `화이트(기본)`입니다.
+- 레이더 루프는 첫 진입 시 최신 프레임에서 일시정지 상태로 시작합니다.
+- `Traffic` 레이어는 기본적으로 꺼져 있습니다.
+- 공항 선택은 경로별로 로컬 저장됩니다.
+  - `/`: 기본 공항 `RKSI`, `TST1` 숨김
+  - `/test`: 기본 공항 `TST1`, `TST1` 선택 가능
 
 ## 배포 업데이트 예시
 
@@ -243,11 +279,43 @@ pm2 logs weather-app --lines 100
 git stash push -u -m "server-local-before-update"
 ```
 
+## nginx 메모
+
+배포에서 nginx가 `frontend/dist` 정적 파일을 직접 서빙한다면 아래 두 가지를 같이 적용하는 편이 좋습니다.
+
+1. `.geojson` MIME 타입 지정
+2. `gzip` 또는 `brotli` 압축 활성화
+
+예시:
+
+```nginx
+gzip on;
+gzip_vary on;
+gzip_min_length 1024;
+gzip_comp_level 5;
+gzip_proxied any;
+gzip_types
+  text/plain
+  text/css
+  application/json
+  application/javascript
+  text/javascript
+  application/geo+json
+  image/svg+xml;
+
+types {
+  application/geo+json geojson;
+}
+```
+
+`server.js`도 `.geojson`에 대해 `application/geo+json; charset=utf-8`을 반환하도록 맞춰져 있습니다.
+
 ## 트러블슈팅
 
 - KMA API 401/403: `API_AUTH_KEY`와 일일 호출량 제한 확인
 - 레이더 에코 미갱신: 최신 코드 프로세스 + cron 동작 여부 확인
 - 대시보드 데이터 정체: 각 `backend/data/<type>/latest.json` 갱신 여부와 서버 로그 확인
+- OpenSky/기타 HTTPS 호출에서 인증서 체인 오류가 나면 테스트/로컬 확인 시 `NODE_TLS_REJECT_UNAUTHORIZED=0`를 임시 사용하고, 운영에서는 서버 CA 체인을 바로잡는 쪽을 우선합니다.
 - 포트 충돌: `PORT` 환경 변수 변경 또는 기존 프로세스 종료
 
 ## 기여 가이드
