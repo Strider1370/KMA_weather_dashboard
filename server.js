@@ -157,12 +157,34 @@ function readLightning() {
   let payload = {
     type: "lightning",
     fetched_at: new Date().toISOString(),
-    query: { itv_minutes: 3, range_km: 32 },
-    airports: {}
+    query: { itv_minutes: 3, range_km: 32, nationwide_range_km: 500 },
+    airports: {},
+    nationwide: {
+      summary: {
+        total_count: 0,
+        by_zone: { alert: 0, danger: 0, caution: 0 },
+        by_type: { ground: 0, cloud: 0 },
+        max_intensity: null,
+        latest_time: null
+      },
+      strikes: []
+    }
   };
   if (fs.existsSync(latestFile)) {
     payload = JSON.parse(fs.readFileSync(latestFile, "utf8"));
     if (!payload.airports) payload.airports = {};
+    if (!payload.nationwide) {
+      payload.nationwide = {
+        summary: {
+          total_count: 0,
+          by_zone: { alert: 0, danger: 0, caution: 0 },
+          by_type: { ground: 0, cloud: 0 },
+          max_intensity: null,
+          latest_time: null
+        },
+        strikes: []
+      };
+    }
   }
   return mergeTst1(payload, "lightning");
 }
@@ -173,6 +195,7 @@ function contentTypeFor(filePath) {
   if (filePath.endsWith(".js")) return "application/javascript; charset=utf-8";
   if (filePath.endsWith(".json")) return "application/json; charset=utf-8";
   if (filePath.endsWith(".geojson")) return "application/geo+json; charset=utf-8";
+  if (filePath.endsWith(".topojson")) return "application/topo+json; charset=utf-8";
   if (filePath.endsWith(".png")) return "image/png";
   return "text/plain; charset=utf-8";
 }

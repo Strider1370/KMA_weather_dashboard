@@ -38,6 +38,11 @@ module.exports = {
   lightning: {
     range_km: 32,
     itv_minutes: 3,
+    nationwide: {
+      lat: 36.2,
+      lon: 127.8,
+      range_km: 500
+    },
     zones: {
       alert: 8,
       danger: 16,

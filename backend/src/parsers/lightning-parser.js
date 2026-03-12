@@ -58,7 +58,7 @@ function classifyStrike(strike, airport, zones) {
   };
 }
 
-function parse(responseText, airport, zones) {
+function parse(responseText, airport, zones, options = {}) {
   const text = String(responseText || "");
   if (!text.includes("#START7777") || !text.includes("#7777END")) {
     throw new Error("Invalid lightning payload markers");
@@ -98,7 +98,18 @@ function parse(responseText, airport, zones) {
     };
 
     const classified = classifyStrike(strike, airport, zones);
-    if (classified.zone !== "outside") strikes.push(classified);
+    const shouldInclude = classified.zone !== "outside" || options.includeOutside === true;
+    if (!shouldInclude) continue;
+
+    if (options.forceZone) {
+      strikes.push({
+        ...classified,
+        zone: options.forceZone
+      });
+      continue;
+    }
+
+    strikes.push(classified);
   }
 
   strikes.sort((a, b) => new Date(b.time).getTime() - new Date(a.time).getTime());

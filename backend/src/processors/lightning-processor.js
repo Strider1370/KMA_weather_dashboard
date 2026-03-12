@@ -27,6 +27,20 @@ function buildLightningUrl(airport, tm) {
   return `${config.api.lightning_url}?${params.toString()}`;
 }
 
+function buildNationwideLightningUrl(tm) {
+  const nationwide = config.lightning.nationwide || {};
+  const params = new URLSearchParams({
+    tm,
+    itv: String(config.lightning.itv_minutes),
+    lon: String(nationwide.lon),
+    lat: String(nationwide.lat),
+    range: String(nationwide.range_km),
+    gc: "T",
+    authKey: config.api.auth_key
+  });
+  return `${config.api.lightning_url}?${params.toString()}`;
+}
+
 async function fetchWithTimeout(url, timeoutMs = config.api.timeout_ms) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
@@ -83,6 +97,19 @@ function emptyAirportPayload(airport) {
   };
 }
 
+function emptyNationwidePayload() {
+  return {
+    summary: {
+      total_count: 0,
+      by_zone: { alert: 0, danger: 0, caution: 0 },
+      by_type: { ground: 0, cloud: 0 },
+      max_intensity: null,
+      latest_time: null
+    },
+    strikes: []
+  };
+}
+
 async function process() {
   const tm = getCurrentKstTm();
   const result = {
@@ -91,9 +118,11 @@ async function process() {
     query: {
       tm,
       itv_minutes: config.lightning.itv_minutes,
-      range_km: config.lightning.range_km
+      range_km: config.lightning.range_km,
+      nationwide_range_km: config.lightning.nationwide?.range_km || null
     },
-    airports: {}
+    airports: {},
+    nationwide: emptyNationwidePayload()
   };
 
   const previous = store.loadLatest(path.join(config.storage.base_path, "lightning"));
@@ -125,6 +154,35 @@ async function process() {
     }
   }
 
+  try {
+    const rawNationwide = await fetchWithTimeout(buildNationwideLightningUrl(tm));
+    const nationwidePoint = {
+      lat: config.lightning.nationwide?.lat,
+      lon: config.lightning.nationwide?.lon
+    };
+    const nationwideStrikes = lightningParser.parse(
+      rawNationwide,
+      nationwidePoint,
+      config.lightning.zones,
+      {
+        includeOutside: true,
+        forceZone: "nationwide"
+      }
+    );
+    result.nationwide = {
+      summary: summarize(nationwideStrikes),
+      strikes: nationwideStrikes
+    };
+  } catch (error) {
+    const previousNationwide = previous?.nationwide;
+    if (previousNationwide) {
+      result.nationwide = {
+        ...previousNationwide,
+        _stale: true
+      };
+    }
+  }
+
   const saveResult = store.save("lightning", result);
   const totalStrikes = Object.values(result.airports).reduce(
     (acc, airport) => acc + Number(airport?.summary?.total_count || 0),
@@ -136,6 +194,7 @@ async function process() {
     saved: saveResult.saved,
     filePath: saveResult.filePath || null,
     airports: Object.keys(result.airports).length,
+    nationwideStrikes: Number(result.nationwide?.summary?.total_count || 0),
     totalStrikes,
     failedAirports,
     airportErrors
