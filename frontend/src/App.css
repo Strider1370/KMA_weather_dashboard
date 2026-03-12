@@ -321,15 +321,73 @@ tr.row-danger td { background: #ffe9e7; }
 }
 .radar-seek-wrap {
   position: relative;
+  padding-top: 8px;
   padding-bottom: 14px;
   display: grid;
   grid-template-columns: auto 1fr;
   gap: 8px;
   align-items: center;
 }
+.radar-seek-track {
+  position: relative;
+  grid-column: 2;
+}
 .radar-seek {
   width: 100%;
   margin: 0;
+  accent-color: var(--accent);
+}
+.radar-seek.loop-active {
+  appearance: none;
+  background: transparent;
+  height: 14px;
+}
+.radar-seek.loop-active::-webkit-slider-runnable-track {
+  height: 6px;
+  background: linear-gradient(
+    to right,
+    var(--line) 0%,
+    var(--line) var(--loop-start-pct, 0%),
+    var(--accent) var(--loop-start-pct, 0%),
+    var(--accent) var(--loop-end-pct, 100%),
+    var(--line) var(--loop-end-pct, 100%),
+    var(--line) 100%
+  );
+  border-radius: 2px;
+}
+.radar-seek.loop-active::-webkit-slider-thumb {
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--accent);
+  border: 2px solid var(--accent);
+  margin-top: -4px;
+}
+.radar-seek.loop-active::-moz-range-track {
+  height: 6px;
+  background: linear-gradient(
+    to right,
+    var(--line) 0%,
+    var(--line) var(--loop-start-pct, 0%),
+    var(--accent) var(--loop-start-pct, 0%),
+    var(--accent) var(--loop-end-pct, 100%),
+    var(--line) var(--loop-end-pct, 100%),
+    var(--line) 100%
+  );
+  border-radius: 2px;
+}
+.radar-seek.loop-active::-moz-range-progress {
+  height: 6px;
+  background: transparent;
+  border-radius: 2px;
+}
+.radar-seek.loop-active::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--accent);
+  border: 2px solid var(--accent);
 }
 .radar-icon-inline {
   width: 30px;
@@ -355,6 +413,32 @@ tr.row-danger td { background: #ffe9e7; }
   pointer-events: none;
 }
 
+/* ── Radar Loop Section Markers ── */
+.radar-loop-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  user-select: none;
+  touch-action: none;
+}
+.radar-loop-handle {
+  position: absolute;
+  top: -11px;
+  transform: translateX(-50%);
+  font-size: 0.82rem;
+  line-height: 1;
+  color: #d4603a;
+  cursor: grab;
+  padding: 0;
+  pointer-events: auto;
+  transition: color 0.15s;
+}
+.radar-loop-handle:active {
+  cursor: grabbing;
+}
+.radar-loop-handle.active {
+  color: #b84f2f;
+}
 /* ── Alert Settings Button ── */
 .alert-settings-btn {
   position: static;

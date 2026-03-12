@@ -24,6 +24,8 @@ export default function Settings({
   setTimeZone,
   mapTheme,
   setMapTheme,
+  mapBoundaryDetail,
+  setMapBoundaryDetail,
 }) {
   const current = resolveSettings(defaults);
 
@@ -44,6 +46,7 @@ export default function Settings({
   const [localTimeZone, setLocalTimeZone] = useState(timeZone || "KST");
   const [radarOpacity, setRadarOpacity] = useState(() => parseFloat(localStorage.getItem("radar_overlay_opacity") || "0.6"));
   const [localMapTheme, setLocalMapTheme] = useState(mapTheme || localStorage.getItem("map_theme") || "light");
+  const [localMapBoundaryDetail, setLocalMapBoundaryDetail] = useState(mapBoundaryDetail || localStorage.getItem("map_boundary_detail") || "sido");
   const [activeTab, setActiveTab] = useState("general");
 
   const [triggers, setTriggers] = useState(() => {
@@ -93,8 +96,10 @@ export default function Settings({
     localStorage.setItem("time_zone", localTimeZone);
     localStorage.setItem("radar_overlay_opacity", radarOpacity);
     localStorage.setItem("map_theme", localMapTheme);
+    localStorage.setItem("map_boundary_detail", localMapBoundaryDetail);
     setTimeZone?.(localTimeZone);
     setMapTheme?.(localMapTheme);
+    setMapBoundaryDetail?.(localMapBoundaryDetail);
 
     onSettingsChange?.(overrides);
     onClose();
@@ -107,8 +112,10 @@ export default function Settings({
     localStorage.removeItem("time_zone");
     localStorage.removeItem("radar_overlay_opacity");
     localStorage.removeItem("map_theme");
+    localStorage.removeItem("map_boundary_detail");
     setTimeZone?.("KST");
     setMapTheme?.("light");
+    setMapBoundaryDetail?.("sido");
     onSettingsChange?.(null);
     onClose();
   }
@@ -168,6 +175,13 @@ export default function Settings({
                   <select value={localMapTheme} onChange={(e) => setLocalMapTheme(e.target.value)}>
                     <option value="light">화이트(기본)</option>
                     <option value="dark">다크</option>
+                  </select>
+                </label>
+                <label className="alert-settings-row">
+                  <span>경계 상세도</span>
+                  <select value={localMapBoundaryDetail} onChange={(e) => setLocalMapBoundaryDetail(e.target.value)}>
+                    <option value="sido">시도(기본)</option>
+                    <option value="sigungu">시군구</option>
                   </select>
                 </label>
                 <label className="alert-settings-row alert-settings-sub">

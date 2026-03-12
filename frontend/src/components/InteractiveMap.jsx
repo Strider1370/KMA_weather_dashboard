@@ -1,6 +1,7 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { MapContainer, GeoJSON, CircleMarker, Circle, Marker, Pane, ImageOverlay, Tooltip, useMap } from "react-leaflet";
 import L from "leaflet";
+import { feature as topoFeature } from "topojson-client";
 import "leaflet/dist/leaflet.css";
 
 const ZONE_RADII = [
@@ -122,6 +123,7 @@ export default function InteractiveMap({
   echoMeta = null,
   radarOpacity = 0.6,
   mapTheme = "dark",
+  boundaryDetail = "sido",
 }) {
   const [mapScope, setMapScope] = useState("airport");
   const [geoData, setGeoData] = useState(null);
@@ -133,29 +135,44 @@ export default function InteractiveMap({
   const [isPlaying, setIsPlaying] = useState(false);
   const [playbackMs, setPlaybackMs] = useState(DEFAULT_FRAME_MS);
   const [recenterKey, setRecenterKey] = useState(0);
+  const [loopStart, setLoopStart] = useState(0);
+  const [loopEnd, setLoopEnd] = useState(0);
+  const loopTrackRef = useRef(null);
+  const draggingRef = useRef(null); // "start" | "end" | null
   const isNationwide = mapScope === "nationwide";
   const timeRangeMin = 30;
 
   useEffect(() => {
     setGeoData(null);
-    fetch("/geo/korea_sido.v1.geojson")
-      .then((r) => r.json())
-      .then(setGeoData)
-      .catch(() => {});
-  }, []);
+    const objectName = boundaryDetail === "sigungu" ? "sigungu" : "sido";
+
+    fetch("/geo/korea_boundaries.v1.topojson")
+      .then((r) => {
+        if (!r.ok) throw new Error("topology not found");
+        return r.json();
+      })
+      .then((topology) => {
+        const objectDef = topology?.objects?.[objectName];
+        if (!objectDef) throw new Error(`missing topology object: ${objectName}`);
+        setGeoData(topoFeature(topology, objectDef));
+      })
+      .catch(() => {
+        const fallbackFile = objectName === "sigungu"
+          ? "/geo/korea_sigungu.v1.geojson"
+          : "/geo/korea_sido.v1.geojson";
+        fetch(fallbackFile)
+          .then((r) => r.json())
+          .then(setGeoData)
+          .catch(() => {});
+      });
+  }, [boundaryDetail]);
 
   useEffect(() => {
     setNeighborGeoData(null);
     fetch("/geo/korea_neighbors_masked.v1.geojson")
       .then((r) => r.json())
       .then((data) => {
-        const features = (data?.features || []).filter(
-          (feature) => feature?.properties?.layer === "neighbors"
-        );
-        setNeighborGeoData({
-          type: "FeatureCollection",
-          features,
-        });
+        setNeighborGeoData(data);
       })
       .catch(() => {});
   }, []);
@@ -167,11 +184,13 @@ export default function InteractiveMap({
   const arp = airportData?.arp || (airportMeta ? { lat: airportMeta.lat, lon: airportMeta.lon } : null);
   const strikes = airportData?.strikes || [];
 
-  const center = isNationwide
-    ? NATIONWIDE_CENTER
-    : arp
-      ? [arp.lat, arp.lon]
-      : DEFAULT_CENTER;
+  const center = useMemo(() => (
+    isNationwide
+      ? NATIONWIDE_CENTER
+      : arp
+        ? [arp.lat, arp.lon]
+        : DEFAULT_CENTER
+  ), [isNationwide, arp?.lat, arp?.lon]);
   const mapZoom = isNationwide ? NATIONWIDE_ZOOM : DEFAULT_ZOOM;
 
   const airportIcon = useMemo(() => {
@@ -191,9 +210,15 @@ export default function InteractiveMap({
   const visibleStrikes = useMemo(() => {
     const cutoff = Date.now() - timeRangeMin * 60 * 1000;
     const sourceStrikes = isNationwide
-      ? Object.entries(lightningData?.airports || {}).flatMap(([icao, data]) =>
-          (data?.strikes || []).map((strike) => ({ ...strike, airport: icao }))
-        )
+      ? (() => {
+          const nationwideStrikes = lightningData?.nationwide?.strikes;
+          if (Array.isArray(nationwideStrikes)) {
+            return nationwideStrikes;
+          }
+          return Object.entries(lightningData?.airports || {}).flatMap(([icao, data]) =>
+            (data?.strikes || []).map((strike) => ({ ...strike, airport: icao }))
+          );
+        })()
       : strikes;
 
     return sourceStrikes.filter((s) => {
@@ -246,12 +271,36 @@ export default function InteractiveMap({
         }
       : BOUNDARY_STYLE
   ), [mapTheme]);
+  const neighborBoundaryStyle = useMemo(() => (
+    mapTheme === "light"
+      ? {
+          fill: false,
+          color: "#111111",
+          weight: 0.8,
+          opacity: 0.55,
+        }
+      : {
+          fill: false,
+          color: "#00cc66",
+          weight: 0.6,
+          opacity: 0.4,
+        }
+  ), [mapTheme]);
   const echoFrames = useMemo(() => echoMeta?.frames || [], [echoMeta]);
   const currentFrame = echoFrames[frameIndex] || echoMeta?.nationwide || null;
   const maxIndex = Math.max(echoFrames.length - 1, 0);
   const progressRatio = maxIndex > 0 ? (frameIndex / maxIndex) : 0;
+  const loopStartPct = maxIndex > 0 ? (loopStart / maxIndex) * 100 : 0;
+  const loopEndPct = maxIndex > 0 ? (loopEnd / maxIndex) * 100 : 100;
   const canDecrementSpeed = playbackMs > MIN_FRAME_MS;
   const canIncrementSpeed = playbackMs < MAX_FRAME_MS;
+  const loopActive = loopStart !== 0 || loopEnd !== maxIndex;
+
+  // Clamp loop bounds when echoFrames change
+  useEffect(() => {
+    setLoopStart(0);
+    setLoopEnd(maxIndex);
+  }, [maxIndex]);
 
   useEffect(() => {
     if (!echoFrames.length) {
@@ -260,7 +309,11 @@ export default function InteractiveMap({
     }
 
     if (isPlaying) {
-      setFrameIndex((prev) => prev % echoFrames.length);
+      setFrameIndex((prev) => {
+        const clamped = Math.min(prev, maxIndex);
+        if (loopActive && (clamped < loopStart || clamped > loopEnd)) return loopStart;
+        return clamped;
+      });
       return;
     }
 
@@ -269,11 +322,62 @@ export default function InteractiveMap({
 
   useEffect(() => {
     if (!isPlaying || echoFrames.length <= 1) return undefined;
+    const effectiveStart = loopActive ? loopStart : 0;
+    const effectiveEnd = loopActive ? loopEnd : maxIndex;
     const timer = setInterval(() => {
-      setFrameIndex((prev) => (prev + 1) % echoFrames.length);
+      setFrameIndex((prev) => {
+        const next = prev + 1;
+        if (next > effectiveEnd) return effectiveStart;
+        return next;
+      });
     }, playbackMs);
     return () => clearInterval(timer);
-  }, [echoFrames.length, isPlaying, playbackMs]);
+  }, [echoFrames.length, isPlaying, playbackMs, loopStart, loopEnd, loopActive, maxIndex]);
+
+  const resolveLoopIndex = useCallback((clientX) => {
+    const track = loopTrackRef.current;
+    if (!track || maxIndex <= 0) return null;
+    const rect = track.getBoundingClientRect();
+    const ratio = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
+    return Math.round(ratio * maxIndex);
+  }, [maxIndex]);
+
+  const handleLoopPointerDown = useCallback((which, e) => {
+    e.preventDefault();
+    draggingRef.current = which;
+    let nextStart = loopStart;
+    let nextEnd = loopEnd;
+
+    const applyLoop = (start, end) => {
+      nextStart = start;
+      nextEnd = end;
+      setLoopStart(start);
+      setLoopEnd(end);
+    };
+
+    const onMove = (ev) => {
+      const idx = resolveLoopIndex(ev.clientX);
+      if (idx == null) return;
+      if (draggingRef.current === "start") {
+        applyLoop(Math.min(idx, nextEnd), nextEnd);
+      } else {
+        applyLoop(nextStart, Math.max(idx, nextStart));
+      }
+    };
+
+    const onUp = () => {
+      setFrameIndex((prev) => {
+        if (prev < nextStart || prev > nextEnd) return nextStart;
+        return prev;
+      });
+      draggingRef.current = null;
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+    };
+
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+  }, [resolveLoopIndex, loopStart, loopEnd]);
 
   useEffect(() => {
     if (!echoFrames.length) return undefined;
@@ -376,9 +480,15 @@ export default function InteractiveMap({
           <div className={`interactive-map-shell interactive-map-shell--${mapTheme}`}>
             {showLightning && (
               <div className="interactive-map-legend">
-                <span className="zone-tag alert">8km {summary.byZone.alert}</span>
-                <span className="zone-tag danger">16km {summary.byZone.danger}</span>
-                <span className="zone-tag caution">32km {summary.byZone.caution}</span>
+                {!isNationwide ? (
+                  <>
+                    <span className="zone-tag alert">8km {summary.byZone.alert}</span>
+                    <span className="zone-tag danger">16km {summary.byZone.danger}</span>
+                    <span className="zone-tag caution">32km {summary.byZone.caution}</span>
+                  </>
+                ) : (
+                  <span className="zone-tag caution">KR {summary.total}</span>
+                )}
                 {showTraffic && adsbData && (
                   <span className="zone-tag traffic">ACFT {visibleAircraft.length}</span>
                 )}
@@ -407,7 +517,7 @@ export default function InteractiveMap({
                 <GeoJSON
                   key="neighbors-boundary"
                   data={neighborGeoData}
-                  style={() => boundaryStyle}
+                  style={() => neighborBoundaryStyle}
                 />
               )}
             </Pane>
@@ -539,16 +649,42 @@ export default function InteractiveMap({
                 >
                   {isPlaying ? "❚❚" : "▶"}
                 </button>
-                <input
-                  className="radar-seek"
-                  type="range"
-                  min={0}
-                  max={maxIndex}
-                  step={1}
-                  value={Math.min(frameIndex, maxIndex)}
-                  onChange={(event) => setFrameIndex(Number(event.target.value))}
-                  aria-label="Radar timeline"
-                />
+                <div className="radar-seek-track" ref={loopTrackRef}>
+                  <input
+                    className={`radar-seek${loopActive ? " loop-active" : ""}`}
+                    type="range"
+                    min={0}
+                    max={maxIndex}
+                    step={1}
+                    value={Math.min(frameIndex, maxIndex)}
+                    onChange={(event) => setFrameIndex(Number(event.target.value))}
+                    style={loopActive ? {
+                      "--loop-start-pct": `${loopStartPct}%`,
+                      "--loop-end-pct": `${loopEndPct}%`,
+                    } : undefined}
+                    aria-label="Radar timeline"
+                  />
+                  {maxIndex > 1 && (
+                    <div className="radar-loop-overlay" aria-hidden="true">
+                      <div
+                        className={`radar-loop-handle radar-loop-handle--start${loopActive ? " active" : ""}`}
+                        style={{ left: `${loopStartPct}%` }}
+                        onPointerDown={(e) => handleLoopPointerDown("start", e)}
+                        title={`구간 시작: ${formatTmLabel(echoFrames[loopStart]?.tm)}`}
+                      >
+                        ▼
+                      </div>
+                      <div
+                        className={`radar-loop-handle radar-loop-handle--end${loopActive ? " active" : ""}`}
+                        style={{ left: `${loopEndPct}%` }}
+                        onPointerDown={(e) => handleLoopPointerDown("end", e)}
+                        title={`구간 종료: ${formatTmLabel(echoFrames[loopEnd]?.tm)}`}
+                      >
+                        ▼
+                      </div>
+                    </div>
+                  )}
+                </div>
                 <div className="radar-time-row">
                   <span
                     className="radar-current-time"
