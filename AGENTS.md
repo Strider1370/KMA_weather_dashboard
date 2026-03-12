@@ -165,8 +165,9 @@ Derived from `.editorconfig` + existing source files.
 - Some collectors are intentionally independent (not all use `api-client.js`).
 - ADS-B uses OpenSky `states/all` with bounding-box filtering and has a TLS fallback path for environments that surface `SELF_SIGNED_CERT_IN_CHAIN`.
 - `server.js` binds to `127.0.0.1`; expose externally via reverse proxy (nginx/LB), not direct app port.
-- If nginx serves `frontend/dist` directly, keep `.geojson` MIME handling correct (`application/geo+json`) and enable gzip/brotli for `.geojson`, `.json`, `.js`, and `.css` to reduce first-load payload size.
 - If nginx serves `frontend/dist` directly, keep both `.geojson` (`application/geo+json`) and `.topojson` (`application/topo+json`) MIME handling correct and enable gzip/brotli for `.geojson`, `.topojson`, `.json`, `.js`, and `.css`.
+- InteractiveMap boundary detail is auto-switched by zoom (`zoom >= 8`: sigungu, `zoom < 8`: sido); there is no user setting toggle anymore.
+- InteractiveMap renders nationwide lightning strikes in both Airport/Korea modes; Airport mode zone counters (8/16/32km) must remain based on selected-airport strikes.
 - In PowerShell, Korean UTF-8 files may render incorrectly with plain `Get-Content`.
 - When reading Korean text files, prefer explicit UTF-8 decoding:
   - `[Console]::OutputEncoding = [System.Text.Encoding]::UTF8`

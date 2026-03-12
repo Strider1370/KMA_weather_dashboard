@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef, useCallback } from "react";
+import { useState, useEffect, useMemo, useRef, useCallback, useReducer } from "react";
 import { MapContainer, GeoJSON, CircleMarker, Circle, Marker, Pane, ImageOverlay, Tooltip, useMap } from "react-leaflet";
 import L from "leaflet";
 import { feature as topoFeature } from "topojson-client";
@@ -22,6 +22,66 @@ const DEFAULT_CENTER = [36.5, 127.5];
 const DEFAULT_ZOOM = 10;
 const NATIONWIDE_CENTER = [36.2, 127.8];
 const NATIONWIDE_ZOOM = 6;
+const BOUNDARY_ZOOM_THRESHOLD = 8;
+
+// ── Module-level boundary cache (survives re-renders, zero re-fetch) ──
+const _boundaryCache = {
+  topology: null,       // raw TopoJSON object
+  sido: null,           // topoFeature result for sido
+  sigungu: null,        // topoFeature result for sigungu
+  neighbors: null,      // neighbor GeoJSON
+  loading: false,
+  promise: null,        // dedup concurrent fetches
+};
+
+function loadBoundaries() {
+  if (_boundaryCache.topology) return Promise.resolve(_boundaryCache);
+  if (_boundaryCache.promise) return _boundaryCache.promise;
+
+  _boundaryCache.loading = true;
+  _boundaryCache.promise = fetch("/geo/korea_boundaries.v1.topojson")
+    .then((r) => {
+      if (!r.ok) throw new Error("topology not found");
+      return r.json();
+    })
+    .then((topology) => {
+      _boundaryCache.topology = topology;
+      if (topology.objects?.sido) {
+        _boundaryCache.sido = topoFeature(topology, topology.objects.sido);
+      }
+      if (topology.objects?.sigungu) {
+        _boundaryCache.sigungu = topoFeature(topology, topology.objects.sigungu);
+      }
+      _boundaryCache.loading = false;
+      return _boundaryCache;
+    })
+    .catch(() => {
+      // fallback: try individual GeoJSON files
+      _boundaryCache.loading = false;
+      _boundaryCache.promise = null;
+      return Promise.all([
+        fetch("/geo/korea_sido.v1.geojson").then((r) => r.json()).catch(() => null),
+        fetch("/geo/korea_sigungu.v1.geojson").then((r) => r.json()).catch(() => null),
+      ]).then(([sido, sigungu]) => {
+        if (sido) _boundaryCache.sido = sido;
+        if (sigungu) _boundaryCache.sigungu = sigungu;
+        return _boundaryCache;
+      });
+    });
+
+  return _boundaryCache.promise;
+}
+
+function loadNeighbors() {
+  if (_boundaryCache.neighbors) return Promise.resolve(_boundaryCache.neighbors);
+  return fetch("/geo/korea_neighbors_masked.v1.geojson")
+    .then((r) => r.json())
+    .then((data) => {
+      _boundaryCache.neighbors = data;
+      return data;
+    })
+    .catch(() => null);
+}
 const DEFAULT_FRAME_MS = 500;
 const MIN_FRAME_MS = 100;
 const MAX_FRAME_MS = 2000;
@@ -53,6 +113,21 @@ function MapRecenter({ center, zoom, recenterKey }) {
   useEffect(() => {
     if (center) map.setView(center, zoom);
   }, [map, center, zoom, recenterKey]);
+  return null;
+}
+
+function ZoomBoundaryController({ onBoundaryChange }) {
+  const map = useMap();
+  useEffect(() => {
+    function handleZoom() {
+      const z = map.getZoom();
+      onBoundaryChange(z >= BOUNDARY_ZOOM_THRESHOLD ? "sigungu" : "sido");
+    }
+    // set initial value from current zoom
+    handleZoom();
+    map.on("zoomend", handleZoom);
+    return () => { map.off("zoomend", handleZoom); };
+  }, [map, onBoundaryChange]);
   return null;
 }
 
@@ -123,11 +198,10 @@ export default function InteractiveMap({
   echoMeta = null,
   radarOpacity = 0.6,
   mapTheme = "dark",
-  boundaryDetail = "sido",
 }) {
   const [mapScope, setMapScope] = useState("airport");
-  const [geoData, setGeoData] = useState(null);
-  const [neighborGeoData, setNeighborGeoData] = useState(null);
+  const [boundaryLevel, setBoundaryLevel] = useState("sido");
+  const [, forceRender] = useReducer((x) => x + 1, 0);
   const [showEcho, setShowEcho] = useState(true);
   const [showLightning, setShowLightning] = useState(true);
   const [showTraffic, setShowTraffic] = useState(false);
@@ -142,39 +216,18 @@ export default function InteractiveMap({
   const isNationwide = mapScope === "nationwide";
   const timeRangeMin = 30;
 
+  // Load boundaries + neighbors once; forceRender when ready
   useEffect(() => {
-    setGeoData(null);
-    const objectName = boundaryDetail === "sigungu" ? "sigungu" : "sido";
+    loadBoundaries().then(() => forceRender());
+    loadNeighbors().then(() => forceRender());
+  }, []);
 
-    fetch("/geo/korea_boundaries.v1.topojson")
-      .then((r) => {
-        if (!r.ok) throw new Error("topology not found");
-        return r.json();
-      })
-      .then((topology) => {
-        const objectDef = topology?.objects?.[objectName];
-        if (!objectDef) throw new Error(`missing topology object: ${objectName}`);
-        setGeoData(topoFeature(topology, objectDef));
-      })
-      .catch(() => {
-        const fallbackFile = objectName === "sigungu"
-          ? "/geo/korea_sigungu.v1.geojson"
-          : "/geo/korea_sido.v1.geojson";
-        fetch(fallbackFile)
-          .then((r) => r.json())
-          .then(setGeoData)
-          .catch(() => {});
-      });
-  }, [boundaryDetail]);
+  // Derive geoData directly from cache — no async, no stale closures
+  const geoData = _boundaryCache[boundaryLevel] || null;
+  const neighborGeoData = _boundaryCache.neighbors || null;
 
-  useEffect(() => {
-    setNeighborGeoData(null);
-    fetch("/geo/korea_neighbors_masked.v1.geojson")
-      .then((r) => r.json())
-      .then((data) => {
-        setNeighborGeoData(data);
-      })
-      .catch(() => {});
+  const handleBoundaryChange = useCallback((level) => {
+    setBoundaryLevel(level);
   }, []);
 
   const airportMeta = airports?.find((a) => a.icao === selectedAirport) || null;
@@ -207,25 +260,20 @@ export default function InteractiveMap({
     });
   }, [effectiveHdg, mapTheme]);
 
+  // All strikes for map rendering — always nationwide regardless of mode
   const visibleStrikes = useMemo(() => {
     const cutoff = Date.now() - timeRangeMin * 60 * 1000;
-    const sourceStrikes = isNationwide
-      ? (() => {
-          const nationwideStrikes = lightningData?.nationwide?.strikes;
-          if (Array.isArray(nationwideStrikes)) {
-            return nationwideStrikes;
-          }
-          return Object.entries(lightningData?.airports || {}).flatMap(([icao, data]) =>
-            (data?.strikes || []).map((strike) => ({ ...strike, airport: icao }))
-          );
-        })()
-      : strikes;
-
-    return sourceStrikes.filter((s) => {
+    const nationwideStrikes = lightningData?.nationwide?.strikes;
+    const source = Array.isArray(nationwideStrikes)
+      ? nationwideStrikes
+      : Object.entries(lightningData?.airports || {}).flatMap(([icao, data]) =>
+          (data?.strikes || []).map((strike) => ({ ...strike, airport: icao }))
+        );
+    return source.filter((s) => {
       const t = new Date(s.time).getTime();
       return Number.isFinite(t) && t >= cutoff;
     });
-  }, [isNationwide, lightningData, strikes, timeRangeMin]);
+  }, [lightningData, timeRangeMin]);
 
   const aircraft = useMemo(() => {
     return (adsbData?.aircraft || []).filter((item) => (
@@ -244,21 +292,29 @@ export default function InteractiveMap({
     ) <= AIRCRAFT_AIRPORT_RANGE_KM);
   }, [aircraft, arp, isNationwide]);
 
+  // Zone counts from per-airport data in airport mode; total always from nationwide
   const summary = useMemo(() => {
     const byZone = { alert: 0, danger: 0, caution: 0 };
     let latest = null;
     let nearest = null;
 
-    for (const strike of visibleStrikes) {
-      if (byZone[strike.zone] != null) byZone[strike.zone] += 1;
-      if (!latest || strike.time > latest) latest = strike.time;
-      if (strike.distance_km != null) {
-        nearest = nearest == null ? strike.distance_km : Math.min(nearest, strike.distance_km);
+    if (!isNationwide) {
+      const cutoff = Date.now() - timeRangeMin * 60 * 1000;
+      const airportStrikes = (strikes || []).filter((s) => {
+        const t = new Date(s.time).getTime();
+        return Number.isFinite(t) && t >= cutoff;
+      });
+      for (const strike of airportStrikes) {
+        if (byZone[strike.zone] != null) byZone[strike.zone] += 1;
+        if (!latest || strike.time > latest) latest = strike.time;
+        if (strike.distance_km != null) {
+          nearest = nearest == null ? strike.distance_km : Math.min(nearest, strike.distance_km);
+        }
       }
     }
 
     return { byZone, total: visibleStrikes.length, nearest, latest };
-  }, [visibleStrikes]);
+  }, [isNationwide, strikes, visibleStrikes, timeRangeMin]);
 
   const boundaryStyle = useMemo(() => (
     mapTheme === "light"
@@ -504,11 +560,12 @@ export default function InteractiveMap({
               className="interactive-map-container"
             >
               <MapRecenter center={center} zoom={mapZoom} recenterKey={recenterKey} />
+              <ZoomBoundaryController onBoundaryChange={handleBoundaryChange} />
 
             <Pane name="boundary-pane" style={{ zIndex: 350 }}>
               {geoData && (
                 <GeoJSON
-                  key="korea-sido-boundary"
+                  key={`korea-boundary-${boundaryLevel}`}
                   data={geoData}
                   style={() => boundaryStyle}
                 />

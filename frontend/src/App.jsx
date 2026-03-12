@@ -48,7 +48,6 @@ export default function App() {
   const [timeZone, setTimeZone] = useState(() => localStorage.getItem("time_zone") || "KST");
   const [radarOpacity, setRadarOpacity] = useState(() => parseFloat(localStorage.getItem("radar_overlay_opacity") || "0.6"));
   const [mapTheme, setMapTheme] = useState(() => localStorage.getItem("map_theme") || "light");
-  const [mapBoundaryDetail, setMapBoundaryDetail] = useState(() => localStorage.getItem("map_boundary_detail") || "sido");
 
   useEffect(() => {
     localStorage.setItem("metar_version", metarVersion);
@@ -65,10 +64,6 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem("map_theme", mapTheme);
   }, [mapTheme]);
-
-  useEffect(() => {
-    localStorage.setItem("map_boundary_detail", mapBoundaryDetail);
-  }, [mapBoundaryDetail]);
 
   useEffect(() => {
     if (selectedAirport) {
@@ -260,7 +255,6 @@ export default function App() {
     setTimeZone(localStorage.getItem("time_zone") || "KST");
     setRadarOpacity(parseFloat(localStorage.getItem("radar_overlay_opacity") || "0.6"));
     setMapTheme(localStorage.getItem("map_theme") || "light");
-    setMapBoundaryDetail(localStorage.getItem("map_boundary_detail") || "sido");
   }
 
   const settings = alertDefaults ? resolveSettings(alertDefaults) : null;
@@ -374,7 +368,6 @@ export default function App() {
                   echoMeta={data.echoMeta}
                   radarOpacity={radarOpacity}
                   mapTheme={mapTheme}
-                  boundaryDetail={mapBoundaryDetail}
                 />
               </div>
             </section>
@@ -391,8 +384,6 @@ export default function App() {
           setTimeZone={setTimeZone}
           mapTheme={mapTheme}
           setMapTheme={setMapTheme}
-          mapBoundaryDetail={mapBoundaryDetail}
-          setMapBoundaryDetail={setMapBoundaryDetail}
         />
       )}
     </>

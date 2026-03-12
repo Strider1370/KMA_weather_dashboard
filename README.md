@@ -261,8 +261,12 @@ $env:NODE_TLS_REJECT_UNAUTHORIZED="0"; node backend/test/run-once.js adsb
 ## 프론트 동작 메모
 
 - 기본 맵 테마는 `화이트(기본)`입니다.
+- 지도 경계는 확대/축소에 따라 자동 전환됩니다 (`zoom >= 8`: 시군구, `zoom < 8`: 시도).
+- 경계 데이터(`.v1.topojson`/`.v1.geojson`)는 브라우저 HTTP 캐시 + 프론트 메모리 캐시를 함께 사용해 전환 시 재요청을 최소화합니다.
 - 레이더 루프는 첫 진입 시 최신 프레임에서 일시정지 상태로 시작합니다.
 - `Traffic` 레이어는 기본적으로 꺼져 있습니다.
+- 낙뢰 마커는 Airport/Korea 모드 모두 전국(`nationwide`) 데이터를 표시합니다.
+- Airport 모드의 8km/16km/32km 카운트는 선택 공항 기준 zone 집계를 그대로 유지합니다.
 - 공항 선택은 경로별로 로컬 저장됩니다.
   - `/`: 기본 공항 `RKSI`, `TST1` 숨김
   - `/test`: 기본 공항 `TST1`, `TST1` 선택 가능

@@ -243,7 +243,7 @@ function serveStatic(req, res) {
   }
 
   const body = fs.readFileSync(filePath);
-  const versionedGeoPattern = /[\\/]geo[\\/].+\.v\d+\.geojson$/;
+  const versionedGeoPattern = /[\\/]geo[\\/].+\.v\d+\.(?:geo|topo)json$/;
   const cacheControl = versionedGeoPattern.test(filePath)
     ? "public, max-age=31536000, immutable"
     : "no-cache";
