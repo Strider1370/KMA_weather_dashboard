@@ -7,7 +7,11 @@
     "start": "node backend/src/index.js",
     "test": "node backend/test/run-once.js all",
     "dashboard": "node server.js",
-    "dev": "concurrently -n API,VITE -c blue,green \"node server.js\" \"npm run dev --prefix frontend\""
+    "dev": "concurrently -n API,VITE -c blue,green \"node server.js\" \"npm run dev --prefix frontend\"",
+    "geo:sido": "node scripts/generate-sido-geojson.js",
+    "geo:sigungu": "node scripts/generate-sigungu-geojson.js",
+    "geo:topo": "node scripts/generate-boundary-topojson.js",
+    "geo:neighbors": "node scripts/extract-neighbors-only-geojson.js"
   },
   "dependencies": {
     "dotenv": "^16.0.0",
@@ -18,6 +22,7 @@
   },
   "devDependencies": {
     "@turf/union": "^7.3.4",
-    "concurrently": "^9.2.1"
+    "concurrently": "^9.2.1",
+    "topojson-server": "^3.0.1"
   }
 }
