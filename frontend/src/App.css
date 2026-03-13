@@ -1095,13 +1095,76 @@ tr.row-danger td { background: #ffe9e7; }
   max-width: calc(100% - 24px);
 }
 
+.rainrate-legend {
+  position: absolute;
+  top: 12px;
+  right: 4px;
+  z-index: 700;
+  display: grid;
+  gap: 4px;
+  width: 48px;
+  padding: 6px 3px 6px 4px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid rgba(17, 24, 39, 0.18);
+  box-shadow: 0 10px 26px rgba(15, 23, 42, 0.2);
+  backdrop-filter: blur(4px);
+}
+
+.interactive-map-shell--dark .rainrate-legend {
+  background: rgba(248, 250, 252, 0.9);
+}
+
+.rainrate-legend-title {
+  font-size: 0.66rem;
+  font-weight: 800;
+  line-height: 1;
+  color: #111827;
+  text-align: right;
+}
+
+.rainrate-legend-scale {
+  display: grid;
+  gap: 0;
+}
+
+.rainrate-legend-row {
+  display: grid;
+  grid-template-columns: 1fr 9px;
+  align-items: center;
+  gap: 3px;
+  min-height: 14px;
+}
+
+.rainrate-legend-label {
+  font-size: 0.62rem;
+  line-height: 1;
+  text-align: right;
+  color: #111827;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+}
+
+.rainrate-legend-swatch {
+  display: block;
+  width: 9px;
+  min-width: 9px;
+  height: 14px;
+  border: 1px solid rgba(17, 24, 39, 0.12);
+}
+
 .interactive-map-panel .leaflet-top.leaflet-left {
-  left: auto;
-  right: 10px;
+  left: 10px;
+  right: auto;
+  top: auto;
+  bottom: 10px;
 }
 
 .interactive-map-panel .leaflet-top.leaflet-right {
-  right: 10px;
+  right: auto;
+  left: 10px;
+  top: auto;
+  bottom: 10px;
 }
 
 .radar-lightning-summary {
@@ -1115,4 +1178,11 @@ tr.row-danger td { background: #ffe9e7; }
 @media (max-width: 900px) {
   .lightning-head { flex-wrap: wrap; }
   .radar-controls { flex-wrap: wrap; }
+  .rainrate-legend {
+    top: auto;
+    bottom: 12px;
+    right: 2px;
+    transform: scale(0.92);
+    transform-origin: bottom right;
+  }
 }

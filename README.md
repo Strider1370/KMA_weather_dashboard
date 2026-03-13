@@ -22,6 +22,14 @@ KMA 항공기상 수집기 + 대시보드 프로젝트입니다.
 - 프론트엔드 모듈: ESM (`import`/`export`)
 - 저장소: 파일 기반 JSON + PNG 에셋 (`backend/data`)
 
+## 모듈 구조 메모
+
+- 현재 모듈 시스템은 의도적으로 혼합되어 있습니다.
+- 백엔드 수집기/파서는 CommonJS를 사용합니다.
+- `server.js`는 ESM으로 작성되어 있으며 `createRequire()`로 CommonJS 백엔드 모듈을 로드합니다.
+- 현재 동작상 결함으로 판단되지는 않지만, 추후 모듈 시스템 정리 여부는 별도 결정 사항입니다.
+- 리스크는 기능 변경 시 import/require 경계, 모듈 캐시 처리, 향후 `type: module` 전환 또는 테스트/번들 환경 변경 시 호환성 검토가 필요하다는 점입니다.
+
 ## 시스템 아키텍처
 
 ```text
@@ -170,6 +178,7 @@ API_AUTH_KEY=your_kma_key
 # LIGHTNING_API_URL=https://apihub.kma.go.kr/api/typ01/url/lgt_pnt.php
 # AMOS_API_URL=https://apihub.kma.go.kr/api/typ01/url/amos.php
 # RADAR_API_URL=https://apihub.kma.go.kr/api/typ04/url/rdr_cmp_file.php
+# RADAR_CMP_TYPE=hsr
 # ADSB_API_URL=https://opensky-network.org/api/states/all
 # ADSB_LAMIN=33
 # ADSB_LAMAX=39
@@ -261,9 +270,11 @@ $env:NODE_TLS_REJECT_UNAUTHORIZED="0"; node backend/test/run-once.js adsb
 ## 프론트 동작 메모
 
 - 기본 맵 테마는 `화이트(기본)`입니다.
-- 지도 경계는 확대/축소에 따라 자동 전환됩니다 (`zoom >= 8`: 시군구, `zoom < 8`: 시도).
+- 지도 경계는 확대/축소에 따라 자동 전환됩니다 (`zoom >= 9`: 시군구, `zoom < 9`: 시도).
 - 경계 데이터(`.v1.topojson`/`.v1.geojson`)는 브라우저 HTTP 캐시 + 프론트 메모리 캐시를 함께 사용해 전환 시 재요청을 최소화합니다.
 - 레이더 루프는 첫 진입 시 최신 프레임에서 일시정지 상태로 시작합니다.
+- 전국 레이더 에코는 `HSR` 바이너리를 사용하며, 반사도(`dBZ`)를 강수강도(`mm/h`)로 치환한 뒤 한반도 bbox 기준으로 재투영한 PNG를 오버레이합니다.
+- 레이더 오버레이의 `0.1 mm/h` 미만 영역은 투명 처리되어 다크 모드에서 밝은 테두리가 보이지 않도록 조정되어 있습니다.
 - `Traffic` 레이어는 기본적으로 꺼져 있습니다.
 - 낙뢰 마커는 Airport/Korea 모드 모두 전국(`nationwide`) 데이터를 표시합니다.
 - Airport 모드의 8km/16km/32km 카운트는 선택 공항 기준 zone 집계를 그대로 유지합니다.

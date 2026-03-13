@@ -4,6 +4,7 @@ const config = require("../config");
 const { parseRadarBinary, renderNationwideEcho } = require("../parsers/radar-echo-parser");
 
 let backgroundFillRunning = false;
+const RENDER_VERSION = "rainrate-reproject-v1";
 
 function ensureRadarDir() {
   const radarDir = path.join(config.storage.base_path, "radar");
@@ -38,7 +39,7 @@ function buildEchoUrl(tm) {
   const params = new URLSearchParams({
     tm,
     data: "bin",
-    cmp: "cpp",
+    cmp: config.radar_echo.cmp,
     authKey: config.api.auth_key,
   });
   return `${config.api.radar_url}?${params.toString()}`;
@@ -119,6 +120,8 @@ async function renderFrame(radarDir, tm) {
 
   return {
     tm,
+    cmp: config.radar_echo.cmp,
+    render_version: RENDER_VERSION,
     path: `/data/radar/${filename}`,
     bounds: nationwide.bounds,
     width: nationwide.width,
@@ -136,6 +139,8 @@ function writeMeta(radarDir, latestTm, frameTms, existingFrames) {
 
   const meta = {
     type: "RADAR_ECHO",
+    cmp: config.radar_echo.cmp,
+    render_version: RENDER_VERSION,
     updated_at: new Date().toISOString(),
     tm: latestTm,
     nationwide: frames.find((frame) => frame.tm === latestTm) || null,
@@ -211,8 +216,10 @@ async function process() {
   const frameTms = buildFrameTms(latestTm, frameCount);
 
   const existingMeta = loadExistingMeta(radarDir);
+  const sameCmp = existingMeta?.cmp === config.radar_echo.cmp;
+  const sameRenderVersion = existingMeta?.render_version === RENDER_VERSION;
   const existingFrames = new Map(
-    (existingMeta?.frames || []).map((frame) => [frame.tm, frame])
+    ((sameCmp && sameRenderVersion ? existingMeta?.frames : []) || []).map((frame) => [frame.tm, frame])
   );
   const missingTms = frameTms.filter((tm) => {
     const filename = `echo_korea_${tm}.png`;

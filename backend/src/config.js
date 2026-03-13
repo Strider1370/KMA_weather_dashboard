@@ -55,6 +55,7 @@ module.exports = {
     stale_tolerance_minutes: 60
   },
   radar_echo: {
+    cmp: (process.env.RADAR_CMP_TYPE || "hsr").toLowerCase(),
     delay_minutes: 10,
     max_images: 36,
     range_km: 100,

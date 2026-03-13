@@ -10,6 +10,33 @@ const ZONE_RADII = [
   { zone: "alert", km: 8, color: "#FF0000", label: "8km" },
 ];
 
+const RAINRATE_LEGEND = [
+  { label: "150", color: "rgb(51, 50, 59)" },
+  { label: "110", color: "rgb(2, 4, 138)" },
+  { label: "90", color: "rgb(75, 79, 170)" },
+  { label: "70", color: "rgb(178, 180, 219)" },
+  { label: "60", color: "rgb(141, 6, 219)" },
+  { label: "50", color: "rgb(174, 44, 250)" },
+  { label: "40", color: "rgb(201, 107, 248)" },
+  { label: "30", color: "rgb(223, 170, 250)" },
+  { label: "25", color: "rgb(174, 5, 7)" },
+  { label: "20", color: "rgb(202, 4, 6)" },
+  { label: "15", color: "rgb(246, 61, 4)" },
+  { label: "10", color: "rgb(237, 118, 7)" },
+  { label: "9", color: "rgb(211, 175, 10)" },
+  { label: "8", color: "rgb(237, 196, 10)" },
+  { label: "7", color: "rgb(251, 218, 32)" },
+  { label: "6", color: "rgb(254, 247, 19)" },
+  { label: "5", color: "rgb(18, 92, 5)" },
+  { label: "4", color: "rgb(7, 135, 6)" },
+  { label: "3", color: "rgb(6, 187, 8)" },
+  { label: "2", color: "rgb(8, 250, 8)" },
+  { label: "1.0", color: "rgb(4, 74, 231)" },
+  { label: "0.5", color: "rgb(6, 153, 238)" },
+  { label: "0.1", color: "rgb(8, 198, 246)" },
+  { label: "0.0", color: "rgb(247, 252, 249)" },
+];
+
 const BOUNDARY_STYLE = {
   fillColor: "#1e2d3d",
   color: "#00cc66",
@@ -22,7 +49,7 @@ const DEFAULT_CENTER = [36.5, 127.5];
 const DEFAULT_ZOOM = 10;
 const NATIONWIDE_CENTER = [36.2, 127.8];
 const NATIONWIDE_ZOOM = 6;
-const BOUNDARY_ZOOM_THRESHOLD = 8;
+const BOUNDARY_ZOOM_THRESHOLD = 9;
 
 // ── Module-level boundary cache (survives re-renders, zero re-fetch) ──
 const _boundaryCache = {
@@ -548,6 +575,23 @@ export default function InteractiveMap({
                 {showTraffic && adsbData && (
                   <span className="zone-tag traffic">ACFT {visibleAircraft.length}</span>
                 )}
+              </div>
+            )}
+            {showEcho && echoInfo && (
+              <div className="rainrate-legend" aria-label="Radar rain rate legend">
+                <div className="rainrate-legend-title">mm/h</div>
+                <div className="rainrate-legend-scale">
+                  {RAINRATE_LEGEND.map((entry) => (
+                    <div key={entry.label} className="rainrate-legend-row">
+                      <span className="rainrate-legend-label">{entry.label}</span>
+                      <span
+                        className="rainrate-legend-swatch"
+                        style={{ backgroundColor: entry.color }}
+                        aria-hidden="true"
+                      />
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
             <MapContainer
