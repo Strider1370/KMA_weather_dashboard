@@ -17,6 +17,7 @@ import {
   resolveSettings,
   setAlertCallback,
 } from "./utils/alerts";
+import { formatUtc, getFlightCategory } from "./utils/helpers";
 import Header from "./components/Header";
 import MetarCard from "./components/MetarCard";
 import WarningList from "./components/WarningList";
@@ -42,20 +43,12 @@ export default function App() {
   const [activeAlerts, setActiveAlerts] = useState([]);
   const [showSettings, setShowSettings] = useState(false);
 
-  // UI Version states
-  const [metarVersion, setMetarVersion] = useState(() => localStorage.getItem("metar_version") || "v1");
-  const [tafVersion, setTafVersion] = useState(() => localStorage.getItem("taf_version") || "v1");
+  // UI Version states (kept for dead-code paths in MetarCard/TafTimeline)
+  const [metarVersion] = useState("v2");
+  const [tafVersion] = useState("v2");
   const [timeZone, setTimeZone] = useState(() => localStorage.getItem("time_zone") || "KST");
   const radarOpacity = 1;
   const [mapTheme, setMapTheme] = useState(() => localStorage.getItem("map_theme") || "light");
-
-  useEffect(() => {
-    localStorage.setItem("metar_version", metarVersion);
-  }, [metarVersion]);
-
-  useEffect(() => {
-    localStorage.setItem("taf_version", tafVersion);
-  }, [tafVersion]);
 
   useEffect(() => {
     localStorage.setItem("time_zone", timeZone);
@@ -246,12 +239,7 @@ export default function App() {
   }
 
   function handleSettingsChange() {
-    // 설정 변경 시 alertDefaults를 다시 로드하여 resolveSettings가 새 값을 반영
     loadAlertDefaults().then((defaults) => setAlertDefaults({ ...defaults }));
-    
-    // UI 버전 상태도 localStorage에서 다시 읽어옴
-    setMetarVersion(localStorage.getItem("metar_version") || "v1");
-    setTafVersion(localStorage.getItem("taf_version") || "v1");
     setTimeZone(localStorage.getItem("time_zone") || "KST");
     setMapTheme(localStorage.getItem("map_theme") || "light");
   }
@@ -276,16 +264,24 @@ export default function App() {
     .sort();
   const airportList = [...orderedAirports, ...remainingAirports];
 
-  const lastUpdated = [data.metar?.fetched_at, data.taf?.fetched_at, data.warning?.fetched_at, data.lightning?.fetched_at, data.adsb?.updated_at, data.echoMeta?.updated_at]
-    .filter(Boolean)
-    .sort()
-    .pop() || null;
+  // Flight category from current METAR
+  const metarTarget = data.metar?.airports?.[selectedAirport];
+  const metarVis = metarTarget?.observation?.visibility?.value ?? null;
+  const metarClouds = metarTarget?.observation?.clouds || [];
+  const metarCeiling = metarClouds
+    .filter(c => c.amount === "BKN" || c.amount === "OVC")
+    .sort((a, b) => (a.base ?? Infinity) - (b.base ?? Infinity))[0]?.base ?? null;
+  const flightCat = getFlightCategory(metarVis, metarCeiling);
+
+  const metarTime = (() => {
+    const t = metarTarget?.header?.issue_time || metarTarget?.header?.observation_time;
+    if (!t) return "";
+    const reportType = metarTarget?.header?.report_type || "METAR";
+    return `${formatUtc(t, timeZone)} ${reportType}`;
+  })();
 
   return (
     <>
-      <div className="bg-shape shape-a" />
-      <div className="bg-shape shape-b" />
-
       {/* Alert UI components */}
       {settings && (
         <>
@@ -305,74 +301,87 @@ export default function App() {
         </>
       )}
 
-      <main className="container">
-        <Header
-          lastUpdated={lastUpdated}
-          onSettingsClick={() => setShowSettings(true)}
-          airports={airportList}
-          selectedAirport={selectedAirport}
-          onAirportChange={setSelectedAirport}
-          tz={timeZone}
-        />
-
-        {loading && !data.metar && (
+      {loading && !data.metar && (
+        <div className="loading-overlay">
           <p className="loading-message">Loading data...</p>
-        )}
+        </div>
+      )}
 
-        {error && (
+      {error && (
+        <div className="loading-overlay">
           <p className="error-message">Load failed: {error}</p>
-        )}
+        </div>
+      )}
 
-        {data.metar && (
-          <>
-            <section className="dashboard-layout">
-              <div className="primary-column">
-                <div className="dashboard-top-row">
-                  <MetarCard
-                    metarData={data.metar}
-                    icao={selectedAirport}
-                    version={metarVersion}
-                    onVersionToggle={setMetarVersion}
-                    tz={timeZone}
-                  />
-                  <WarningList
-                    warningData={data.warning}
-                    icao={selectedAirport}
-                    warningTypes={data.warningTypes}
-                    tz={timeZone}
-                  />
-                </div>
-                <div className="dashboard-bottom-row">
-                  <TafTimeline
-                    tafData={data.taf}
-                    icao={selectedAirport}
-                    version={tafVersion}
-                    onVersionToggle={setTafVersion}
-                    tz={timeZone}
-                  />
-                </div>
-              </div>
+      {data.metar && (
+        <div className="dashboard-root">
+          {/* Row 1 left: Header */}
+          <div className="left-panel-header">
+            <Header
+              airports={airportList}
+              selectedAirport={selectedAirport}
+              onAirportChange={setSelectedAirport}
+              metarTime={metarTime}
+              flightCategory={flightCat}
+            />
+          </div>
 
-              <div className="secondary-column">
-                <InteractiveMap
-                  lightningData={data.lightning}
-                  adsbData={data.adsb}
-                  selectedAirport={selectedAirport}
-                  airports={data.airports}
-                  windDir={(() => {
-                    const w = data.metar?.airports?.[selectedAirport]?.observation?.wind;
-                    if (!w || w.calm || w.variable) return null;
-                    return w.direction;
-                  })()}
-                  echoMeta={data.echoMeta}
-                  radarOpacity={radarOpacity}
-                  mapTheme={mapTheme}
-                />
-              </div>
-            </section>
-          </>
-        )}
-      </main>
+          {/* Row 1 right: Settings icon */}
+          <div className="right-panel-top">
+            <button
+              className="settings-icon-btn"
+              onClick={() => setShowSettings(true)}
+              title="설정"
+              aria-label="설정"
+            >
+              &#8943;
+            </button>
+          </div>
+
+          {/* Row 2 left: Warning + Metrics + TAF */}
+          <div className="left-panel-body">
+            <WarningList
+              warningData={data.warning}
+              icao={selectedAirport}
+              warningTypes={data.warningTypes}
+              tz={timeZone}
+            />
+
+            <MetarCard
+              metarData={data.metar}
+              icao={selectedAirport}
+              version={metarVersion}
+              tz={timeZone}
+            />
+
+            <TafTimeline
+              tafData={data.taf}
+              icao={selectedAirport}
+              version={tafVersion}
+              tz={timeZone}
+            />
+          </div>
+
+          {/* Row 2 right: Map panel */}
+          <div className="map-panel-wrap">
+            <div className="map-panel-title">기상 레이더</div>
+            <InteractiveMap
+              lightningData={data.lightning}
+              adsbData={data.adsb}
+              selectedAirport={selectedAirport}
+              airports={data.airports}
+              windDir={(() => {
+                const w = data.metar?.airports?.[selectedAirport]?.observation?.wind;
+                if (!w || w.calm || w.variable) return null;
+                return w.direction;
+              })()}
+              echoMeta={data.echoMeta}
+              radarOpacity={radarOpacity}
+              mapTheme={mapTheme}
+            />
+          </div>
+        </div>
+      )}
 
       {showSettings && alertDefaults && (
         <Settings

@@ -112,3 +112,27 @@ export function computeFeelsLikeC({ tempC, dewpointC, windKt, observedAt }) {
   const value = 13.12 + 0.6215 * tempC - 11.37 * v16 + 0.3965 * v16 * tempC;
   return { value: Number.isFinite(value) ? value : null, season: "winter" };
 }
+
+/**
+ * Flight Category 판정 (METAR/TAF 공통)
+ * @param {number|null} visibilityM - 시정 (미터)
+ * @param {number|null} ceilingFt  - 운고 (피트), BKN/OVC 최저 base. null/NSC = unlimited
+ * @returns {{ category: string, color: string }}
+ */
+export function getFlightCategory(visibilityM, ceilingFt) {
+  const vis = Number.isFinite(visibilityM) ? visibilityM : 99999;
+  const ceil = Number.isFinite(ceilingFt) ? ceilingFt : 99999;
+
+  const CATEGORIES = [
+    { name: "LIFR", color: "#7c3aed", maxVis: 1600, maxCeil: 500 },
+    { name: "IFR",  color: "#dc2626", maxVis: 4800, maxCeil: 1000 },
+    { name: "MVFR", color: "#2563eb", maxVis: 8000, maxCeil: 3000 },
+  ];
+
+  for (const cat of CATEGORIES) {
+    if (vis < cat.maxVis || ceil < cat.maxCeil) {
+      return { category: cat.name, color: cat.color };
+    }
+  }
+  return { category: "VFR", color: "#15803d" };
+}

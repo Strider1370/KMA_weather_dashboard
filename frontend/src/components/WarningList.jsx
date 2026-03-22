@@ -28,37 +28,35 @@ export default function WarningList({ warningData, icao, warningTypes, tz = "UTC
   const block = warningData?.airports?.[icao];
   const list = block?.warnings || [];
 
-  return (
-    <article className="panel">
-      <h3>공항경보</h3>
-      <div className="warning-list">
-        {list.length === 0 ? (
-          <div className="warning-item">
-            <strong>유효한 경보 없음</strong>
-            <span>현재 발효 중인 공항경보가 없습니다.</span>
-          </div>
-        ) : (
-          list.map((item, i) => {
-            const meta = warningMeta(item.wrng_type, warningTypes || {}) || {};
-            const color = meta.color || "#d4603a";
-            const key = item.wrng_type_key === "UNKNOWN" && meta.key ? meta.key : item.wrng_type_key;
-            const name = WARNING_NAME_KO[key] || safe(item.wrng_type_name) || "미확인경보";
-            const validRange = `${formatValidTime(item.valid_start, tz)} ~ ${formatValidTime(item.valid_end, tz)}`;
-
-            return (
-              <article
-                key={i}
-                className="warning-item"
-                style={{ borderLeftColor: color, background: `${color}18` }}
-              >
-                <strong>{safe(name)}</strong>
-                <span className="warning-time-label">유효시간</span>
-                <span className="warning-time-value">{validRange}</span>
-              </article>
-            );
-          })
-        )}
+  if (list.length === 0) {
+    return (
+      <div className="warning-banner warning-banner--ok">
+        <span className="warning-banner-icon">&#10003;</span>
+        <span>경보 없음</span>
       </div>
-    </article>
+    );
+  }
+
+  return (
+    <div className="warning-banner warning-banner--danger">
+      <span className="warning-banner-icon">&#9888;</span>
+      <span>
+        {list.map((item, i) => {
+          const meta = warningMeta(item.wrng_type, warningTypes || {}) || {};
+          const key = item.wrng_type_key === "UNKNOWN" && meta.key ? meta.key : item.wrng_type_key;
+          const name = WARNING_NAME_KO[key] || safe(item.wrng_type_name) || "미확인경보";
+          return (
+            <span key={i}>
+              {i > 0 && " / "}
+              <strong>{name}</strong>
+              {" "}
+              <span className="warning-banner-time">
+                {formatValidTime(item.valid_start, tz)} ~ {formatValidTime(item.valid_end, tz)}
+              </span>
+            </span>
+          );
+        })}
+      </span>
+    </div>
   );
 }

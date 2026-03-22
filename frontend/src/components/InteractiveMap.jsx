@@ -668,7 +668,7 @@ export default function InteractiveMap({
   }, [radarCoverageBoundary]);
 
   return (
-    <aside className="panel lightning-panel interactive-map-panel">
+    <aside className={`panel lightning-panel interactive-map-panel ${isNationwide ? "interactive-map-panel--korea" : "interactive-map-panel--airport"}`}>
       <div className="lightning-head">
         <div className="panel-switch map-scope-switch" role="tablist" aria-label="Map scope">
           <button
@@ -679,7 +679,7 @@ export default function InteractiveMap({
               setRecenterKey((prev) => prev + 1);
             }}
           >
-            Airport
+            공항
           </button>
           <button
             type="button"
@@ -689,7 +689,7 @@ export default function InteractiveMap({
               setRecenterKey((prev) => prev + 1);
             }}
           >
-            Korea
+            전국
           </button>
         </div>
         <div className="time-range">
@@ -698,7 +698,7 @@ export default function InteractiveMap({
             className={`range-btn ${showLightning ? "active" : ""}`}
             onClick={() => setShowLightning((v) => !v)}
           >
-            Lightning
+            낙뢰
           </button>
           <button
             type="button"
@@ -707,16 +707,7 @@ export default function InteractiveMap({
             title={echoInfo ? `Radar echo (${echoInfo.echoCount} px)` : isNationwide ? "Nationwide radar overlay unavailable" : "Radar echo unavailable"}
             disabled={!echoInfo}
           >
-            RDR
-          </button>
-          <button
-            type="button"
-            className={`range-btn ${showTraffic ? "active" : ""}`}
-            onClick={() => setShowTraffic((v) => !v)}
-            title={adsbData ? `ADS-B traffic (${visibleAircraft.length})` : "Traffic layer unavailable"}
-            disabled={!adsbData}
-          >
-            Traffic
+            강수에코
           </button>
         </div>
       </div>
@@ -725,7 +716,7 @@ export default function InteractiveMap({
         <p className="sub">Lightning data unavailable for this airport.</p>
       ) : (
         <>
-          <div className={`interactive-map-shell interactive-map-shell--${mapTheme}`}>
+          <div className={`interactive-map-shell interactive-map-shell--${mapTheme} ${isNationwide ? "interactive-map-shell--korea" : "interactive-map-shell--airport"}`}>
             {showLightning && (
               <div className="interactive-map-legend">
                 {!isNationwide ? (
@@ -759,15 +750,15 @@ export default function InteractiveMap({
                 </div>
               </div>
             )}
-            <MapContainer
-              key={`interactive-map-${mapTheme}-${mapScope}`}
-              center={center}
-              zoom={mapZoom}
-              scrollWheelZoom={true}
-              zoomControl={true}
-              attributionControl={false}
-              className="interactive-map-container"
-            >
+              <MapContainer
+                key={`interactive-map-${mapTheme}-${mapScope}`}
+                center={center}
+                zoom={mapZoom}
+                scrollWheelZoom={true}
+                zoomControl={true}
+                attributionControl={false}
+                className={`interactive-map-container ${isNationwide ? "interactive-map-container--korea" : "interactive-map-container--airport"}`}
+              >
               <MapRecenter center={center} zoom={mapZoom} recenterKey={recenterKey} />
               <ZoomBoundaryController onBoundaryChange={handleBoundaryChange} />
 
