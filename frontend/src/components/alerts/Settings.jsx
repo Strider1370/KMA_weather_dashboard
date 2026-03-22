@@ -42,7 +42,6 @@ export default function Settings({
   const [metarVersion, setMetarVersion] = useState(() => localStorage.getItem("metar_version") || "v1");
   const [tafVersion, setTafVersion] = useState(() => localStorage.getItem("taf_version") || "v1");
   const [localTimeZone, setLocalTimeZone] = useState(timeZone || "KST");
-  const [radarOpacity, setRadarOpacity] = useState(() => parseFloat(localStorage.getItem("radar_overlay_opacity") || "0.6"));
   const [localMapTheme, setLocalMapTheme] = useState(mapTheme || localStorage.getItem("map_theme") || "light");
   const [activeTab, setActiveTab] = useState("general");
 
@@ -91,7 +90,6 @@ export default function Settings({
     localStorage.setItem("metar_version", metarVersion);
     localStorage.setItem("taf_version", tafVersion);
     localStorage.setItem("time_zone", localTimeZone);
-    localStorage.setItem("radar_overlay_opacity", radarOpacity);
     localStorage.setItem("map_theme", localMapTheme);
     setTimeZone?.(localTimeZone);
     setMapTheme?.(localMapTheme);
@@ -105,7 +103,6 @@ export default function Settings({
     localStorage.removeItem("metar_version");
     localStorage.removeItem("taf_version");
     localStorage.removeItem("time_zone");
-    localStorage.removeItem("radar_overlay_opacity");
     localStorage.removeItem("map_theme");
     setTimeZone?.("KST");
     setMapTheme?.("light");
@@ -169,17 +166,6 @@ export default function Settings({
                     <option value="light">화이트(기본)</option>
                     <option value="dark">다크</option>
                   </select>
-                </label>
-                <label className="alert-settings-row alert-settings-sub">
-                  <span>레이더 투명도 ({Math.round(radarOpacity * 100)}%)</span>
-                  <input
-                    type="range"
-                    min={0.1}
-                    max={0.9}
-                    step={0.1}
-                    value={radarOpacity}
-                    onChange={(e) => setRadarOpacity(parseFloat(e.target.value))}
-                  />
                 </label>
               </fieldset>
             )}

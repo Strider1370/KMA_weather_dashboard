@@ -1,10 +1,10 @@
 const fs = require("fs");
 const path = require("path");
 const config = require("../config");
-const { parseRadarBinary, renderNationwideEcho } = require("../parsers/radar-echo-parser");
+const { parseRadarBinary, renderFullCoverageEcho } = require("../parsers/radar-echo-parser");
 
 let backgroundFillRunning = false;
-const RENDER_VERSION = "rainrate-reproject-v1";
+const RENDER_VERSION = "rainrate-reproject-full-v2";
 
 function ensureRadarDir() {
   const radarDir = path.join(config.storage.base_path, "radar");
@@ -115,7 +115,7 @@ async function renderFrame(radarDir, tm) {
   if (!gzBuffer) return null;
 
   const { refl } = parseRadarBinary(gzBuffer);
-  const nationwide = await renderNationwideEcho(refl);
+  const nationwide = await renderFullCoverageEcho(refl);
   fs.writeFileSync(filePath, nationwide.pngBuffer);
 
   return {

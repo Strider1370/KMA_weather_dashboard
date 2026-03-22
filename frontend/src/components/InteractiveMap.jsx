@@ -1,7 +1,8 @@
 import { useState, useEffect, useMemo, useRef, useCallback, useReducer } from "react";
-import { MapContainer, GeoJSON, CircleMarker, Circle, Marker, Pane, ImageOverlay, Tooltip, useMap } from "react-leaflet";
+import { MapContainer, GeoJSON, CircleMarker, Circle, Marker, Pane, ImageOverlay, Polygon, Tooltip, useMap } from "react-leaflet";
 import L from "leaflet";
 import { feature as topoFeature } from "topojson-client";
+import { circle as turfCircle, featureCollection, union as turfUnion } from "@turf/turf";
 import "leaflet/dist/leaflet.css";
 
 const ZONE_RADII = [
@@ -45,11 +46,47 @@ const BOUNDARY_STYLE = {
   fillOpacity: 0.8,
 };
 
+const BOUNDARY_CASE_DARK = {
+  fill: false,
+  color: "#05090f",
+  weight: 3.2,
+  opacity: 0.84,
+};
+
+const BOUNDARY_LINE_DARK = {
+  fill: false,
+  color: "#9be2b8",
+  weight: 1.3,
+  opacity: 0.98,
+};
+
 const DEFAULT_CENTER = [36.5, 127.5];
 const DEFAULT_ZOOM = 10;
 const NATIONWIDE_CENTER = [36.2, 127.8];
 const NATIONWIDE_ZOOM = 6;
 const BOUNDARY_ZOOM_THRESHOLD = 9;
+
+const RADAR_SITES = [
+  { name: "백령도", coords: [124.629309, 37.966937], radiusKm: 240 },
+  { name: "광덕산", coords: [127.433582, 38.117112], radiusKm: 240 },
+  { name: "강릉", coords: [128.865815, 37.817706], radiusKm: 280 },
+  { name: "관악산", coords: [126.945743, 37.455594], radiusKm: 240 },
+  { name: "오성산", coords: [126.784179, 36.013268], radiusKm: 240 },
+  { name: "면봉산", coords: [128.997306, 36.179395], radiusKm: 285 },
+  { name: "진도", coords: [126.323801, 34.47255], radiusKm: 240 },
+  { name: "구덕산", coords: [128.999739, 35.118713], radiusKm: 240 },
+  { name: "성산", coords: [126.880259, 33.386949], radiusKm: 240 },
+  { name: "고산", coords: [126.162982, 33.294199], radiusKm: 240 },
+  { name: "영종도(인천공항)", coords: [126.363055, 37.465224], radiusKm: 120 },
+];
+
+const WORLD_OUTER_RING = [
+  [85, -180],
+  [85, 180],
+  [-85, 180],
+  [-85, -180],
+  [85, -180],
+];
 
 // ── Module-level boundary cache (survives re-renders, zero re-fetch) ──
 const _boundaryCache = {
@@ -148,7 +185,7 @@ function ZoomBoundaryController({ onBoundaryChange }) {
   useEffect(() => {
     function handleZoom() {
       const z = map.getZoom();
-      onBoundaryChange(z >= BOUNDARY_ZOOM_THRESHOLD ? "sigungu" : "sido");
+      onBoundaryChange(z >= BOUNDARY_ZOOM_THRESHOLD ? "sigungu" : "sido", z);
     }
     // set initial value from current zoom
     handleZoom();
@@ -228,6 +265,7 @@ export default function InteractiveMap({
 }) {
   const [mapScope, setMapScope] = useState("airport");
   const [boundaryLevel, setBoundaryLevel] = useState("sido");
+  const [currentZoom, setCurrentZoom] = useState(NATIONWIDE_ZOOM);
   const [, forceRender] = useReducer((x) => x + 1, 0);
   const [showEcho, setShowEcho] = useState(true);
   const [showLightning, setShowLightning] = useState(true);
@@ -253,8 +291,11 @@ export default function InteractiveMap({
   const geoData = _boundaryCache[boundaryLevel] || null;
   const neighborGeoData = _boundaryCache.neighbors || null;
 
-  const handleBoundaryChange = useCallback((level) => {
+  const handleBoundaryChange = useCallback((level, zoom) => {
     setBoundaryLevel(level);
+    if (typeof zoom === "number" && Number.isFinite(zoom)) {
+      setCurrentZoom(zoom);
+    }
   }, []);
 
   const airportMeta = airports?.find((a) => a.icao === selectedAirport) || null;
@@ -272,6 +313,35 @@ export default function InteractiveMap({
         : DEFAULT_CENTER
   ), [isNationwide, arp?.lat, arp?.lon]);
   const mapZoom = isNationwide ? NATIONWIDE_ZOOM : DEFAULT_ZOOM;
+
+  useEffect(() => {
+    setCurrentZoom(mapZoom);
+  }, [mapZoom]);
+
+  const strokeProfile = useMemo(() => {
+    if (currentZoom < 7) {
+      return {
+        caseWeight: 2.3,
+        caseOpacity: 0.72,
+        lineWeight: 1,
+        lineOpacity: 0.9,
+      };
+    }
+    if (currentZoom < 9) {
+      return {
+        caseWeight: 2.9,
+        caseOpacity: 0.8,
+        lineWeight: 1.2,
+        lineOpacity: 0.94,
+      };
+    }
+    return {
+      caseWeight: 3.4,
+      caseOpacity: 0.88,
+      lineWeight: 1.4,
+      lineOpacity: 0.98,
+    };
+  }, [currentZoom]);
 
   const airportIcon = useMemo(() => {
     const rotation = effectiveHdg - 90;
@@ -364,11 +434,68 @@ export default function InteractiveMap({
         }
       : {
           fill: false,
-          color: "#00cc66",
-          weight: 0.6,
-          opacity: 0.4,
+          color: "#2ea56b",
+          weight: 0.8,
+          opacity: 0.58,
         }
   ), [mapTheme]);
+  const boundaryCaseStyle = useMemo(() => (
+    mapTheme === "light"
+      ? {
+          fill: false,
+          color: "#ffffff",
+          weight: strokeProfile.caseWeight,
+          opacity: Math.min(1, strokeProfile.caseOpacity + 0.1),
+        }
+      : {
+          ...BOUNDARY_CASE_DARK,
+          weight: strokeProfile.caseWeight,
+          opacity: strokeProfile.caseOpacity,
+        }
+  ), [mapTheme, strokeProfile]);
+  const boundaryLineStyle = useMemo(() => (
+    mapTheme === "light"
+      ? {
+          fill: false,
+          color: "#111111",
+          weight: strokeProfile.lineWeight,
+          opacity: strokeProfile.lineOpacity,
+        }
+      : {
+          ...BOUNDARY_LINE_DARK,
+          weight: strokeProfile.lineWeight,
+          opacity: strokeProfile.lineOpacity,
+        }
+  ), [mapTheme, strokeProfile]);
+  const neighborBoundaryCaseStyle = useMemo(() => (
+    mapTheme === "light"
+      ? {
+          fill: false,
+          color: "#ffffff",
+          weight: Math.max(1.5, strokeProfile.caseWeight - 0.4),
+          opacity: Math.max(0.75, strokeProfile.caseOpacity),
+        }
+      : {
+          fill: false,
+          color: "#0b1320",
+          weight: Math.max(1.5, strokeProfile.caseWeight - 0.4),
+          opacity: Math.max(0.55, strokeProfile.caseOpacity - 0.06),
+        }
+  ), [mapTheme, strokeProfile]);
+  const neighborBoundaryLineStyle = useMemo(() => (
+    mapTheme === "light"
+      ? {
+          fill: false,
+          color: "#111111",
+          weight: Math.max(0.65, strokeProfile.lineWeight - 0.15),
+          opacity: Math.max(0.72, strokeProfile.lineOpacity - 0.08),
+        }
+      : {
+          ...neighborBoundaryStyle,
+          weight: Math.max(0.65, strokeProfile.lineWeight - 0.15),
+          opacity: Math.max(0.55, strokeProfile.lineOpacity - 0.12),
+        }
+  ), [mapTheme, neighborBoundaryStyle, strokeProfile]);
   const echoFrames = useMemo(() => echoMeta?.frames || [], [echoMeta]);
   const currentFrame = echoFrames[frameIndex] || echoMeta?.nationwide || null;
   const maxIndex = Math.max(echoFrames.length - 1, 0);
@@ -502,6 +629,44 @@ export default function InteractiveMap({
     };
   }, [currentFrame, echoMeta]);
 
+  const radarCoverageBoundary = useMemo(() => {
+    if (!RADAR_SITES.length) return null;
+
+    const siteCircles = RADAR_SITES.map((site) => (
+      turfCircle(site.coords, site.radiusKm, { steps: 96, units: "kilometers" })
+    ));
+    let merged = siteCircles[0];
+
+    for (let i = 1; i < siteCircles.length; i++) {
+      const mergedResult = turfUnion(featureCollection([merged, siteCircles[i]]));
+      if (mergedResult) merged = mergedResult;
+    }
+
+    return merged;
+  }, []);
+
+  const radarOutsideMaskPositions = useMemo(() => {
+    if (!radarCoverageBoundary?.geometry) return null;
+
+    const holes = [];
+    const { geometry } = radarCoverageBoundary;
+
+    if (geometry.type === "Polygon") {
+      if (Array.isArray(geometry.coordinates?.[0])) {
+        holes.push(geometry.coordinates[0].map(([lon, lat]) => [lat, lon]));
+      }
+    } else if (geometry.type === "MultiPolygon") {
+      for (const polygon of geometry.coordinates || []) {
+        if (Array.isArray(polygon?.[0])) {
+          holes.push(polygon[0].map(([lon, lat]) => [lat, lon]));
+        }
+      }
+    }
+
+    if (!holes.length) return null;
+    return [WORLD_OUTER_RING, ...holes];
+  }, [radarCoverageBoundary]);
+
   return (
     <aside className="panel lightning-panel interactive-map-panel">
       <div className="lightning-head">
@@ -606,22 +771,17 @@ export default function InteractiveMap({
               <MapRecenter center={center} zoom={mapZoom} recenterKey={recenterKey} />
               <ZoomBoundaryController onBoundaryChange={handleBoundaryChange} />
 
-            <Pane name="boundary-pane" style={{ zIndex: 350 }}>
-              {geoData && (
-                <GeoJSON
-                  key={`korea-boundary-${boundaryLevel}`}
-                  data={geoData}
-                  style={() => boundaryStyle}
-                />
-              )}
-              {neighborGeoData && (
-                <GeoJSON
-                  key="neighbors-boundary"
-                  data={neighborGeoData}
-                  style={() => neighborBoundaryStyle}
-                />
-              )}
-            </Pane>
+            {!showEcho && (
+              <Pane name="boundary-fill-pane" style={{ zIndex: 350 }}>
+                {geoData && (
+                  <GeoJSON
+                    key={`korea-boundary-fill-${boundaryLevel}`}
+                    data={geoData}
+                    style={() => boundaryStyle}
+                  />
+                )}
+              </Pane>
+            )}
 
             {showEcho && echoInfo && (
               <Pane name="echo-pane" style={{ zIndex: 400 }}>
@@ -632,6 +792,70 @@ export default function InteractiveMap({
                 />
               </Pane>
             )}
+
+            {showEcho && isNationwide && (
+              <Pane name="radar-range-pane" style={{ zIndex: 420 }}>
+                {radarOutsideMaskPositions && (
+                  <Polygon
+                    positions={radarOutsideMaskPositions}
+                    pathOptions={{
+                      stroke: false,
+                      fill: true,
+                      fillColor: "#05090f",
+                      fillOpacity: mapTheme === "light" ? 0.13 : 0.22,
+                      interactive: false,
+                    }}
+                  />
+                )}
+                {radarCoverageBoundary && (
+                  <GeoJSON
+                    key="radar-coverage-boundary"
+                    data={radarCoverageBoundary}
+                    style={() => ({
+                      fill: false,
+                      color: mapTheme === "light" ? "#5b6470" : "#8097aa",
+                      weight: 1.2,
+                      opacity: mapTheme === "light" ? 0.38 : 0.5,
+                      dashArray: "4 8",
+                    })}
+                  />
+                )}
+              </Pane>
+            )}
+
+            <Pane name="boundary-case-pane" style={{ zIndex: 430 }}>
+              {geoData && (
+                <GeoJSON
+                  key={`korea-boundary-case-${boundaryLevel}`}
+                  data={geoData}
+                  style={() => boundaryCaseStyle}
+                />
+              )}
+              {neighborGeoData && (
+                <GeoJSON
+                  key="neighbors-boundary-case"
+                  data={neighborGeoData}
+                  style={() => neighborBoundaryCaseStyle}
+                />
+              )}
+            </Pane>
+
+            <Pane name="boundary-line-pane" style={{ zIndex: 440 }}>
+              {geoData && (
+                <GeoJSON
+                  key={`korea-boundary-line-${boundaryLevel}`}
+                  data={geoData}
+                  style={() => boundaryLineStyle}
+                />
+              )}
+              {neighborGeoData && (
+                <GeoJSON
+                  key="neighbors-boundary-line"
+                  data={neighborGeoData}
+                  style={() => neighborBoundaryLineStyle}
+                />
+              )}
+            </Pane>
 
             <Pane name="overlay-pane" style={{ zIndex: 450 }}>
               {showLightning && !isNationwide && ZONE_RADII.map((zone) => (

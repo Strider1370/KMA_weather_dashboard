@@ -46,7 +46,7 @@ export default function App() {
   const [metarVersion, setMetarVersion] = useState(() => localStorage.getItem("metar_version") || "v1");
   const [tafVersion, setTafVersion] = useState(() => localStorage.getItem("taf_version") || "v1");
   const [timeZone, setTimeZone] = useState(() => localStorage.getItem("time_zone") || "KST");
-  const [radarOpacity, setRadarOpacity] = useState(() => parseFloat(localStorage.getItem("radar_overlay_opacity") || "0.6"));
+  const radarOpacity = 1;
   const [mapTheme, setMapTheme] = useState(() => localStorage.getItem("map_theme") || "light");
 
   useEffect(() => {
@@ -253,7 +253,6 @@ export default function App() {
     setMetarVersion(localStorage.getItem("metar_version") || "v1");
     setTafVersion(localStorage.getItem("taf_version") || "v1");
     setTimeZone(localStorage.getItem("time_zone") || "KST");
-    setRadarOpacity(parseFloat(localStorage.getItem("radar_overlay_opacity") || "0.6"));
     setMapTheme(localStorage.getItem("map_theme") || "light");
   }
 

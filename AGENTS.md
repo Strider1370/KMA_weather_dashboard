@@ -168,7 +168,8 @@ Derived from `.editorconfig` + existing source files.
 - If nginx serves `frontend/dist` directly, keep both `.geojson` (`application/geo+json`) and `.topojson` (`application/topo+json`) MIME handling correct and enable gzip/brotli for `.geojson`, `.topojson`, `.json`, `.js`, and `.css`.
 - InteractiveMap boundary detail is auto-switched by zoom (`zoom >= 9`: sigungu, `zoom < 9`: sido); there is no user setting toggle anymore.
 - InteractiveMap renders nationwide lightning strikes in both Airport/Korea modes; Airport mode zone counters (8/16/32km) must remain based on selected-airport strikes.
-- Nationwide radar echo currently uses `cmp=hsr`, converts `dBZ` to `mm/h`, then reprojects the raster to the Korea bbox before writing `/data/radar/echo_korea_<tm>.png`.
+- Nationwide radar echo currently uses `cmp=hsr`, converts `dBZ` to `mm/h`, and reprojects to full radar-domain bounds before writing `/data/radar/echo_korea_<tm>.png`.
+- In Korea mode, InteractiveMap draws a unioned KMA radar-coverage boundary from site radius metadata and can dim only the area outside that union boundary.
 - Rain-rate colors follow the in-app `mm/h` legend, and sub-`0.1 mm/h` pixels should remain transparent so dark mode does not show a bright fringe.
 - In PowerShell, Korean UTF-8 files may render incorrectly with plain `Get-Content`.
 - When reading Korean text files, prefer explicit UTF-8 decoding:

@@ -1,7 +1,5 @@
 "use strict";
 
-const fs = require("fs");
-const path = require("path");
 const zlib = require("zlib");
 const sharp = require("sharp");
 
@@ -11,8 +9,6 @@ const RE_KM = 6371.00877;
 const NX = 2305;
 const NY = 2881;
 const DXY = 0.5;
-const PROJECT_ROOT = path.resolve(__dirname, "../../..");
-const TOPOJSON_PATH = path.join(PROJECT_ROOT, "frontend", "public", "geo", "korea_boundaries.v1.topojson");
 const BASE_OUTPUT_WIDTH = 1600;
 const NO_DATA = -25000;
 
@@ -28,7 +24,7 @@ const _n = Math.log(Math.cos(PHI1) / Math.cos(PHI2)) /
 const _F = Math.cos(PHI1) * Math.pow(Math.tan(Math.PI / 4 + PHI1 / 2), _n) / _n;
 const _rho0 = RE_KM * _F / Math.pow(Math.tan(Math.PI / 4 + PHI0 / 2), _n);
 
-let cachedTopoBounds = null;
+let cachedRadarBounds = null;
 
 function latLonToGrid(latDeg, lonDeg) {
   const lat = latDeg * DEG2RAD;
@@ -121,17 +117,45 @@ function rainRateToRGBA(rate) {
   return null;
 }
 
-function loadTopoBounds() {
-  if (cachedTopoBounds) return cachedTopoBounds;
+function loadRadarBounds() {
+  if (cachedRadarBounds) return cachedRadarBounds;
 
-  const topo = JSON.parse(fs.readFileSync(TOPOJSON_PATH, "utf8"));
-  if (!Array.isArray(topo.bbox) || topo.bbox.length !== 4) {
-    throw new Error("korea_boundaries.v1.topojson is missing bbox");
+  const sampleXStep = Math.max(1, Math.floor((NX - 1) / 256));
+  const sampleYStep = Math.max(1, Math.floor((NY - 1) / 256));
+  let west = Infinity;
+  let south = Infinity;
+  let east = -Infinity;
+  let north = -Infinity;
+
+  function capturePoint(x, y) {
+    const p = gridToLatLon(x, y);
+    if (!Number.isFinite(p.lat) || !Number.isFinite(p.lon)) return;
+    west = Math.min(west, p.lon);
+    south = Math.min(south, p.lat);
+    east = Math.max(east, p.lon);
+    north = Math.max(north, p.lat);
   }
 
-  const [west, south, east, north] = topo.bbox;
-  cachedTopoBounds = { west, south, east, north };
-  return cachedTopoBounds;
+  for (let x = 0; x < NX; x += sampleXStep) {
+    capturePoint(x, 0);
+    capturePoint(x, NY - 1);
+  }
+  capturePoint(NX - 1, 0);
+  capturePoint(NX - 1, NY - 1);
+
+  for (let y = 0; y < NY; y += sampleYStep) {
+    capturePoint(0, y);
+    capturePoint(NX - 1, y);
+  }
+  capturePoint(0, NY - 1);
+  capturePoint(NX - 1, NY - 1);
+
+  if (!Number.isFinite(west) || !Number.isFinite(south) || !Number.isFinite(east) || !Number.isFinite(north)) {
+    throw new Error("Failed to derive radar coverage bounds");
+  }
+
+  cachedRadarBounds = { west, south, east, north };
+  return cachedRadarBounds;
 }
 
 function parseHeader(buf, read16) {
@@ -219,8 +243,8 @@ async function cropAirportEcho(refl, lat, lon, rangeKm = 100, cropSize = 200) {
   return { pngBuffer, bounds, echoCount, width: cropSize, height: cropSize };
 }
 
-async function renderNationwideEcho(refl, scale = 1) {
-  const { west, south, east, north } = loadTopoBounds();
+async function renderFullCoverageEcho(refl, scale = 1) {
+  const { west, south, east, north } = loadRadarBounds();
   const minX = lonToMercatorX(west);
   const maxX = lonToMercatorX(east);
   const minY = latToMercatorY(south);
@@ -278,7 +302,8 @@ async function renderNationwideEcho(refl, scale = 1) {
 module.exports = {
   parseRadarBinary,
   cropAirportEcho,
-  renderNationwideEcho,
+  renderFullCoverageEcho,
+  renderNationwideEcho: renderFullCoverageEcho,
   latLonToGrid,
   gridToLatLon,
   dBZtoRGBA,
