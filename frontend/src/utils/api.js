@@ -15,7 +15,7 @@ export async function fetchJsonOptional(url) {
 }
 
 export async function loadAllData() {
-  const [metar, taf, warning, airports, warningTypes, lightning, echoMeta, adsb] = await Promise.all([
+  const [metar, taf, warning, airports, warningTypes, lightning, echoMeta, adsb, sigmet, airmet] = await Promise.all([
     fetchJson("/api/metar"),
     fetchJson("/api/taf"),
     fetchJson("/api/warning"),
@@ -24,8 +24,10 @@ export async function loadAllData() {
     fetchJsonOptional("/api/lightning"),
     fetchJsonOptional("/data/radar/echo_meta.json"),
     fetchJsonOptional("/api/adsb"),
+    fetchJsonOptional("/api/sigmet"),
+    fetchJsonOptional("/api/airmet"),
   ]);
-  return { metar, taf, warning, airports, warningTypes, lightning, echoMeta, adsb };
+  return { metar, taf, warning, airports, warningTypes, lightning, echoMeta, adsb, sigmet, airmet };
 }
 
 export async function loadAlertDefaults() {
@@ -52,6 +54,8 @@ export async function loadChangedData(changes) {
   if (changes.metar) { fetches.push(fetchJson("/api/metar")); keys.push("metar"); }
   if (changes.taf) { fetches.push(fetchJson("/api/taf")); keys.push("taf"); }
   if (changes.warning) { fetches.push(fetchJson("/api/warning")); keys.push("warning"); }
+  if (changes.sigmet) { fetches.push(fetchJsonOptional("/api/sigmet")); keys.push("sigmet"); }
+  if (changes.airmet) { fetches.push(fetchJsonOptional("/api/airmet")); keys.push("airmet"); }
   if (changes.lightning) { fetches.push(fetchJsonOptional("/api/lightning")); keys.push("lightning"); }
   if (changes.adsb) { fetches.push(fetchJsonOptional("/api/adsb")); keys.push("adsb"); }
   if (changes.echoMeta) { fetches.push(fetchJsonOptional("/data/radar/echo_meta.json")); keys.push("echoMeta"); }

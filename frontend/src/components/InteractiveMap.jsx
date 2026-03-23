@@ -94,6 +94,7 @@ const _boundaryCache = {
   sido: null,           // topoFeature result for sido
   sigungu: null,        // topoFeature result for sigungu
   neighbors: null,      // neighbor GeoJSON
+  firDraft: null,
   loading: false,
   promise: null,        // dedup concurrent fetches
 };
@@ -142,6 +143,17 @@ function loadNeighbors() {
     .then((r) => r.json())
     .then((data) => {
       _boundaryCache.neighbors = data;
+      return data;
+    })
+    .catch(() => null);
+}
+
+function loadFirDraft() {
+  if (_boundaryCache.firDraft) return Promise.resolve(_boundaryCache.firDraft);
+  return fetch("/geo/rkrr_fir.geojson")
+    .then((r) => r.json())
+    .then((data) => {
+      _boundaryCache.firDraft = data;
       return data;
     })
     .catch(() => null);
@@ -270,8 +282,104 @@ function formatLightningSummary(summary, isNationwide) {
   return `${summary.total} recent strikes`;
 }
 
+function advisoryPhenomenonIcon(code) {
+  if (!code) return "!";
+  if (code.includes("ICE")) return "❄";
+  if (code.includes("TURB") || code.includes("MTW") || code.includes("LLWS")) return "≋";
+  if (code.includes("TS") || code.includes("CB")) return "⚡";
+  if (code.includes("VA")) return "▲";
+  if (code.includes("IFR") || code.includes("OBSC")) return "◌";
+  return "!";
+}
+
+function advisoryStyle(item, kind, hovered) {
+  const code = String(item?.phenomenon_code || "");
+  const isSigmet = kind === "sigmet";
+  let color = isSigmet ? "#ef4444" : "#fb923c";
+
+  if (code.includes("ICE")) color = isSigmet ? "#06b6d4" : "#38bdf8";
+  else if (code.includes("TURB") || code.includes("MTW") || code.includes("LLWS")) color = isSigmet ? "#f97316" : "#fb923c";
+  else if (code.includes("TS") || code.includes("CB")) color = isSigmet ? "#ef4444" : "#f43f5e";
+  else if (code.includes("VA")) color = isSigmet ? "#7c3aed" : "#8b5cf6";
+  else if (code.includes("IFR") || code.includes("OBSC")) color = isSigmet ? "#64748b" : "#94a3b8";
+
+  return {
+    color,
+    weight: hovered ? (isSigmet ? 2.8 : 2.2) : (isSigmet ? 2.1 : 1.7),
+    opacity: hovered ? 1 : 0.9,
+    fillColor: color,
+    fillOpacity: hovered ? (isSigmet ? 0.3 : 0.24) : (isSigmet ? 0.12 : 0.08)
+  };
+}
+
+function advisoryLabel(item) {
+  return item?.phenomenon_label || item?.phenomenon_code || "Advisory";
+}
+
+function advisoryAltitudeLabel(item) {
+  const lower = item?.altitude?.lower_fl;
+  const upper = item?.altitude?.upper_fl;
+  if (lower == null && upper == null) return "고도 미상";
+  if (lower != null && upper != null) return `FL${String(lower).padStart(3, "0")} - FL${String(upper).padStart(3, "0")}`;
+  if (lower != null) return `ABV FL${String(lower).padStart(3, "0")}`;
+  return `BLW FL${String(upper).padStart(3, "0")}`;
+}
+
+function advisoryValidLabel(item) {
+  const from = item?.valid_from ? new Date(item.valid_from).toISOString().slice(11, 16) : "--:--";
+  const to = item?.valid_to ? new Date(item.valid_to).toISOString().slice(11, 16) : "--:--";
+  return `${from}Z - ${to}Z`;
+}
+
+function advisoryStatusLabel(item) {
+  const bits = [];
+  if (item?.time_indicator) bits.push(item.time_indicator === "OBSERVATION" ? "Observed" : "Forecast");
+  if (item?.intensity_change) bits.push(item.intensity_change.replaceAll("_", " "));
+  return bits.join(" · ") || "Active";
+}
+
+function geometryToLeafletPositions(geometry) {
+  if (!geometry) return null;
+  if (geometry.type === "Polygon") {
+    return (geometry.coordinates?.[0] || []).map(([lon, lat]) => [lat, lon]);
+  }
+  if (geometry.type === "MultiPolygon") {
+    return (geometry.coordinates || []).map((polygon) => (polygon?.[0] || []).map(([lon, lat]) => [lat, lon]));
+  }
+  return null;
+}
+
+function advisoryCenter(item) {
+  const bbox = item?.bbox;
+  if (bbox && [bbox.min_lon, bbox.min_lat, bbox.max_lon, bbox.max_lat].every((v) => Number.isFinite(v))) {
+    return [(bbox.min_lat + bbox.max_lat) / 2, (bbox.min_lon + bbox.max_lon) / 2];
+  }
+
+  const geometry = item?.geometry;
+  if (geometry?.type === "Polygon" && Array.isArray(geometry.coordinates?.[0])) {
+    const coords = geometry.coordinates[0];
+    if (!coords.length) return null;
+    const sum = coords.reduce((acc, [lon, lat]) => ({ lon: acc.lon + lon, lat: acc.lat + lat }), { lon: 0, lat: 0 });
+    return [sum.lat / coords.length, sum.lon / coords.length];
+  }
+
+  return null;
+}
+
+function createAdvisoryIcon(item, kind) {
+  const icon = advisoryPhenomenonIcon(item?.phenomenon_code);
+  return L.divIcon({
+    className: `leaflet-advisory-icon leaflet-advisory-icon--${kind}`,
+    html: `<span class="leaflet-advisory-icon-badge">${icon}</span>`,
+    iconSize: [24, 24],
+    iconAnchor: [12, 12]
+  });
+}
+
 export default function InteractiveMap({
   lightningData,
+  sigmetData = null,
+  airmetData = null,
   adsbData = null,
   selectedAirport,
   airports,
@@ -286,7 +394,11 @@ export default function InteractiveMap({
   const [, forceRender] = useReducer((x) => x + 1, 0);
   const [showEcho, setShowEcho] = useState(true);
   const [showLightning, setShowLightning] = useState(true);
+  const [showSigmet, setShowSigmet] = useState(false);
+  const [showAirmet, setShowAirmet] = useState(false);
   const [showTraffic, setShowTraffic] = useState(false);
+  const [hoveredAdvisoryId, setHoveredAdvisoryId] = useState(null);
+  const [openAdvisoryPanel, setOpenAdvisoryPanel] = useState(null);
   const [frameIndex, setFrameIndex] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
   const [playbackMs, setPlaybackMs] = useState(DEFAULT_FRAME_MS);
@@ -302,11 +414,13 @@ export default function InteractiveMap({
   useEffect(() => {
     loadBoundaries().then(() => forceRender());
     loadNeighbors().then(() => forceRender());
+    loadFirDraft().then(() => forceRender());
   }, []);
 
   // Derive geoData directly from cache — no async, no stale closures
   const geoData = _boundaryCache[boundaryLevel] || null;
   const neighborGeoData = _boundaryCache.neighbors || null;
+  const firDraftGeoData = _boundaryCache.firDraft || null;
 
   const handleBoundaryChange = useCallback((level, zoom) => {
     setBoundaryLevel(level);
@@ -415,6 +529,24 @@ export default function InteractiveMap({
       { lat: item.lat, lon: item.lon }
     ) <= AIRCRAFT_AIRPORT_RANGE_KM);
   }, [aircraft, arp, isNationwide]);
+
+  const sigmetItems = useMemo(() => (sigmetData?.items || []).filter((item) => item?.geometry), [sigmetData]);
+  const airmetItems = useMemo(() => (airmetData?.items || []).filter((item) => item?.geometry), [airmetData]);
+  const showFirDraft = isNationwide && (showSigmet || showAirmet) && firDraftGeoData;
+  const advisoryBadgeItems = useMemo(() => ([
+    showSigmet ? { key: "sigmet", label: "SIGMET", count: sigmetItems.length } : null,
+    showAirmet ? { key: "airmet", label: "AIRMET", count: airmetItems.length } : null
+  ].filter((item) => item && item.count > 0)), [showSigmet, showAirmet, sigmetItems.length, airmetItems.length]);
+  const advisoryPanelItems = useMemo(() => {
+    if (openAdvisoryPanel === "sigmet") return sigmetItems;
+    if (openAdvisoryPanel === "airmet") return airmetItems;
+    return [];
+  }, [openAdvisoryPanel, sigmetItems, airmetItems]);
+
+  useEffect(() => {
+    if (openAdvisoryPanel === "sigmet" && !showSigmet) setOpenAdvisoryPanel(null);
+    if (openAdvisoryPanel === "airmet" && !showAirmet) setOpenAdvisoryPanel(null);
+  }, [openAdvisoryPanel, showSigmet, showAirmet]);
 
   // Zone counts from per-airport data in airport mode; total always from nationwide
   const summary = useMemo(() => {
@@ -726,7 +858,7 @@ export default function InteractiveMap({
             전국
           </button>
         </div>
-        <div className="time-range">
+          <div className="time-range">
           <button
             type="button"
             className={`range-btn ${showLightning ? "active" : ""}`}
@@ -734,16 +866,30 @@ export default function InteractiveMap({
           >
             낙뢰
           </button>
-          <button
-            type="button"
-            className={`range-btn echo-toggle ${showEcho ? "active" : ""}`}
+            <button
+              type="button"
+              className={`range-btn echo-toggle ${showEcho ? "active" : ""}`}
             onClick={() => setShowEcho((v) => !v)}
             title={echoInfo ? `Radar echo (${echoInfo.echoCount} px)` : isNationwide ? "Nationwide radar overlay unavailable" : "Radar echo unavailable"}
             disabled={!echoInfo}
-          >
-            강수에코
-          </button>
-        </div>
+            >
+              강수에코
+            </button>
+            <button
+              type="button"
+              className={`range-btn sigmet-toggle ${showSigmet ? "active" : ""}`}
+              onClick={() => setShowSigmet((v) => !v)}
+            >
+              SIGMET
+            </button>
+            <button
+              type="button"
+              className={`range-btn airmet-toggle ${showAirmet ? "active" : ""}`}
+              onClick={() => setShowAirmet((v) => !v)}
+            >
+              AIRMET
+            </button>
+          </div>
       </div>
 
       {!isNationwide && !arp ? (
@@ -751,20 +897,46 @@ export default function InteractiveMap({
       ) : (
         <>
           <div className={`interactive-map-shell interactive-map-shell--${mapTheme} ${isNationwide ? "interactive-map-shell--korea" : "interactive-map-shell--airport"}`}>
-            {showLightning && (
-              <div className="interactive-map-legend">
-                {!isNationwide ? (
+            {(showLightning || advisoryBadgeItems.length > 0 || (showTraffic && adsbData)) && (
+              <div className="interactive-map-legend" aria-label="Active map badges">
+                {showLightning && !isNationwide ? (
                   <>
                     <span className="zone-tag alert">8km {summary.byZone.alert}</span>
                     <span className="zone-tag danger">16km {summary.byZone.danger}</span>
                     <span className="zone-tag caution">32km {summary.byZone.caution}</span>
                   </>
-                ) : (
-                  <span className="zone-tag caution">KR {summary.total}</span>
-                )}
+                ) : null}
                 {showTraffic && adsbData && (
                   <span className="zone-tag traffic">ACFT {visibleAircraft.length}</span>
                 )}
+                {advisoryBadgeItems.map((item) => (
+                  <button
+                    key={item.key}
+                    type="button"
+                    className={`advisory-count-badge advisory-count-badge--${item.key} ${openAdvisoryPanel === item.key ? "active" : ""}`}
+                    onClick={() => setOpenAdvisoryPanel((prev) => (prev === item.key ? null : item.key))}
+                  >
+                    {item.label} {item.count}
+                  </button>
+                ))}
+              </div>
+            )}
+            {openAdvisoryPanel && advisoryPanelItems.length > 0 && (
+              <div className="advisory-detail-panel" aria-label={`${openAdvisoryPanel} details`}>
+                <div className="advisory-detail-panel-head">{openAdvisoryPanel.toUpperCase()}</div>
+                <div className="advisory-detail-list">
+                  {advisoryPanelItems.map((item) => (
+                    <article key={`${openAdvisoryPanel}-${item.id}`} className="advisory-detail-item">
+                      <div className="advisory-detail-icon" aria-hidden="true">{advisoryPhenomenonIcon(item.phenomenon_code)}</div>
+                      <div className="advisory-detail-main">
+                        <div className="advisory-detail-title">{advisoryLabel(item)}</div>
+                        <div className="advisory-detail-time">{advisoryValidLabel(item)}</div>
+                        <div className="advisory-detail-meta">{advisoryStatusLabel(item)}</div>
+                        <div className="advisory-detail-altitude">{advisoryAltitudeLabel(item)}</div>
+                      </div>
+                    </article>
+                  ))}
+                </div>
               </div>
             )}
             {showEcho && echoInfo && (
@@ -891,6 +1063,21 @@ export default function InteractiveMap({
               )}
             </Pane>
 
+            <Pane name="fir-boundary-pane" style={{ zIndex: 445 }}>
+              {showFirDraft && (
+                <GeoJSON
+                  key="rkrr-fir-draft"
+                  data={firDraftGeoData}
+                  style={() => ({
+                    fill: false,
+                    color: mapTheme === "light" ? "#2563eb" : "#60a5fa",
+                    weight: 1.5,
+                    opacity: mapTheme === "light" ? 0.78 : 0.84
+                  })}
+                />
+              )}
+            </Pane>
+
             <Pane name="overlay-pane" style={{ zIndex: 450 }}>
               {showLightning && !isNationwide && ZONE_RADII.map((zone) => (
                 <Circle
@@ -901,11 +1088,99 @@ export default function InteractiveMap({
                     color: zone.color,
                     dashArray: "8 5",
                     weight: 1.5,
-                    opacity: 0.65,
+                    opacity: 1,
                     fill: false,
                   }}
                 />
               ))}
+            </Pane>
+
+            <Pane name="advisory-pane" style={{ zIndex: 520 }}>
+              {showSigmet && sigmetItems.map((item) => {
+                const positions = geometryToLeafletPositions(item.geometry);
+                if (!positions) return null;
+                const hovered = hoveredAdvisoryId === item.id;
+                return (
+                  <Polygon
+                    key={`sigmet-${item.id}`}
+                    positions={positions}
+                    pathOptions={advisoryStyle(item, "sigmet", hovered)}
+                    eventHandlers={{
+                      mouseover: () => setHoveredAdvisoryId(item.id),
+                      mouseout: () => setHoveredAdvisoryId((prev) => (prev === item.id ? null : prev))
+                    }}
+                  >
+                    <Tooltip sticky opacity={0.96} className="advisory-tooltip">
+                      <div className="advisory-tooltip-body">
+                        <strong>{advisoryLabel(item)}</strong>
+                        <div>{advisoryValidLabel(item)}</div>
+                        <div>{advisoryAltitudeLabel(item)}</div>
+                        <div>{item.sequence_number || "-"}</div>
+                      </div>
+                    </Tooltip>
+                  </Polygon>
+                );
+              })}
+              {showAirmet && airmetItems.map((item) => {
+                const positions = geometryToLeafletPositions(item.geometry);
+                if (!positions) return null;
+                const hovered = hoveredAdvisoryId === item.id;
+                return (
+                  <Polygon
+                    key={`airmet-${item.id}`}
+                    positions={positions}
+                    pathOptions={advisoryStyle(item, "airmet", hovered)}
+                    eventHandlers={{
+                      mouseover: () => setHoveredAdvisoryId(item.id),
+                      mouseout: () => setHoveredAdvisoryId((prev) => (prev === item.id ? null : prev))
+                    }}
+                  >
+                    <Tooltip sticky opacity={0.96} className="advisory-tooltip">
+                      <div className="advisory-tooltip-body">
+                        <strong>{advisoryLabel(item)}</strong>
+                        <div>{advisoryValidLabel(item)}</div>
+                        <div>{advisoryAltitudeLabel(item)}</div>
+                        <div>{item.sequence_number || "-"}</div>
+                      </div>
+                    </Tooltip>
+                  </Polygon>
+                );
+              })}
+            </Pane>
+
+            <Pane name="advisory-icon-pane" style={{ zIndex: 530 }}>
+              {showSigmet && sigmetItems.map((item) => {
+                const centerPoint = advisoryCenter(item);
+                if (!centerPoint) return null;
+                return (
+                  <Marker key={`sigmet-icon-${item.id}`} position={centerPoint} icon={createAdvisoryIcon(item, "sigmet")}>
+                    <Tooltip direction="top" offset={[0, -10]} opacity={0.96} className="advisory-tooltip">
+                      <div className="advisory-tooltip-body">
+                        <strong>{advisoryLabel(item)}</strong>
+                        <div>{advisoryValidLabel(item)}</div>
+                        <div>{advisoryAltitudeLabel(item)}</div>
+                        <div>{item.sequence_number || "-"}</div>
+                      </div>
+                    </Tooltip>
+                  </Marker>
+                );
+              })}
+              {showAirmet && airmetItems.map((item) => {
+                const centerPoint = advisoryCenter(item);
+                if (!centerPoint) return null;
+                return (
+                  <Marker key={`airmet-icon-${item.id}`} position={centerPoint} icon={createAdvisoryIcon(item, "airmet")}>
+                    <Tooltip direction="top" offset={[0, -10]} opacity={0.96} className="advisory-tooltip">
+                      <div className="advisory-tooltip-body">
+                        <strong>{advisoryLabel(item)}</strong>
+                        <div>{advisoryValidLabel(item)}</div>
+                        <div>{advisoryAltitudeLabel(item)}</div>
+                        <div>{item.sequence_number || "-"}</div>
+                      </div>
+                    </Tooltip>
+                  </Marker>
+                );
+              })}
             </Pane>
 
             <Pane name="airport-pane" style={{ zIndex: 650 }}>
