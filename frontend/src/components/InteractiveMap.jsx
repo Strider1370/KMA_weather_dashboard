@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo, useRef, useCallback, useReducer } from "r
 import { MapContainer, GeoJSON, CircleMarker, Circle, Marker, Pane, ImageOverlay, Polygon, Tooltip, useMap } from "react-leaflet";
 import L from "leaflet";
 import { feature as topoFeature } from "topojson-client";
-import { circle as turfCircle, featureCollection, union as turfUnion } from "@turf/turf";
+import { bbox as turfBbox, circle as turfCircle, featureCollection, union as turfUnion } from "@turf/turf";
 import "leaflet/dist/leaflet.css";
 
 const ZONE_RADII = [
@@ -172,11 +172,28 @@ function pickRunwayDirection(runwayHdg, windDir) {
   return diff1 <= diff2 ? opt1 : opt2;
 }
 
-function MapRecenter({ center, zoom, recenterKey }) {
+function bboxToLeafletBounds(bbox) {
+  if (!Array.isArray(bbox) || bbox.length !== 4) return null;
+  const [minLon, minLat, maxLon, maxLat] = bbox;
+  if (![minLon, minLat, maxLon, maxLat].every((value) => Number.isFinite(value))) return null;
+  return [
+    [minLat, minLon],
+    [maxLat, maxLon],
+  ];
+}
+
+function MapRecenter({ center, zoom, bounds, boundsPadding = [24, 24], zoomOffset = 0, recenterKey }) {
   const map = useMap();
   useEffect(() => {
+    if (bounds) {
+      const latLngBounds = L.latLngBounds(bounds);
+      const paddingPoint = L.point(boundsPadding[0], boundsPadding[1]);
+      const computedZoom = map.getBoundsZoom(latLngBounds, false, paddingPoint) + zoomOffset;
+      map.setView(latLngBounds.getCenter(), computedZoom);
+      return;
+    }
     if (center) map.setView(center, zoom);
-  }, [map, center, zoom, recenterKey]);
+  }, [map, recenterKey]);
   return null;
 }
 
@@ -313,10 +330,20 @@ export default function InteractiveMap({
         : DEFAULT_CENTER
   ), [isNationwide, arp?.lat, arp?.lon]);
   const mapZoom = isNationwide ? NATIONWIDE_ZOOM : DEFAULT_ZOOM;
+  const airportFocusBounds = useMemo(() => {
+    if (!arp) return null;
+    return bboxToLeafletBounds(turfBbox(
+      turfCircle([arp.lon, arp.lat], 32, { steps: 96, units: "kilometers" })
+    ));
+  }, [arp]);
 
   useEffect(() => {
     setCurrentZoom(mapZoom);
   }, [mapZoom]);
+
+  useEffect(() => {
+    setRecenterKey((prev) => prev + 1);
+  }, [selectedAirport]);
 
   const strokeProfile = useMemo(() => {
     if (currentZoom < 7) {
@@ -666,6 +693,12 @@ export default function InteractiveMap({
     if (!holes.length) return null;
     return [WORLD_OUTER_RING, ...holes];
   }, [radarCoverageBoundary]);
+  const radarCoverageBounds = useMemo(() => (
+    radarCoverageBoundary ? bboxToLeafletBounds(turfBbox(radarCoverageBoundary)) : null
+  ), [radarCoverageBoundary]);
+  const mapBounds = isNationwide ? radarCoverageBounds : airportFocusBounds;
+  const mapBoundsPadding = isNationwide ? [4, 4] : [4, 4];
+  const mapZoomOffset = isNationwide ? 0.05 : 0.08;
 
   return (
     <aside className={`panel lightning-panel interactive-map-panel ${isNationwide ? "interactive-map-panel--korea" : "interactive-map-panel--airport"}`}>
@@ -754,12 +787,21 @@ export default function InteractiveMap({
                 key={`interactive-map-${mapTheme}-${mapScope}`}
                 center={center}
                 zoom={mapZoom}
+                zoomSnap={0.1}
+                zoomDelta={0.2}
                 scrollWheelZoom={true}
                 zoomControl={true}
                 attributionControl={false}
                 className={`interactive-map-container ${isNationwide ? "interactive-map-container--korea" : "interactive-map-container--airport"}`}
               >
-              <MapRecenter center={center} zoom={mapZoom} recenterKey={recenterKey} />
+              <MapRecenter
+                center={center}
+                zoom={mapZoom}
+                bounds={mapBounds}
+                boundsPadding={mapBoundsPadding}
+                zoomOffset={mapZoomOffset}
+                recenterKey={recenterKey}
+              />
               <ZoomBoundaryController onBoundaryChange={handleBoundaryChange} />
 
             {!showEcho && (
@@ -784,7 +826,7 @@ export default function InteractiveMap({
               </Pane>
             )}
 
-            {showEcho && isNationwide && (
+            {showEcho && (
               <Pane name="radar-range-pane" style={{ zIndex: 420 }}>
                 {radarOutsideMaskPositions && (
                   <Polygon

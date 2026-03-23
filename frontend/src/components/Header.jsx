@@ -4,8 +4,7 @@ export default function Header({
   airports = [],
   selectedAirport,
   onAirportChange,
-  metarTime,
-  flightCategory,
+  airportLabel,
 }) {
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
@@ -18,8 +17,6 @@ export default function Header({
     return () => document.removeEventListener("mousedown", handleClick);
   }, []);
 
-  const cat = flightCategory || { category: "VFR", color: "#15803d" };
-
   return (
     <header className="new-header">
       <div className="new-header-left">
@@ -28,33 +25,26 @@ export default function Header({
             className="airport-dropdown-btn"
             onClick={() => setOpen((p) => !p)}
           >
-            <span className="airport-dropdown-icao">{selectedAirport || "----"}</span>
+            <span className="airport-dropdown-icao">{airportLabel || selectedAirport || "----"}</span>
             <span className="airport-dropdown-caret">&#9660;</span>
           </button>
           {open && (
             <ul className="airport-dropdown-list">
-              {airports.map((icao) => (
+              {airports.map((airport) => (
                 <li
-                  key={icao}
-                  className={icao === selectedAirport ? "active" : ""}
+                  key={airport.icao}
+                  className={airport.icao === selectedAirport ? "active" : ""}
                   onClick={() => {
-                    onAirportChange?.(icao);
+                    onAirportChange?.(airport.icao);
                     setOpen(false);
                   }}
                 >
-                  {icao}
+                  {airport.label}
                 </li>
               ))}
             </ul>
           )}
         </div>
-        <span className="new-header-time">{metarTime || ""}</span>
-      </div>
-      <div
-        className="flight-cat-badge"
-        style={{ background: cat.color }}
-      >
-        {cat.category}
       </div>
     </header>
   );

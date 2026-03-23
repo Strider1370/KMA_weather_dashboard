@@ -29,6 +29,17 @@ import AlertMarquee from "./components/alerts/AlertMarquee";
 import Settings from "./components/alerts/Settings";
 import "./App.css";
 
+const AIRPORT_NAME_KO = {
+  RKSI: "인천국제공항",
+  RKSS: "김포국제공항",
+  RKPC: "제주국제공항",
+  RKPK: "김해국제공항",
+  RKJB: "무안국제공항",
+  RKNY: "양양국제공항",
+  RKPU: "울산공항",
+  RKJY: "여수공항",
+};
+
 export default function App() {
   const pathname = typeof window !== "undefined" ? window.location.pathname : "/";
   const isTestPage = pathname === "/test";
@@ -263,9 +274,18 @@ export default function App() {
     .filter((icao) => !orderedAirports.includes(icao))
     .sort();
   const airportList = [...orderedAirports, ...remainingAirports];
+  const airportOptions = airportList.map((icao) => {
+    const airport = data.airports?.find((item) => item.icao === icao) || null;
+    const airportName = AIRPORT_NAME_KO[icao] || airport?.name || icao;
+    return {
+      icao,
+      label: `${airportName}(${icao})`,
+    };
+  });
 
   // Flight category from current METAR
   const metarTarget = data.metar?.airports?.[selectedAirport];
+  const selectedAirportMeta = data.airports?.find((airport) => airport.icao === selectedAirport) || null;
   const metarVis = metarTarget?.observation?.visibility?.value ?? null;
   const metarClouds = metarTarget?.observation?.clouds || [];
   const metarCeiling = metarClouds
@@ -278,6 +298,11 @@ export default function App() {
     if (!t) return "";
     const reportType = metarTarget?.header?.report_type || "METAR";
     return `${formatUtc(t, timeZone)} ${reportType}`;
+  })();
+  const airportLabel = (() => {
+    const icao = selectedAirport || "----";
+    const airportName = AIRPORT_NAME_KO[icao] || selectedAirportMeta?.name || metarTarget?.header?.airport_name || icao;
+    return `${airportName}(${icao})`;
   })();
 
   return (
@@ -318,11 +343,10 @@ export default function App() {
           {/* Row 1 left: Header */}
           <div className="left-panel-header">
             <Header
-              airports={airportList}
+              airports={airportOptions}
               selectedAirport={selectedAirport}
               onAirportChange={setSelectedAirport}
-              metarTime={metarTime}
-              flightCategory={flightCat}
+              airportLabel={airportLabel}
             />
           </div>
 
@@ -350,6 +374,8 @@ export default function App() {
             <MetarCard
               metarData={data.metar}
               icao={selectedAirport}
+              airportMeta={selectedAirportMeta}
+              metarTime={metarTime}
               version={metarVersion}
               tz={timeZone}
             />

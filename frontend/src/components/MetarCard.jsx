@@ -1,8 +1,54 @@
-import { safe, formatUtc, getSeverityLevel, computeFeelsLikeC, computeRelativeHumidity } from "../utils/helpers";
+import {
+  safe,
+  formatUtc,
+  getSeverityLevel,
+  computeFeelsLikeC,
+  computeRelativeHumidity,
+  classifyVisibilityCategory,
+  classifyCeilingCategory,
+  getFlightCategory,
+} from "../utils/helpers";
 import WeatherIcon from "./WeatherIcon";
 import { resolveIconKey, resolveWindBarb, convertWeatherToKorean } from "../utils/visual-mapper";
 
-export default function MetarCard({ metarData, icao, version = "v2", onVersionToggle, tz = "UTC" }) {
+function getWindDirectionLabel(wind) {
+  if (!wind) return "-";
+  if (wind.calm) return "CALM";
+  if (wind.variable) return "VRB";
+  if (!Number.isFinite(wind.direction)) return "-";
+  return `${wind.direction}°`;
+}
+
+function pickRunwayDirection(runwayHdg, windDir) {
+  if (!Number.isFinite(runwayHdg)) return null;
+  if (!Number.isFinite(windDir)) return runwayHdg;
+  const optionA = runwayHdg;
+  const optionB = (runwayHdg + 180) % 360;
+  const diffA = Math.abs(((windDir - optionA + 180 + 360) % 360) - 180);
+  const diffB = Math.abs(((windDir - optionB + 180 + 360) % 360) - 180);
+  return diffA <= diffB ? optionA : optionB;
+}
+
+function formatCrosswindText(wind, runwayHdg) {
+  if (!wind || wind.calm) return "측풍 0kt";
+  if (!Number.isFinite(wind.speed) || !Number.isFinite(wind.direction) || !Number.isFinite(runwayHdg)) {
+    return "측풍 -";
+  }
+  const selectedRunwayHdg = pickRunwayDirection(runwayHdg, wind.direction);
+  const angle = Math.abs(((wind.direction - selectedRunwayHdg + 180 + 360) % 360) - 180);
+  const crosswind = Math.abs(wind.speed * Math.sin((angle * Math.PI) / 180));
+  return `측풍 ${Math.round(crosswind)}kt`;
+}
+
+function formatVisibilityValue(value, rawText) {
+  if (rawText && rawText !== "//" && rawText !== "-") {
+    return /\d$/.test(rawText) ? `${rawText} m` : rawText;
+  }
+  if (Number.isFinite(value)) return `${value} m`;
+  return "-";
+}
+
+export default function MetarCard({ metarData, icao, airportMeta = null, metarTime = "", version = "v2", onVersionToggle, tz = "UTC" }) {
   const target = metarData?.airports?.[icao];
 
   if (!target) {
@@ -13,42 +59,38 @@ export default function MetarCard({ metarData, icao, version = "v2", onVersionTo
     );
   }
 
-  const windSpeed = target.observation?.wind?.speed;
-  const windGust = target.observation?.wind?.gust;
+  const wind = target.observation?.wind || null;
+  const windSpeed = wind?.speed;
+  const windGust = wind?.gust;
   const visibility = target.observation?.visibility?.value;
   const issueTime = target.header?.issue_time || target.header?.observation_time;
   const obsTime = target.header?.observation_time || issueTime;
   const rain1h = target.observation?.rainfall_1h || null;
-  const rainText = (rain1h?.mm == null || rain1h.mm <= 0) ? "— mm" : `${rain1h.mm.toFixed(1)} mm`;
+  const rainText = (rain1h?.mm == null || rain1h.mm <= 0) ? null : `${rain1h.mm.toFixed(1)} mm/h`;
   const feelsLike = computeFeelsLikeC({
     tempC: target.observation?.temperature?.air,
     dewpointC: target.observation?.temperature?.dewpoint,
-    windKt: target.observation?.wind?.speed,
+    windKt: windSpeed,
     observedAt: obsTime,
   });
-  const feelsLikeText = feelsLike.value == null ? "—" : `${feelsLike.value.toFixed(1)}°C`;
 
   const tempC = target.observation?.temperature?.air;
   const dewpointC = target.observation?.temperature?.dewpoint;
   const rh = computeRelativeHumidity(tempC, dewpointC);
-  const tempDisplay = Number.isFinite(tempC) ? `${tempC.toFixed(1)}°C` : "—";
-  const rhDisplay = Number.isFinite(rh) ? `${Math.round(rh)}%` : "—";
+  const tempDisplay = Number.isFinite(tempC) ? `${tempC.toFixed(1)}°C` : "-";
+  const feelsLikeText = feelsLike.value == null ? "체감 -" : `체감 ${feelsLike.value.toFixed(1)}°C`;
+  const rhDisplay = Number.isFinite(rh) ? `${Math.round(rh)}%` : "-";
 
   const visibilityRaw = target.observation?.display?.visibility;
-  const visibilityText = (visibilityRaw == null || visibilityRaw === "//" || visibilityRaw === "-")
-    ? "—"
-    : visibilityRaw;
+  const visibilityValue = formatVisibilityValue(visibility, visibilityRaw);
 
-  // Ceiling: lowest BKN/OVC base
   const clouds = target.observation?.clouds || [];
   const ceilingCloud = clouds
-    .filter(c => c.amount === "BKN" || c.amount === "OVC")
+    .filter((cloud) => cloud.amount === "BKN" || cloud.amount === "OVC")
     .sort((a, b) => (a.base ?? Infinity) - (b.base ?? Infinity))[0];
-  const ceilingText = ceilingCloud?.base != null
-    ? `${ceilingCloud.base}ft`
-    : "NSC";
+  const ceilingFt = ceilingCloud?.base ?? null;
+  const ceilingValue = Number.isFinite(ceilingFt) ? `${ceilingFt} ft` : "NSC";
 
-  // v1 text mode (kept as dead code path)
   if (version === "v1") {
     const level = getSeverityLevel({ visibility, wind: windSpeed, gust: windGust });
     const rainHourText = /^\d{12}$/.test(rain1h?.target_hour_kst || "")
@@ -58,18 +100,18 @@ export default function MetarCard({ metarData, icao, version = "v2", onVersionTo
       `Report Type: ${safe(target.header?.report_type || metarData?.type || "METAR")}`,
       `Issue Time: ${safe(formatUtc(issueTime, tz))}`,
       `Wind: ${safe(target.observation?.display?.wind)}`,
-      `Visibility: ${visibilityText}`,
+      `Visibility: ${visibilityValue}`,
       `Weather: ${safe(target.observation?.display?.weather)}`,
       `Clouds: ${safe(target.observation?.display?.clouds)}`,
       `Temp: ${safe(target.observation?.display?.temperature)}`,
       `Relative Humidity: ${rhDisplay}`,
-      `Rainfall(1h @ ${rainHourText}): ${rainText}`,
-      `Feels Like: ${feelsLikeText}`,
+      `Rainfall(1h @ ${rainHourText}): ${rainText || "-"}`,
+      `Feels Like: ${feelsLike.value == null ? "-" : feelsLike.value.toFixed(1) + "C"}`,
       `QNH: ${safe(target.observation?.display?.qnh)}`,
     ];
     return (
       <article className="panel metar-panel-v1">
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px" }}>
           <h3 style={{ margin: 0 }}>METAR/SPECI</h3>
         </div>
         <pre className={`mono level-${level}`}>{lines.join("\n")}</pre>
@@ -77,77 +119,161 @@ export default function MetarCard({ metarData, icao, version = "v2", onVersionTo
     );
   }
 
-  // New layout: primary + secondary metric cards
   const iconKey = resolveIconKey(target.observation, issueTime);
-  const barb = resolveWindBarb(target.observation?.wind);
+  const barb = resolveWindBarb(wind);
   const weatherKorean = convertWeatherToKorean(target.observation?.display?.weather, target.observation?.cavok);
-
-  const windDir = target.observation?.wind;
-  const windDirText = windDir?.calm ? "CALM"
-    : windDir?.variable ? "VRB"
-    : (windDir?.direction != null ? `${windDir.direction}°` : "—");
-  const windSpeedText = windDir?.calm ? "0" : (windSpeed != null ? String(windSpeed) : "—");
+  const windDirectionText = getWindDirectionLabel(wind);
+  const windSpeedText = wind?.calm ? "0" : (Number.isFinite(windSpeed) ? String(windSpeed) : "-");
+  const crosswindText = formatCrosswindText(wind, airportMeta?.runway_hdg ?? null);
+  const visibilityCategory = classifyVisibilityCategory(visibility);
+  const ceilingCategory = classifyCeilingCategory(ceilingFt);
+  const flightCategory = getFlightCategory(visibility, ceilingFt);
 
   return (
-    <>
-      {/* ③-1 주요 메트릭 (4열) */}
-      <div className="metric-row metric-row-primary">
-        {/* 현재 날씨 */}
-        <div className="metric-card">
-          <div className="metric-card-label">현재 날씨</div>
-          <div className="metric-card-icon">
-            <WeatherIcon iconKey={iconKey} />
+    <section className="metar-panel">
+      <div className="metar-panel-grid">
+        <div className="metar-section">
+          <div className="metar-section-head">
+            <div className="metar-section-time">{metarTime}</div>
           </div>
-          <div className="metric-card-main-text">{weatherKorean}</div>
-        </div>
-        {/* 바람 */}
-        <div className="metric-card">
-          <div className="metric-card-label">바람</div>
-          <div className="metric-card-wind-inline">
-            <span
-              className="metric-wind-arrow-inline"
-              style={{ transform: `rotate(${barb.rotation + 180}deg)` }}
-            >
-              ↑
-            </span>
-            <span className="metric-wind-value">{windSpeedText}</span>
-            <span className="metric-wind-unit">kt</span>
-          </div>
-        </div>
-        {/* 시정 */}
-        <div className="metric-card">
-          <div className="metric-card-label">시정</div>
-          <div className="metric-card-value-row">
-            <span className="metric-card-value">{visibilityText}</span>
-            <span className="metric-card-value-unit">m</span>
-          </div>
-        </div>
-        {/* 운고 */}
-        <div className="metric-card">
-          <div className="metric-card-label">운고</div>
-          <div className="metric-card-value">{ceilingText}</div>
-        </div>
-      </div>
+          <div className="metar-weather-grid">
+            <article className="metar-surface-card metar-surface-card--weather">
+              <div className="metar-side-label">
+                <div className="metar-side-text">현재 날씨</div>
+              </div>
+              <div className="metar-side-value">
+                <div className="metar-weather-inline-icon">
+                  <WeatherIcon iconKey={iconKey} />
+                </div>
+                <div className="metar-weather-text">{weatherKorean}</div>
+                {rainText && <div className="metar-rain-text">{rainText}</div>}
+              </div>
+            </article>
 
-      {/* ③-2 보조 메트릭 (4열) */}
-      <div className="metric-row metric-row-secondary">
-        <div className="metric-card-sm">
-          <div className="metric-card-label">기온</div>
-          <div className="metric-card-sm-value">{tempDisplay}</div>
+            <article className="metar-surface-card metar-surface-card--wind">
+              <div className="metar-side-label">
+                <div className="metar-side-icon metar-side-icon--wind">
+                  <svg viewBox="0 0 64 64" role="presentation">
+                    <path d="M4 24h30c7 0 12-5 12-12S41 0 34 0 22 5 22 12" fill="none" stroke="currentColor" strokeWidth="6" strokeLinecap="round" strokeLinejoin="round" />
+                    <path d="M2 32h44c8 0 14-6 14-14S54 4 46 4 32 10 32 18" fill="none" stroke="currentColor" strokeWidth="6" strokeLinecap="round" strokeLinejoin="round" />
+                    <path d="M18 44h26c7 0 12 5 12 12s-5 12-12 12-12-5-12-12" fill="none" stroke="currentColor" strokeWidth="6" strokeLinecap="round" strokeLinejoin="round" />
+                    <circle cx="6" cy="24" r="3" fill="currentColor" />
+                  </svg>
+                </div>
+                <div className="metar-side-text">바람</div>
+              </div>
+              <div className="metar-side-value">
+                <div className="metar-wind-row">
+                  <span
+                    className="metar-wind-arrow"
+                    style={{ transform: `rotate(${barb.rotation + 180}deg)` }}
+                    aria-hidden="true"
+                  >
+                    <svg viewBox="0 0 22 22" role="presentation">
+                      <path d="M11 2 L17 10 H13 V20 H9 V10 H5 Z" fill="currentColor" />
+                    </svg>
+                  </span>
+                  <span className="metar-wind-heading">{windDirectionText}</span>
+                  <span className="metar-wind-speed">{windSpeedText}</span>
+                  <span className="metar-wind-unit">kt</span>
+                </div>
+                <div className="metar-wind-direction">{crosswindText}</div>
+              </div>
+            </article>
+          </div>
+
+          <div className="metar-weather-grid metar-weather-grid--bottom">
+            <article className="metar-surface-card metar-surface-card--compact">
+              <div className="metar-side-label">
+                <div className="metar-side-icon metar-side-icon--metric">
+                  <svg viewBox="0 0 24 24" role="presentation">
+                    <path d="M14 14.8V5a2 2 0 1 0-4 0v9.8a4 4 0 1 0 4 0Z" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                    <path d="M12 10v7" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+                  </svg>
+                </div>
+                <div className="metar-side-text">기온</div>
+              </div>
+              <div className="metar-side-value">
+                <div className="metar-compact-value">{tempDisplay}</div>
+                <div className="metar-compact-sub">{feelsLikeText}</div>
+              </div>
+            </article>
+
+            <article className="metar-surface-card metar-surface-card--compact">
+              <div className="metar-side-label">
+                <div className="metar-side-icon metar-side-icon--metric">
+                  <svg viewBox="0 0 24 24" role="presentation">
+                    <path d="M12 3C9.2 6.7 7 9.4 7 13a5 5 0 0 0 10 0c0-3.6-2.2-6.3-5-10Z" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" />
+                  </svg>
+                </div>
+                <div className="metar-side-text">상대습도</div>
+              </div>
+              <div className="metar-side-value">
+                <div className="metar-compact-value">{rhDisplay}</div>
+              </div>
+            </article>
+          </div>
         </div>
-        <div className="metric-card-sm">
-          <div className="metric-card-label">체감온도</div>
-          <div className="metric-card-sm-value">{feelsLikeText}</div>
-        </div>
-        <div className="metric-card-sm">
-          <div className="metric-card-label">상대습도</div>
-          <div className="metric-card-sm-value">{rhDisplay}</div>
-        </div>
-        <div className="metric-card-sm">
-          <div className="metric-card-label">강수량(1h)</div>
-          <div className="metric-card-sm-value">{rainText}</div>
+
+        <div className="metar-section">
+          <div className="metar-section-head">
+            <div className="metar-section-label">현재비행조건</div>
+          </div>
+          <article className="flight-category-banner" style={{ backgroundColor: flightCategory.color }}>
+            <span className="flight-category-banner-code">{flightCategory.category}</span>
+            <span className="flight-category-banner-divider" aria-hidden="true" />
+            <span className="flight-category-banner-label">{flightCategory.labelKo}</span>
+          </article>
+
+          <article
+            className="flight-condition-card"
+            style={{
+              backgroundColor: visibilityCategory.bg,
+              borderLeftColor: visibilityCategory.border,
+              borderTopColor: visibilityCategory.borderSoft,
+              borderRightColor: visibilityCategory.borderSoft,
+              borderBottomColor: visibilityCategory.borderSoft,
+            }}
+          >
+            <div className="flight-condition-head">
+              <span className="flight-condition-label" style={{ color: visibilityCategory.color }}>시정</span>
+              <span
+                className="flight-condition-pill"
+                style={{ color: visibilityCategory.color, backgroundColor: "#ffffffaa" }}
+              >
+                {visibilityCategory.category}
+              </span>
+            </div>
+            <div className="flight-condition-value" style={{ color: visibilityCategory.valueColor }}>
+              {visibilityValue}
+            </div>
+          </article>
+
+          <article
+            className="flight-condition-card"
+            style={{
+              backgroundColor: ceilingCategory.bg,
+              borderLeftColor: ceilingCategory.border,
+              borderTopColor: ceilingCategory.borderSoft,
+              borderRightColor: ceilingCategory.borderSoft,
+              borderBottomColor: ceilingCategory.borderSoft,
+            }}
+          >
+            <div className="flight-condition-head">
+              <span className="flight-condition-label" style={{ color: ceilingCategory.color }}>운고</span>
+              <span
+                className="flight-condition-pill"
+                style={{ color: ceilingCategory.color, backgroundColor: "#ffffffaa" }}
+              >
+                {ceilingCategory.category}
+              </span>
+            </div>
+            <div className="flight-condition-value" style={{ color: ceilingCategory.valueColor }}>
+              {ceilingValue}
+            </div>
+          </article>
         </div>
       </div>
-    </>
+    </section>
   );
 }

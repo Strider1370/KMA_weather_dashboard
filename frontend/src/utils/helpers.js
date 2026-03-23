@@ -119,20 +119,70 @@ export function computeFeelsLikeC({ tempC, dewpointC, windKt, observedAt }) {
  * @param {number|null} ceilingFt  - 운고 (피트), BKN/OVC 최저 base. null/NSC = unlimited
  * @returns {{ category: string, color: string }}
  */
-export function getFlightCategory(visibilityM, ceilingFt) {
+export const FLIGHT_CATEGORY_META = {
+  VFR: {
+    category: "VFR",
+    color: "#15803d",
+    labelKo: "시계비행규칙",
+    bg: "#f0fdf4",
+    border: "#15803d",
+    borderSoft: "#bbf7d0",
+    valueColor: "#166534",
+  },
+  MVFR: {
+    category: "MVFR",
+    color: "#2563eb",
+    labelKo: "한계시계비행규칙",
+    bg: "#eff6ff",
+    border: "#2563eb",
+    borderSoft: "#bfdbfe",
+    valueColor: "#1d4ed8",
+  },
+  IFR: {
+    category: "IFR",
+    color: "#dc2626",
+    labelKo: "계기비행규칙",
+    bg: "#fef2f2",
+    border: "#dc2626",
+    borderSoft: "#fecaca",
+    valueColor: "#b91c1c",
+  },
+  LIFR: {
+    category: "LIFR",
+    color: "#7c3aed",
+    labelKo: "저계기비행규칙",
+    bg: "#f5f3ff",
+    border: "#7c3aed",
+    borderSoft: "#ddd6fe",
+    valueColor: "#6d28d9",
+  },
+};
+
+function getFlightCategoryMeta(category) {
+  return FLIGHT_CATEGORY_META[category] || FLIGHT_CATEGORY_META.VFR;
+}
+
+export function classifyVisibilityCategory(visibilityM) {
   const vis = Number.isFinite(visibilityM) ? visibilityM : 99999;
+  if (vis < 1600) return getFlightCategoryMeta("LIFR");
+  if (vis < 4800) return getFlightCategoryMeta("IFR");
+  if (vis <= 8000) return getFlightCategoryMeta("MVFR");
+  return getFlightCategoryMeta("VFR");
+}
+
+export function classifyCeilingCategory(ceilingFt) {
   const ceil = Number.isFinite(ceilingFt) ? ceilingFt : 99999;
+  if (ceil < 500) return getFlightCategoryMeta("LIFR");
+  if (ceil < 1000) return getFlightCategoryMeta("IFR");
+  if (ceil <= 3000) return getFlightCategoryMeta("MVFR");
+  return getFlightCategoryMeta("VFR");
+}
 
-  const CATEGORIES = [
-    { name: "LIFR", color: "#7c3aed", maxVis: 1600, maxCeil: 500 },
-    { name: "IFR",  color: "#dc2626", maxVis: 4800, maxCeil: 1000 },
-    { name: "MVFR", color: "#2563eb", maxVis: 8000, maxCeil: 3000 },
-  ];
-
-  for (const cat of CATEGORIES) {
-    if (vis < cat.maxVis || ceil < cat.maxCeil) {
-      return { category: cat.name, color: cat.color };
-    }
-  }
-  return { category: "VFR", color: "#15803d" };
+export function getFlightCategory(visibilityM, ceilingFt) {
+  const visibilityCategory = classifyVisibilityCategory(visibilityM);
+  const ceilingCategory = classifyCeilingCategory(ceilingFt);
+  const rank = { VFR: 0, MVFR: 1, IFR: 2, LIFR: 3 };
+  return rank[visibilityCategory.category] >= rank[ceilingCategory.category]
+    ? visibilityCategory
+    : ceilingCategory;
 }
