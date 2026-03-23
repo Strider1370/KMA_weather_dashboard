@@ -10,6 +10,7 @@ import {
 } from "../utils/helpers";
 import WeatherIcon from "./WeatherIcon";
 import { resolveIconKey, resolveWindBarb, convertWeatherToKorean } from "../utils/visual-mapper";
+import tempIcon from "../../../temp_icon.png";
 
 function getWindDirectionLabel(wind) {
   if (!wind) return "-";
@@ -39,7 +40,7 @@ function formatCrosswindText(wind, runwayHdg) {
   const crosswindComponent = wind.speed * Math.sin((relative * Math.PI) / 180);
   const side = crosswindComponent > 0 ? "R" : crosswindComponent < 0 ? "L" : "";
   const crosswind = Math.abs(crosswindComponent);
-  return side ? `측풍 ${side} ${Math.round(crosswind)}kt` : `측풍 ${Math.round(crosswind)}kt`;
+  return side ? `측풍 ${side}/${Math.round(crosswind)}kt` : `측풍 ${Math.round(crosswind)}kt`;
 }
 
 function formatCrosswindValue(wind, runwayHdg) {
@@ -59,6 +60,14 @@ function getCrosswindArrow(wind, runwayHdg) {
   return "↑";
 }
 
+function getWindDirectionRotation(wind) {
+  if (!wind || wind.calm || !Number.isFinite(wind.direction)) {
+    return 0;
+  }
+  const normalized = ((wind.direction % 360) + 360) % 360;
+  return (normalized + 180) % 360;
+}
+
 function formatVisibilityValue(value, rawText) {
   if (rawText && rawText !== "//" && rawText !== "-") {
     return /\d$/.test(rawText) ? `${rawText} m` : rawText;
@@ -69,7 +78,7 @@ function formatVisibilityValue(value, rawText) {
 
 function hasSpecialWeather(observation) {
   const raw = String(observation?.display?.weather || "").toUpperCase();
-  return ["TS", "FG", "BR", "SN"].some((token) => raw.includes(token));
+  return ["TS", "FG", "SN"].some((token) => raw.includes(token));
 }
 
 export default function MetarCard({
@@ -109,8 +118,8 @@ export default function MetarCard({
   const tempC = target.observation?.temperature?.air;
   const dewpointC = target.observation?.temperature?.dewpoint;
   const rh = computeRelativeHumidity(tempC, dewpointC);
-  const tempDisplay = Number.isFinite(tempC) ? `${tempC.toFixed(1)}°C` : "-";
-  const feelsLikeText = feelsLike.value == null ? "체감 -" : `체감 ${feelsLike.value.toFixed(1)}°C`;
+  const tempDisplay = Number.isFinite(tempC) ? `${Math.round(tempC)}°C` : "-";
+  const feelsLikeText = feelsLike.value == null ? null : `체감온도 ${feelsLike.value.toFixed(1)}°C`;
   const rhDisplay = Number.isFinite(rh) ? `${Math.round(rh)}%` : "-";
 
   const visibilityRaw = target.observation?.display?.visibility;
@@ -156,6 +165,7 @@ export default function MetarCard({
   const windDirectionText = getWindDirectionLabel(wind);
   const windSpeedText = wind?.calm ? "0" : Number.isFinite(windSpeed) ? String(windSpeed) : "-";
   const windGustText = Number.isFinite(windGust) ? `Gust ${windGust}kt` : null;
+  const windDirectionRotation = getWindDirectionRotation(wind);
   const crosswindValue = formatCrosswindValue(wind, airportMeta?.runway_hdg ?? null);
   const crosswindArrow = getCrosswindArrow(wind, airportMeta?.runway_hdg ?? null);
   const visibilityCategory = classifyVisibilityCategory(visibility);
@@ -173,78 +183,6 @@ export default function MetarCard({
               <span className="panel-kind-badge">METAR</span>
               <span>{metarTimeText}</span>
             </div>
-          </div>
-          <div className="metar-section-body metar-section-body--weather">
-            <div className="metar-weather-grid">
-              <article className={`metar-surface-card metar-surface-card--weather${specialWeather ? " metar-card--special-weather" : ""}`}>
-                <div className="metar-side-label">
-                  <div className="metar-side-icon metar-side-icon--weather-image">
-                    <img src="/weather-title.png" alt="" aria-hidden="true" />
-                  </div>
-                  <div className="metar-side-text">현재 날씨</div>
-                </div>
-                <div className="metar-side-value">
-                  <div className="metar-weather-inline-icon">
-                    <WeatherIcon iconKey={iconKey} />
-                  </div>
-                  <div className="metar-weather-text">{weatherKorean}</div>
-                  {rainText && <div className="metar-rain-text">{rainText}</div>}
-                </div>
-              </article>
-
-              <article className="metar-surface-card metar-surface-card--wind">
-                <div className="metar-side-label">
-                  <div className="metar-side-icon metar-side-icon--wind">
-                    <img src="/172922.png" alt="" aria-hidden="true" />
-                  </div>
-                  <div className="metar-side-text">바람</div>
-                </div>
-                <div className="metar-side-value">
-                  <div className="metar-wind-row">
-                    <span className="metar-wind-heading-inline">{windDirectionText}</span>
-                    <span className="metar-wind-speed">{windSpeedText}</span>
-                    <span className="metar-wind-unit">kt</span>
-                  </div>
-                  {windGustText && <div className="metar-wind-layer metar-wind-layer--gust">{windGustText}</div>}
-                </div>
-              </article>
-            </div>
-
-            <div className="metar-weather-grid metar-weather-grid--bottom">
-              <article className="metar-surface-card metar-surface-card--compact">
-                <div className="metar-side-label">
-                  <div className="metar-side-icon metar-side-icon--metric">
-                    <svg viewBox="0 0 24 24" role="presentation">
-                      <path d="M14 14.8V5a2 2 0 1 0-4 0v9.8a4 4 0 1 0 4 0Z" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-                      <path d="M12 10v7" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-                    </svg>
-                  </div>
-                  <div className="metar-side-text">기온 /<br />상대습도</div>
-                </div>
-                <div className="metar-side-value">
-                  <div className="metar-compact-value metar-compact-value--paired">{tempDisplay} / {rhDisplay}</div>
-                  <div className="metar-compact-sub">{feelsLikeText}</div>
-                </div>
-              </article>
-
-              <article className="metar-surface-card metar-surface-card--compact">
-                <div className="metar-side-label">
-                  <div className="metar-side-icon metar-side-icon--metric">
-                    <span className="metar-crosswind-arrow" aria-hidden="true">{crosswindArrow}</span>
-                  </div>
-                  <div className="metar-side-text">측풍</div>
-                </div>
-                <div className="metar-side-value">
-                  <div className="metar-compact-value">{crosswindValue}</div>
-                </div>
-              </article>
-            </div>
-          </div>
-        </div>
-
-        <div className="metar-section">
-          <div className="metar-section-head">
-            <div className="metar-section-label">현재비행조건</div>
           </div>
           <div className="metar-section-body metar-section-body--conditions">
             <div className="flight-condition-layout">
@@ -305,6 +243,95 @@ export default function MetarCard({
             </div>
           </div>
         </div>
+
+        <div className="metar-section">
+          <div className="metar-section-head" />
+          <div className="metar-section-body metar-section-body--weather">
+            <div className="metar-weather-grid">
+              <article className={`metar-surface-card metar-surface-card--weather${specialWeather ? " metar-card--special-weather" : ""}`}>
+                <div className="metar-side-label">
+                  <div className="metar-side-icon metar-side-icon--weather-image">
+                    <img src="/weather-title.png" alt="" aria-hidden="true" />
+                  </div>
+                  <div className="metar-side-text">현재 날씨</div>
+                </div>
+                <div className="metar-side-value metar-side-value--anchored">
+                  <div className="metar-side-anchor">
+                    <div className="metar-side-main">
+                      <div className="metar-weather-inline-icon">
+                        <WeatherIcon iconKey={iconKey} />
+                      </div>
+                      <div className="metar-weather-text">{weatherKorean}</div>
+                    </div>
+                    <div className="metar-side-secondary">
+                      {rainText ? <div className="metar-rain-text">{rainText}</div> : null}
+                    </div>
+                  </div>
+                </div>
+              </article>
+
+              <article className="metar-surface-card metar-surface-card--wind">
+                <div className="metar-side-label">
+                  <div className="metar-side-icon metar-side-icon--wind">
+                    <span
+                      className="metar-crosswind-arrow metar-wind-rotation-arrow"
+                      aria-hidden="true"
+                      style={{ transform: `rotate(${windDirectionRotation}deg)` }}
+                    >
+                      ↑
+                    </span>
+                  </div>
+                  <div className="metar-side-text">바람</div>
+                </div>
+                <div className="metar-side-value metar-side-value--anchored">
+                  <div className="metar-side-anchor">
+                    <div className="metar-side-main">
+                      <div className="metar-wind-row">
+                        <span className="metar-wind-inline-text">{`${windDirectionText}/${windSpeedText}kt`}</span>
+                      </div>
+                    </div>
+                    <div className="metar-side-secondary">
+                      {windGustText ? <div className="metar-wind-layer metar-wind-layer--gust">{windGustText}</div> : null}
+                    </div>
+                  </div>
+                </div>
+              </article>
+            </div>
+
+            <div className="metar-weather-grid metar-weather-grid--bottom">
+              <article className="metar-surface-card metar-surface-card--compact">
+                <div className="metar-side-label">
+                  <div className="metar-side-icon metar-side-icon--metric">
+                    <img src={tempIcon} alt="" aria-hidden="true" />
+                  </div>
+                  <div className="metar-side-text">온도/습도</div>
+                </div>
+                <div className="metar-side-value metar-side-value--anchored">
+                  <div className="metar-side-anchor">
+                    <div className="metar-side-main">
+                      <div className="metar-compact-value metar-compact-value--paired">{tempDisplay} / {rhDisplay}</div>
+                    </div>
+                    <div className="metar-side-secondary metar-side-secondary--compact">
+                      {feelsLikeText ? <div className="metar-compact-sub">{feelsLikeText}</div> : null}
+                    </div>
+                  </div>
+                </div>
+              </article>
+
+              <article className="metar-surface-card metar-surface-card--compact">
+                <div className="metar-side-label">
+                  <div className="metar-side-icon metar-side-icon--metric">
+                    <span className="metar-crosswind-arrow" aria-hidden="true">{crosswindArrow}</span>
+                  </div>
+                  <div className="metar-side-text">측풍</div>
+                </div>
+                <div className="metar-side-value">
+                  <div className="metar-compact-value">{crosswindValue}</div>
+                </div>
+              </article>
+              </div>
+            </div>
+          </div>
       </div>
     </section>
   );

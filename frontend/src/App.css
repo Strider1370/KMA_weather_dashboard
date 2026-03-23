@@ -335,25 +335,27 @@ body {
   font-weight: 500;
 }
 
-/* Secondary metric (smaller) */
+/* Secondary metric (lighter weight) */
 .metric-row-secondary {
   gap: 12px;
+  margin-top: 4px;
 }
 
 .metric-card-sm {
-  background: var(--paper);
-  border: 1px solid var(--line);
-  border-radius: 14px;
-  padding: 14px 12px;
+  background: transparent;
+  border: none;
+  border-bottom: 0.5px solid var(--line);
+  border-radius: 0;
+  padding: 10px 12px;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 6px;
-  box-shadow: 0 2px 8px rgba(33, 43, 61, 0.04);
+  gap: 4px;
+  box-shadow: none;
 }
 
 .metric-card-sm-value {
-  font-size: 18px;
+  font-size: 15px;
   font-weight: 600;
   color: var(--ink);
 }
@@ -387,7 +389,7 @@ body {
 }
 
 .metar-section-head {
-  min-height: 18px;
+  min-height: 24px;
   margin-bottom: 8px;
   display: flex;
   align-items: center;
@@ -419,8 +421,10 @@ body {
 
 .metar-section-body--weather {
   display: grid;
-  grid-template-rows: 150px 104px;
+  grid-template-rows: repeat(2, minmax(0, 1fr));
   gap: 8px;
+  height: 262px;
+  min-height: 262px;
 }
 
 .metar-section-body--conditions {
@@ -432,6 +436,8 @@ body {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 8px;
+  min-height: 0;
+  height: 100%;
 }
 
 .metar-weather-grid--bottom {
@@ -446,21 +452,23 @@ body {
   grid-template-columns: 84px 1fr;
   align-items: stretch;
   text-align: center;
+  height: 100%;
 }
 
 .metar-card--special-weather {
-  border: 2px dashed #dc2626 !important;
+  outline: 2px dashed #dc2626;
+  outline-offset: -2px;
 }
 
 .metar-surface-card--weather,
 .metar-surface-card--wind {
-  min-height: 150px;
-  padding: 10px 12px;
+  min-height: 0;
+  padding: 10px 13px;
 }
 
 .metar-surface-card--compact {
-  min-height: 104px;
-  padding: 10px 14px;
+  min-height: 0;
+  padding: 10px 13px;
 }
 
 .metar-side-label {
@@ -486,10 +494,22 @@ body {
   height: 30px;
 }
 
+.metar-side-icon--metric img {
+  display: block;
+  width: 30px;
+  height: 30px;
+  object-fit: contain;
+}
+
 .metar-crosswind-arrow {
   font-size: 30px;
   line-height: 1;
   font-weight: 700;
+}
+
+.metar-wind-rotation-arrow {
+  display: inline-block;
+  transform-origin: center center;
 }
 
 .metar-side-icon--weather-image img,
@@ -517,6 +537,48 @@ body {
   text-align: center;
 }
 
+.metar-side-value--anchored {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.metar-side-anchor {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  right: 0;
+  transform: translateY(-50%);
+  display: block;
+}
+
+.metar-side-main {
+  position: relative;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.metar-side-secondary {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 100%;
+  width: 100%;
+  min-height: 16px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  margin-top: 2px;
+}
+
+.metar-side-secondary--compact {
+  transform: none;
+}
+
 .metar-weather-inline-icon {
   margin-bottom: 10px;
 }
@@ -534,15 +596,14 @@ body {
 }
 
 .metar-weather-text {
-  font-size: 21px;
+  font-size: 22px;
   font-weight: 700;
   color: var(--ink);
   line-height: 1.1;
 }
 
 .metar-rain-text {
-  margin-top: 4px;
-  font-size: 14px;
+  font-size: 13px;
   color: #2563eb;
   line-height: 1.1;
 }
@@ -551,8 +612,25 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
+  gap: 10px;
   min-height: 53px;
+}
+
+.metar-wind-value-group {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 3px;
+}
+
+.metar-wind-inline-text {
+  font-size: 22px;
+  font-weight: 600;
+  line-height: 1;
+  color: var(--ink);
+}
+
+.metar-wind-inline-text--unit {
+  color: var(--ink);
 }
 
 .metar-wind-heading {
@@ -602,29 +680,28 @@ body {
 }
 
 .metar-wind-layer--gust {
-  margin-top: 10px;
+  margin-top: 0;
 }
 
 .metar-compact-value {
-  font-size: 21px;
+  font-size: 22px;
   font-weight: 600;
   color: var(--ink);
 }
 
 .metar-compact-value--paired {
-  font-size: 17px;
+  font-size: 20px;
 }
 
 .metar-compact-sub {
-  margin-top: 4px;
-  font-size: 13px;
+  font-size: 14px;
   color: var(--muted);
 }
 
 .flight-condition-layout {
   display: grid;
-  grid-template-columns: 0.8fr 1.2fr;
-  gap: 10px;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
   height: 100%;
 }
 
@@ -693,6 +770,7 @@ body {
   font-size: 24px;
   font-weight: 600;
   line-height: 1.1;
+  text-align: center;
 }
 
 @media (max-width: 900px) {
@@ -718,6 +796,7 @@ body {
   border: 1px solid var(--line);
   border-radius: 14px;
   padding: 16px 18px;
+  margin-top: 4px;
   display: flex;
   flex-direction: column;
   overflow: hidden;
