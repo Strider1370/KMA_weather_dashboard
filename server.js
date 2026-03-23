@@ -76,12 +76,25 @@ function sendText(req, res, status, body, contentType = "text/plain; charset=utf
 }
 
 function readLatest(category) {
-  const cached = store.getCached(category);
-  if (cached !== null) return cached;
-  // cold start 폴백: initFromFiles() 전에 요청이 오는 경우
   const file = path.join(DATA_ROOT, category, "latest.json");
-  if (!fs.existsSync(file)) return null;
-  return JSON.parse(fs.readFileSync(file, "utf8"));
+  const cached = store.getCached(category);
+
+  if (!fs.existsSync(file)) return cached;
+
+  try {
+    const latest = JSON.parse(fs.readFileSync(file, "utf8"));
+    const diskHash = latest?.content_hash || store.canonicalHash(latest);
+    const cachedHash = cached?.content_hash || (cached ? store.canonicalHash(cached) : null);
+
+    if (cached !== null && cachedHash === diskHash) {
+      return cached;
+    }
+
+    store.updateCache(category, latest, diskHash);
+    return latest;
+  } catch {
+    return cached;
+  }
 }
 
 function readSnapshotHash(category) {

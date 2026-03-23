@@ -222,7 +222,7 @@ function formatWindRaw(direction, speed, gust, variable) {
 
 function resolveWindBarb(wind) {
   const speed = Number.isFinite(wind?.speed) ? wind.speed : 0;
-  if (speed <= 2 || wind?.raw === "00000KT") {
+  if (wind?.raw === "00000KT") {
     return {
       barb_key: "calm",
       rotation: 0,
@@ -286,14 +286,16 @@ function parseWind(windNode) {
   const normalizedDirection = Number.isFinite(direction) ? Math.round(direction) : 0;
   const normalizedGust = Number.isFinite(gust) ? Math.round(gust) : null;
 
+  const raw = formatWindRaw(normalizedDirection, normalizedSpeed, normalizedGust, variable);
+
   const parsed = {
-    raw: formatWindRaw(normalizedDirection, normalizedSpeed, normalizedGust, variable),
+    raw,
     direction: variable ? 0 : normalizedDirection,
     speed: normalizedSpeed,
     gust: normalizedGust,
     unit,
     variable,
-    calm: normalizedSpeed <= 2
+    calm: raw === "00000KT"
   };
 
   parsed.barb = resolveWindBarb(parsed);
