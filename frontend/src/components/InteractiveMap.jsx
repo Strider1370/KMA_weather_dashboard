@@ -292,6 +292,20 @@ function advisoryPhenomenonIcon(code) {
   return "!";
 }
 
+function advisoryPhenomenonLabel(code) {
+  if (!code) return "ADV";
+  if (code.includes("ICE")) return "ICING";
+  if (code.includes("TURB")) return "TURB";
+  if (code.includes("MTW")) return "MTW";
+  if (code.includes("LLWS")) return "LLWS";
+  if (code.includes("TS") || code.includes("CB")) return "TS";
+  if (code.includes("VA")) return "ASH";
+  if (code.includes("SFC_VIS")) return "VIS";
+  if (code.includes("IFR")) return "IFR";
+  if (code.includes("OBSC")) return "OBSC";
+  return code.replace(/^SEV_/, "").replace(/^MOD_/, "").slice(0, 8);
+}
+
 function advisoryStyle(item, kind, hovered) {
   const code = String(item?.phenomenon_code || "");
   const isSigmet = kind === "sigmet";
@@ -367,12 +381,12 @@ function advisoryCenter(item) {
 }
 
 function createAdvisoryIcon(item, kind) {
-  const icon = advisoryPhenomenonIcon(item?.phenomenon_code);
+  const label = advisoryPhenomenonLabel(item?.phenomenon_code);
   return L.divIcon({
     className: `leaflet-advisory-icon leaflet-advisory-icon--${kind}`,
-    html: `<span class="leaflet-advisory-icon-badge">${icon}</span>`,
-    iconSize: [24, 24],
-    iconAnchor: [12, 12]
+    html: `<span class="leaflet-advisory-icon-badge">${label}</span>`,
+    iconSize: [58, 24],
+    iconAnchor: [29, 12]
   });
 }
 

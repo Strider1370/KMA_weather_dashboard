@@ -1624,24 +1624,26 @@ body {
 }
 
 .leaflet-advisory-icon-badge {
-  width: 24px;
-  height: 24px;
+  min-width: 0;
+  height: auto;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border-radius: 999px;
-  color: #fff;
-  font-size: 14px;
-  font-weight: 800;
-  box-shadow: 0 4px 10px rgba(15, 23, 42, 0.3);
+  border-radius: 0;
+  color: #111827;
+  padding: 0;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
 }
 
 .leaflet-advisory-icon--sigmet .leaflet-advisory-icon-badge {
-  background: rgba(14, 165, 233, 0.95);
+  background: transparent;
 }
 
 .leaflet-advisory-icon--airmet .leaflet-advisory-icon-badge {
-  background: rgba(251, 146, 60, 0.95);
+  background: transparent;
 }
 
 .advisory-tooltip .leaflet-tooltip-content {
