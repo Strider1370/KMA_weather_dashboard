@@ -299,6 +299,14 @@ const server = http.createServer(async (req, res) => {
       return sendJson(req, res, 200, mergeTst1(readLatest("warning"), "warning"));
     }
 
+    if (req.url === "/api/sigmet") {
+      return sendJson(req, res, 200, readLatest("sigmet"));
+    }
+
+    if (req.url === "/api/airmet") {
+      return sendJson(req, res, 200, readLatest("airmet"));
+    }
+
     if (req.url === "/api/lightning") {
       return sendJson(req, res, 200, readLightning());
     }
@@ -337,6 +345,8 @@ const server = http.createServer(async (req, res) => {
         metar: { hash: readSnapshotHash("metar") },
         taf: { hash: readSnapshotHash("taf") },
         warning: { hash: readSnapshotHash("warning") },
+        sigmet: { hash: readSnapshotHash("sigmet") },
+        airmet: { hash: readSnapshotHash("airmet") },
         lightning: { hash: readSnapshotHash("lightning") },
         adsb: { hash: readSnapshotHash("adsb") },
         echo: echoTm != null ? { tm: echoTm } : null,

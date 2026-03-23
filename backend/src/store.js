@@ -3,19 +3,23 @@ const fs = require("fs");
 const path = require("path");
 const config = require("./config");
 
-const TYPES = ["metar", "taf", "warning", "lightning"];
+const TYPES = ["metar", "taf", "warning", "lightning", "sigmet", "airmet"];
 const FILE_PREFIX = {
   metar: "METAR",
   taf: "TAF",
   warning: "WARNINGS",
-  lightning: "LIGHTNING"
+  lightning: "LIGHTNING",
+  sigmet: "SIGMET",
+  airmet: "AIRMET"
 };
 
 const cache = {
   metar: { hash: null, prev_data: null },
   taf: { hash: null, prev_data: null },
   warning: { hash: null, prev_data: null },
-  lightning: { hash: null, prev_data: null }
+  lightning: { hash: null, prev_data: null },
+  sigmet: { hash: null, prev_data: null },
+  airmet: { hash: null, prev_data: null }
 };
 
 function ensureDirectories(basePath) {

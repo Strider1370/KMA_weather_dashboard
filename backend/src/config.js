@@ -27,7 +27,9 @@ module.exports = {
     endpoints: {
       metar: "/AmmIwxxmService/getMetar",
       taf: "/AmmIwxxmService/getTaf",
-      warning: "/AmmService/getWarning"
+      warning: "/AmmService/getWarning",
+      sigmet: "/AmmIwxxmService/getSigmet",
+      airmet: "/AmmIwxxmService/getAirmet"
     },
     auth_key: process.env.API_AUTH_KEY || "",
     default_params: { pageNo: 1, numOfRows: 10, dataType: "XML" },
@@ -77,6 +79,8 @@ module.exports = {
     metar_interval: "*/10 * * * *",
     taf_interval: "*/30 * * * *",
     warning_interval: "*/5 * * * *",
+    sigmet_interval: "*/5 * * * *",
+    airmet_interval: "*/5 * * * *",
     lightning_interval: "*/5 * * * *",
     radar_echo_interval: "*/5 * * * *",
     adsb_interval: "*/5 * * * *"
