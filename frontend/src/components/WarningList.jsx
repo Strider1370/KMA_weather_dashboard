@@ -39,15 +39,15 @@ export default function WarningList({ warningData, icao, warningTypes, tz = "UTC
 
   return (
     <div className="warning-banner warning-banner--danger">
-      <span className="warning-banner-icon">&#9888;</span>
-      <span>
+      <span className="warning-banner-icon warning-banner-icon--alert">&#9888;</span>
+      <span className="warning-banner-text">
         {list.map((item, i) => {
           const meta = warningMeta(item.wrng_type, warningTypes || {}) || {};
           const key = item.wrng_type_key === "UNKNOWN" && meta.key ? meta.key : item.wrng_type_key;
           const name = WARNING_NAME_KO[key] || safe(item.wrng_type_name) || "미확인경보";
           return (
-            <span key={i}>
-              {i > 0 && " / "}
+            <span key={i} className="warning-banner-item">
+              {i > 0 && <span className="warning-banner-separator">|</span>}
               <strong>{name}</strong>
               {" "}
               <span className="warning-banner-time">

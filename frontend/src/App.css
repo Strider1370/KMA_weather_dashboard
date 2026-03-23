@@ -176,10 +176,11 @@ body {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 10px 16px;
+  min-height: 54px;
+  padding: 15px 16px;
   border-radius: 10px;
-  font-size: 14px;
-  font-weight: 500;
+  font-size: 17px;
+  font-weight: 600;
 }
 
 .warning-banner--ok {
@@ -188,18 +189,48 @@ body {
 }
 
 .warning-banner--danger {
-  background: #fef2f2;
-  color: #dc2626;
+  background: #f97316;
+  color: #fff7ed;
 }
 
 .warning-banner-icon {
-  font-size: 14px;
+  font-size: 19px;
   flex-shrink: 0;
 }
 
-.warning-banner-time {
-  font-size: 11px;
+.warning-banner-icon--alert {
+  animation: warning-icon-blink 1s steps(1, end) infinite;
+}
+
+.warning-banner-text {
+  flex: 1;
+  min-width: 0;
+  line-height: 1.35;
+}
+
+.warning-banner-item {
+  display: inline-block;
+}
+
+.warning-banner-separator {
+  display: inline-block;
+  margin: 0 10px;
   opacity: 0.8;
+  font-weight: 700;
+}
+
+.warning-banner-time {
+  font-size: 14px;
+  opacity: 0.92;
+}
+
+@keyframes warning-icon-blink {
+  0%, 49% {
+    opacity: 1;
+  }
+  50%, 100% {
+    opacity: 0;
+  }
 }
 
 /* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -344,8 +375,9 @@ body {
 
 .metar-section {
   min-width: 0;
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-rows: auto 1fr;
+  min-height: 0;
 }
 
 .metar-section-label {
@@ -369,12 +401,31 @@ body {
   font-weight: 700;
   white-space: nowrap;
   text-align: left;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .metar-section-head .metar-section-label {
   color: var(--ink);
   font-size: 13px;
   font-weight: 700;
+}
+
+.metar-section-body {
+  flex: 1;
+  min-height: 0;
+}
+
+.metar-section-body--weather {
+  display: grid;
+  grid-template-rows: 150px 104px;
+  gap: 8px;
+}
+
+.metar-section-body--conditions {
+  height: 262px;
+  min-height: 262px;
 }
 
 .metar-weather-grid {
@@ -384,7 +435,7 @@ body {
 }
 
 .metar-weather-grid--bottom {
-  margin-top: 8px;
+  margin-top: 0;
 }
 
 .metar-surface-card {
@@ -395,6 +446,10 @@ body {
   grid-template-columns: 84px 1fr;
   align-items: stretch;
   text-align: center;
+}
+
+.metar-card--special-weather {
+  border: 2px dashed #dc2626 !important;
 }
 
 .metar-surface-card--weather,
@@ -425,15 +480,18 @@ body {
   color: var(--accent);
 }
 
-.metar-side-icon--weather .weather-icon-wrapper span {
-  font-size: 2.6rem !important;
-  line-height: 1;
-}
-
 .metar-side-icon--wind svg,
 .metar-side-icon--metric svg {
   width: 30px;
   height: 30px;
+}
+
+.metar-side-icon--weather-image img,
+.metar-side-icon--wind img {
+  display: block;
+  width: 64px;
+  height: 64px;
+  object-fit: contain;
 }
 
 .metar-side-text {
@@ -454,12 +512,19 @@ body {
 }
 
 .metar-weather-inline-icon {
-  margin-bottom: 6px;
+  margin-bottom: 10px;
 }
 
 .metar-weather-inline-icon .weather-icon-wrapper span {
   font-size: 2.7rem !important;
   line-height: 1;
+}
+
+.metar-weather-inline-icon--image img {
+  display: block;
+  width: 58px;
+  height: 58px;
+  object-fit: contain;
 }
 
 .metar-weather-text {
@@ -481,24 +546,18 @@ body {
   align-items: center;
   justify-content: center;
   gap: 8px;
-  flex-wrap: wrap;
-}
-
-.metar-wind-arrow {
-  width: 30px;
-  height: 30px;
-  display: inline-flex;
-  color: var(--accent);
-  transition: transform 0.35s ease;
-}
-
-.metar-wind-arrow svg {
-  width: 30px;
-  height: 30px;
+  min-height: 53px;
 }
 
 .metar-wind-heading {
-  font-size: 30px;
+  font-size: 20px;
+  font-weight: 600;
+  line-height: 1;
+  color: var(--ink);
+}
+
+.metar-wind-heading-inline {
+  font-size: 22px;
   font-weight: 600;
   line-height: 1;
   color: var(--ink);
@@ -521,7 +580,19 @@ body {
   color: var(--muted);
   font-weight: 600;
   line-height: 1.1;
-  margin-top: 8px;
+}
+
+.metar-wind-layer {
+  width: 100%;
+  text-align: center;
+}
+
+.metar-wind-layer--heading {
+  margin-top: 10px;
+}
+
+.metar-wind-layer--crosswind {
+  margin-top: 10px;
 }
 
 .metar-compact-value {
@@ -536,32 +607,43 @@ body {
   color: var(--muted);
 }
 
-.flight-category-banner {
-  border-radius: 8px;
-  padding: 12px 16px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 12px;
-  color: #fff;
+.flight-condition-layout {
+  display: grid;
+  grid-template-columns: 0.8fr 1.2fr;
+  gap: 10px;
+  height: 100%;
 }
 
-.flight-category-banner-code {
-  font-size: 28px;
-  font-weight: 600;
+.flight-category-panel {
+  border-radius: 8px;
+  padding: 18px 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  color: #fff;
+  position: relative;
+}
+
+.flight-category-panel-code {
+  font-size: 34px;
+  font-weight: 700;
   line-height: 1;
 }
 
-.flight-category-banner-divider {
-  width: 0.5px;
-  align-self: stretch;
-  background: rgba(255, 255, 255, 0.5);
+.flight-category-panel-label {
+  margin-top: 12px;
+  font-size: 18px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.88);
 }
 
-.flight-category-banner-label {
-  font-size: 15px;
-  font-weight: 500;
-  color: rgba(255, 255, 255, 0.88);
+.flight-condition-stack {
+  display: grid;
+  grid-template-rows: 1fr 1fr;
+  gap: 8px;
+  min-height: 0;
 }
 
 .flight-condition-card {
@@ -571,15 +653,6 @@ body {
   border-top: 0.5px solid;
   border-right: 0.5px solid;
   border-bottom: 0.5px solid;
-}
-
-.metar-section:last-child {
-  gap: 8px;
-}
-
-.metar-section:last-child .flight-category-banner,
-.metar-section:last-child .flight-condition-card {
-  flex: 1;
 }
 
 .flight-condition-head {
@@ -610,6 +683,10 @@ body {
 
 @media (max-width: 900px) {
   .metar-panel-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .flight-condition-layout {
     grid-template-columns: 1fr;
   }
 }
@@ -649,6 +726,23 @@ body {
 .taf-new-validity {
   font-size: 13px;
   color: var(--muted);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.panel-kind-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 48px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: var(--ink);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
 }
 
 .taf-new-container {
@@ -744,6 +838,41 @@ body {
   border-radius: 10px;
 }
 
+.taf-new-seg--weather,
+.taf-new-seg--wind,
+.taf-new-seg--tint {
+  color: inherit;
+}
+
+.taf-new-seg--wind {
+  font-weight: 800;
+  border: 1px solid rgba(95, 103, 117, 0.44);
+}
+
+.taf-new-seg--wind .segment-label,
+.taf-new-seg--wind .wind-arrow-inline {
+  color: var(--ink);
+}
+
+.taf-new-seg--weather {
+  border: 1px solid rgba(95, 103, 117, 0.44);
+}
+
+.taf-new-seg--tint {
+  justify-content: center;
+  padding-left: 8px;
+  padding-right: 8px;
+  border-radius: 8px;
+  border-left: 3px solid currentColor;
+  border-top: 1px solid currentColor;
+  border-right: 1px solid currentColor;
+  border-bottom: 1px solid currentColor;
+}
+
+.taf-new-seg--special-weather {
+  border: 2px dashed #dc2626 !important;
+}
+
 .taf-new-seg .weather-icon-wrapper span {
   font-size: 1.3rem !important;
 }
@@ -753,7 +882,7 @@ body {
   font-size: 15px;
   letter-spacing: 0.02em;
   line-height: 1;
-  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.18);
+  text-shadow: none;
 }
 
 .taf-new-seg .wind-arrow-inline {
@@ -761,6 +890,10 @@ body {
   font-weight: 900;
   font-size: 17px;
   line-height: 1;
+}
+
+.taf-new-seg-small {
+  font-size: 0.65em !important;
 }
 
 .taf-panel-empty {

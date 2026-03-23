@@ -95,6 +95,11 @@ export function groupElementsByValue(dataList, valueGetter) {
 export function resolveIconKey(data, time) {
   if (!data) return "UNKNOWN";
   const suffix = isDaytime(time) ? "D" : "N";
+
+  const explicitIcon = data.display?.weather_icon;
+  if (explicitIcon && explicitIcon !== "NSW") {
+    return `wx_${explicitIcon}_${suffix}`;
+  }
   
   if (data.weather && data.weather.length > 0) {
     const wp = data.weather[0];

@@ -48,6 +48,11 @@ function formatVisibilityValue(value, rawText) {
   return "-";
 }
 
+function hasSpecialWeather(observation) {
+  const raw = String(observation?.display?.weather || "").toUpperCase();
+  return ["TS", "FG", "BR", "SN"].some((token) => raw.includes(token));
+}
+
 export default function MetarCard({ metarData, icao, airportMeta = null, metarTime = "", version = "v2", onVersionToggle, tz = "UTC" }) {
   const target = metarData?.airports?.[icao];
 
@@ -128,90 +133,86 @@ export default function MetarCard({ metarData, icao, airportMeta = null, metarTi
   const visibilityCategory = classifyVisibilityCategory(visibility);
   const ceilingCategory = classifyCeilingCategory(ceilingFt);
   const flightCategory = getFlightCategory(visibility, ceilingFt);
+  const metarTimeText = metarTime.replace(/\s+METAR$/, "").trim();
+  const specialWeather = hasSpecialWeather(target.observation);
 
   return (
     <section className="metar-panel">
       <div className="metar-panel-grid">
         <div className="metar-section">
           <div className="metar-section-head">
-            <div className="metar-section-time">{metarTime}</div>
+            <div className="metar-section-time">
+              <span className="panel-kind-badge">METAR</span>
+              <span>{metarTimeText}</span>
+            </div>
           </div>
-          <div className="metar-weather-grid">
-            <article className="metar-surface-card metar-surface-card--weather">
-              <div className="metar-side-label">
-                <div className="metar-side-text">현재 날씨</div>
-              </div>
-              <div className="metar-side-value">
-                <div className="metar-weather-inline-icon">
-                  <WeatherIcon iconKey={iconKey} />
+          <div className="metar-section-body metar-section-body--weather">
+            <div className="metar-weather-grid">
+              <article className={`metar-surface-card metar-surface-card--weather${specialWeather ? " metar-card--special-weather" : ""}`}>
+                <div className="metar-side-label">
+                  <div className="metar-side-icon metar-side-icon--weather-image">
+                    <img src="/weather-title.png" alt="" aria-hidden="true" />
+                  </div>
+                  <div className="metar-side-text">현재 날씨</div>
                 </div>
-                <div className="metar-weather-text">{weatherKorean}</div>
-                {rainText && <div className="metar-rain-text">{rainText}</div>}
-              </div>
-            </article>
+                <div className="metar-side-value">
+                  <div className="metar-weather-inline-icon">
+                    <WeatherIcon iconKey={iconKey} />
+                  </div>
+                  <div className="metar-weather-text">{weatherKorean}</div>
+                  {rainText && <div className="metar-rain-text">{rainText}</div>}
+                </div>
+              </article>
 
-            <article className="metar-surface-card metar-surface-card--wind">
-              <div className="metar-side-label">
-                <div className="metar-side-icon metar-side-icon--wind">
-                  <svg viewBox="0 0 64 64" role="presentation">
-                    <path d="M4 24h30c7 0 12-5 12-12S41 0 34 0 22 5 22 12" fill="none" stroke="currentColor" strokeWidth="6" strokeLinecap="round" strokeLinejoin="round" />
-                    <path d="M2 32h44c8 0 14-6 14-14S54 4 46 4 32 10 32 18" fill="none" stroke="currentColor" strokeWidth="6" strokeLinecap="round" strokeLinejoin="round" />
-                    <path d="M18 44h26c7 0 12 5 12 12s-5 12-12 12-12-5-12-12" fill="none" stroke="currentColor" strokeWidth="6" strokeLinecap="round" strokeLinejoin="round" />
-                    <circle cx="6" cy="24" r="3" fill="currentColor" />
-                  </svg>
+              <article className="metar-surface-card metar-surface-card--wind">
+                <div className="metar-side-label">
+                  <div className="metar-side-icon metar-side-icon--wind">
+                    <img src="/172922.png" alt="" aria-hidden="true" />
+                  </div>
+                  <div className="metar-side-text">바람</div>
                 </div>
-                <div className="metar-side-text">바람</div>
-              </div>
-              <div className="metar-side-value">
-                <div className="metar-wind-row">
-                  <span
-                    className="metar-wind-arrow"
-                    style={{ transform: `rotate(${barb.rotation + 180}deg)` }}
-                    aria-hidden="true"
-                  >
-                    <svg viewBox="0 0 22 22" role="presentation">
-                      <path d="M11 2 L17 10 H13 V20 H9 V10 H5 Z" fill="currentColor" />
+                <div className="metar-side-value">
+                  <div className="metar-wind-row">
+                    <span className="metar-wind-heading-inline">{windDirectionText}</span>
+                    <span className="metar-wind-speed">{windSpeedText}</span>
+                    <span className="metar-wind-unit">kt</span>
+                  </div>
+                  <div className="metar-wind-layer metar-wind-layer--crosswind">{crosswindText}</div>
+                </div>
+              </article>
+            </div>
+
+            <div className="metar-weather-grid metar-weather-grid--bottom">
+              <article className="metar-surface-card metar-surface-card--compact">
+                <div className="metar-side-label">
+                  <div className="metar-side-icon metar-side-icon--metric">
+                    <svg viewBox="0 0 24 24" role="presentation">
+                      <path d="M14 14.8V5a2 2 0 1 0-4 0v9.8a4 4 0 1 0 4 0Z" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                      <path d="M12 10v7" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
                     </svg>
-                  </span>
-                  <span className="metar-wind-heading">{windDirectionText}</span>
-                  <span className="metar-wind-speed">{windSpeedText}</span>
-                  <span className="metar-wind-unit">kt</span>
+                  </div>
+                  <div className="metar-side-text">기온</div>
                 </div>
-                <div className="metar-wind-direction">{crosswindText}</div>
-              </div>
-            </article>
-          </div>
+                <div className="metar-side-value">
+                  <div className="metar-compact-value">{tempDisplay}</div>
+                  <div className="metar-compact-sub">{feelsLikeText}</div>
+                </div>
+              </article>
 
-          <div className="metar-weather-grid metar-weather-grid--bottom">
-            <article className="metar-surface-card metar-surface-card--compact">
-              <div className="metar-side-label">
-                <div className="metar-side-icon metar-side-icon--metric">
-                  <svg viewBox="0 0 24 24" role="presentation">
-                    <path d="M14 14.8V5a2 2 0 1 0-4 0v9.8a4 4 0 1 0 4 0Z" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-                    <path d="M12 10v7" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-                  </svg>
+              <article className="metar-surface-card metar-surface-card--compact">
+                <div className="metar-side-label">
+                  <div className="metar-side-icon metar-side-icon--metric">
+                    <svg viewBox="0 0 24 24" role="presentation">
+                      <path d="M12 3C9.2 6.7 7 9.4 7 13a5 5 0 0 0 10 0c0-3.6-2.2-6.3-5-10Z" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" />
+                    </svg>
+                  </div>
+                  <div className="metar-side-text">상대습도</div>
                 </div>
-                <div className="metar-side-text">기온</div>
-              </div>
-              <div className="metar-side-value">
-                <div className="metar-compact-value">{tempDisplay}</div>
-                <div className="metar-compact-sub">{feelsLikeText}</div>
-              </div>
-            </article>
-
-            <article className="metar-surface-card metar-surface-card--compact">
-              <div className="metar-side-label">
-                <div className="metar-side-icon metar-side-icon--metric">
-                  <svg viewBox="0 0 24 24" role="presentation">
-                    <path d="M12 3C9.2 6.7 7 9.4 7 13a5 5 0 0 0 10 0c0-3.6-2.2-6.3-5-10Z" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" />
-                  </svg>
+                <div className="metar-side-value">
+                  <div className="metar-compact-value">{rhDisplay}</div>
                 </div>
-                <div className="metar-side-text">상대습도</div>
-              </div>
-              <div className="metar-side-value">
-                <div className="metar-compact-value">{rhDisplay}</div>
-              </div>
-            </article>
+              </article>
+            </div>
           </div>
         </div>
 
@@ -219,59 +220,64 @@ export default function MetarCard({ metarData, icao, airportMeta = null, metarTi
           <div className="metar-section-head">
             <div className="metar-section-label">현재비행조건</div>
           </div>
-          <article className="flight-category-banner" style={{ backgroundColor: flightCategory.color }}>
-            <span className="flight-category-banner-code">{flightCategory.category}</span>
-            <span className="flight-category-banner-divider" aria-hidden="true" />
-            <span className="flight-category-banner-label">{flightCategory.labelKo}</span>
-          </article>
+          <div className="metar-section-body metar-section-body--conditions">
+            <div className="flight-condition-layout">
+              <article className="flight-category-panel" style={{ backgroundColor: flightCategory.color }}>
+                <div className="flight-category-panel-code">{flightCategory.category}</div>
+                <div className="flight-category-panel-label">{flightCategory.labelKo}</div>
+              </article>
 
-          <article
-            className="flight-condition-card"
-            style={{
-              backgroundColor: visibilityCategory.bg,
-              borderLeftColor: visibilityCategory.border,
-              borderTopColor: visibilityCategory.borderSoft,
-              borderRightColor: visibilityCategory.borderSoft,
-              borderBottomColor: visibilityCategory.borderSoft,
-            }}
-          >
-            <div className="flight-condition-head">
-              <span className="flight-condition-label" style={{ color: visibilityCategory.color }}>시정</span>
-              <span
-                className="flight-condition-pill"
-                style={{ color: visibilityCategory.color, backgroundColor: "#ffffffaa" }}
-              >
-                {visibilityCategory.category}
-              </span>
-            </div>
-            <div className="flight-condition-value" style={{ color: visibilityCategory.valueColor }}>
-              {visibilityValue}
-            </div>
-          </article>
+              <div className="flight-condition-stack">
+                <article
+                  className="flight-condition-card"
+                  style={{
+                    backgroundColor: visibilityCategory.bg,
+                    borderLeftColor: visibilityCategory.border,
+                    borderTopColor: visibilityCategory.borderSoft,
+                    borderRightColor: visibilityCategory.borderSoft,
+                    borderBottomColor: visibilityCategory.borderSoft,
+                  }}
+                >
+                  <div className="flight-condition-head">
+                    <span className="flight-condition-label" style={{ color: visibilityCategory.color }}>시정</span>
+                    <span
+                      className="flight-condition-pill"
+                      style={{ color: visibilityCategory.color, backgroundColor: "#ffffffaa" }}
+                    >
+                      {visibilityCategory.category}
+                    </span>
+                  </div>
+                  <div className="flight-condition-value" style={{ color: visibilityCategory.valueColor }}>
+                    {visibilityValue}
+                  </div>
+                </article>
 
-          <article
-            className="flight-condition-card"
-            style={{
-              backgroundColor: ceilingCategory.bg,
-              borderLeftColor: ceilingCategory.border,
-              borderTopColor: ceilingCategory.borderSoft,
-              borderRightColor: ceilingCategory.borderSoft,
-              borderBottomColor: ceilingCategory.borderSoft,
-            }}
-          >
-            <div className="flight-condition-head">
-              <span className="flight-condition-label" style={{ color: ceilingCategory.color }}>운고</span>
-              <span
-                className="flight-condition-pill"
-                style={{ color: ceilingCategory.color, backgroundColor: "#ffffffaa" }}
-              >
-                {ceilingCategory.category}
-              </span>
+                <article
+                  className="flight-condition-card"
+                  style={{
+                    backgroundColor: ceilingCategory.bg,
+                    borderLeftColor: ceilingCategory.border,
+                    borderTopColor: ceilingCategory.borderSoft,
+                    borderRightColor: ceilingCategory.borderSoft,
+                    borderBottomColor: ceilingCategory.borderSoft,
+                  }}
+                >
+                  <div className="flight-condition-head">
+                    <span className="flight-condition-label" style={{ color: ceilingCategory.color }}>운고</span>
+                    <span
+                      className="flight-condition-pill"
+                      style={{ color: ceilingCategory.color, backgroundColor: "#ffffffaa" }}
+                    >
+                      {ceilingCategory.category}
+                    </span>
+                  </div>
+                  <div className="flight-condition-value" style={{ color: ceilingCategory.valueColor }}>
+                    {ceilingValue}
+                  </div>
+                </article>
+              </div>
             </div>
-            <div className="flight-condition-value" style={{ color: ceilingCategory.valueColor }}>
-              {ceilingValue}
-            </div>
-          </article>
+          </div>
         </div>
       </div>
     </section>

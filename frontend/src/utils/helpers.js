@@ -140,12 +140,12 @@ export const FLIGHT_CATEGORY_META = {
   },
   IFR: {
     category: "IFR",
-    color: "#dc2626",
+    color: "#f59e0b",
     labelKo: "계기비행규칙",
-    bg: "#fef2f2",
-    border: "#dc2626",
-    borderSoft: "#fecaca",
-    valueColor: "#b91c1c",
+    bg: "#fffbeb",
+    border: "#f59e0b",
+    borderSoft: "#fde68a",
+    valueColor: "#b45309",
   },
   LIFR: {
     category: "LIFR",
@@ -164,25 +164,21 @@ function getFlightCategoryMeta(category) {
 
 export function classifyVisibilityCategory(visibilityM) {
   const vis = Number.isFinite(visibilityM) ? visibilityM : 99999;
-  if (vis < 1600) return getFlightCategoryMeta("LIFR");
-  if (vis < 4800) return getFlightCategoryMeta("IFR");
-  if (vis <= 8000) return getFlightCategoryMeta("MVFR");
+  if (vis < 5000) return getFlightCategoryMeta("IFR");
   return getFlightCategoryMeta("VFR");
 }
 
 export function classifyCeilingCategory(ceilingFt) {
   const ceil = Number.isFinite(ceilingFt) ? ceilingFt : 99999;
-  if (ceil < 500) return getFlightCategoryMeta("LIFR");
-  if (ceil < 1000) return getFlightCategoryMeta("IFR");
-  if (ceil <= 3000) return getFlightCategoryMeta("MVFR");
+  if (ceil < 1500) return getFlightCategoryMeta("IFR");
   return getFlightCategoryMeta("VFR");
 }
 
 export function getFlightCategory(visibilityM, ceilingFt) {
-  const visibilityCategory = classifyVisibilityCategory(visibilityM);
-  const ceilingCategory = classifyCeilingCategory(ceilingFt);
-  const rank = { VFR: 0, MVFR: 1, IFR: 2, LIFR: 3 };
-  return rank[visibilityCategory.category] >= rank[ceilingCategory.category]
-    ? visibilityCategory
-    : ceilingCategory;
+  const vis = Number.isFinite(visibilityM) ? visibilityM : 99999;
+  const ceil = Number.isFinite(ceilingFt) ? ceilingFt : 99999;
+  if (vis < 5000 || ceil < 1500) {
+    return FLIGHT_CATEGORY_META.IFR;
+  }
+  return FLIGHT_CATEGORY_META.VFR;
 }
