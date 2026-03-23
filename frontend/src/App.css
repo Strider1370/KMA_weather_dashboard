@@ -486,6 +486,12 @@ body {
   height: 30px;
 }
 
+.metar-crosswind-arrow {
+  font-size: 30px;
+  line-height: 1;
+  font-weight: 700;
+}
+
 .metar-side-icon--weather-image img,
 .metar-side-icon--wind img {
   display: block;
@@ -595,10 +601,18 @@ body {
   margin-top: 10px;
 }
 
+.metar-wind-layer--gust {
+  margin-top: 10px;
+}
+
 .metar-compact-value {
   font-size: 21px;
   font-weight: 600;
   color: var(--ink);
+}
+
+.metar-compact-value--paired {
+  font-size: 17px;
 }
 
 .metar-compact-sub {
@@ -794,7 +808,7 @@ body {
 }
 
 .taf-scale-date {
-  font-size: 11px;
+  font-size: 13px;
   font-weight: 800;
   color: var(--accent-2);
   margin-bottom: 1px;
@@ -802,9 +816,9 @@ body {
 }
 
 .taf-scale-hour {
-  font-size: 12px;
+  font-size: 14px;
   color: var(--muted);
-  font-weight: 600;
+  font-weight: 700;
   padding-bottom: 4px;
   white-space: nowrap;
 }
@@ -940,9 +954,11 @@ body {
 .map-panel-wrap {
   grid-column: 2;
   grid-row: 2;
+  align-self: start;
   border: 1px solid var(--line);
   border-radius: 14px;
   padding: 16px;
+  height: min(86vh, 820px);
   min-height: 0;
   display: flex;
   flex-direction: column;
@@ -951,11 +967,7 @@ body {
 }
 
 .map-panel-title {
-  font-size: 15px;
-  font-weight: 700;
-  color: var(--ink);
-  margin-bottom: 2px;
-  flex-shrink: 0;
+  display: none;
 }
 
 .map-panel-wrap .interactive-map-panel {
@@ -968,16 +980,24 @@ body {
 /* Override lightning-head inside map-panel-wrap: title on left, buttons on right */
 .map-panel-wrap .lightning-head {
   display: flex;
-  justify-content: flex-end;
+  justify-content: flex-start;
   align-items: center;
   gap: 10px;
-  margin-bottom: 8px;
+  margin-bottom: 6px;
   flex-shrink: 0;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+}
+
+.map-panel-wrap .lightning-head-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--ink);
+  white-space: nowrap;
 }
 
 .map-panel-wrap .lightning-head .map-scope-switch {
   margin-right: auto;
+  margin-top: 0;
 }
 
 /* Make panel-switch and range buttons compact in map panel */
@@ -1205,6 +1225,7 @@ body {
   justify-content: space-between;
   align-items: center;
   gap: 12px;
+  margin-bottom: 5px;
 }
 .radar-icon-btn {
   width: 36px;
@@ -1249,16 +1270,16 @@ body {
 
 .radar-timeline {
   display: grid;
-  gap: 6px;
-  padding: 8px 2px 2px;
+  gap: 0;
+  padding: 6px 0 0;
 }
 .radar-seek-wrap {
   position: relative;
-  padding-top: 8px;
-  padding-bottom: 14px;
+  padding-top: 0;
+  padding-bottom: 0;
   display: grid;
   grid-template-columns: auto 1fr;
-  gap: 8px;
+  gap: 4px;
   align-items: center;
 }
 .radar-seek-track {
@@ -1329,17 +1350,17 @@ body {
 }
 .radar-time-row {
   position: relative;
-  margin-top: 0;
+  margin-top: -2px;
   grid-column: 2;
-  height: 16px;
+  height: 4px;
 }
 .radar-current-time {
   position: absolute;
-  top: 0;
+  top: -1px;
   --radar-thumb-size: 14px;
   left: calc((var(--radar-progress, 0) * (100% - var(--radar-thumb-size))) + (var(--radar-thumb-size) / 2));
   transform: translateX(-50%);
-  font-size: 0.74rem;
+  font-size: 0.62rem;
   color: var(--accent);
   font-weight: 800;
   white-space: nowrap;

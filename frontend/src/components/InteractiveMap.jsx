@@ -703,6 +703,7 @@ export default function InteractiveMap({
   return (
     <aside className={`panel lightning-panel interactive-map-panel ${isNationwide ? "interactive-map-panel--korea" : "interactive-map-panel--airport"}`}>
       <div className="lightning-head">
+        <div className="lightning-head-title">기상 레이더</div>
         <div className="panel-switch map-scope-switch" role="tablist" aria-label="Map scope">
           <button
             type="button"
@@ -966,8 +967,7 @@ export default function InteractiveMap({
             </MapContainer>
           </div>
 
-          {echoFrames.length > 0 && (
-            <div className="radar-timeline">
+          <div className="radar-timeline">
               <div className="radar-controls">
                 <div className="radar-speed-control">
                   <button
@@ -1016,6 +1016,7 @@ export default function InteractiveMap({
                     step={1}
                     value={Math.min(frameIndex, maxIndex)}
                     onChange={(event) => setFrameIndex(Number(event.target.value))}
+                    disabled={echoFrames.length === 0}
                     style={loopActive ? {
                       "--loop-start-pct": `${loopStartPct}%`,
                       "--loop-end-pct": `${loopEndPct}%`,
@@ -1048,12 +1049,11 @@ export default function InteractiveMap({
                     className="radar-current-time"
                     style={{ "--radar-progress": progressRatio }}
                   >
-                    {formatTmLabel(currentFrame?.tm)}
+                    {echoFrames.length > 0 ? formatTmLabel(currentFrame?.tm) : ""}
                   </span>
                 </div>
               </div>
             </div>
-          )}
         </>
       )}
     </aside>

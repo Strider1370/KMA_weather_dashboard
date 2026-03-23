@@ -35,9 +35,28 @@ function formatCrosswindText(wind, runwayHdg) {
     return "측풍 -";
   }
   const selectedRunwayHdg = pickRunwayDirection(runwayHdg, wind.direction);
-  const angle = Math.abs(((wind.direction - selectedRunwayHdg + 180 + 360) % 360) - 180);
-  const crosswind = Math.abs(wind.speed * Math.sin((angle * Math.PI) / 180));
-  return `측풍 ${Math.round(crosswind)}kt`;
+  const relative = ((wind.direction - selectedRunwayHdg + 540) % 360) - 180;
+  const crosswindComponent = wind.speed * Math.sin((relative * Math.PI) / 180);
+  const side = crosswindComponent > 0 ? "R" : crosswindComponent < 0 ? "L" : "";
+  const crosswind = Math.abs(crosswindComponent);
+  return side ? `측풍 ${side} ${Math.round(crosswind)}kt` : `측풍 ${Math.round(crosswind)}kt`;
+}
+
+function formatCrosswindValue(wind, runwayHdg) {
+  return formatCrosswindText(wind, runwayHdg).replace(/^측풍\s*/, "");
+}
+
+function getCrosswindArrow(wind, runwayHdg) {
+  if (!wind || wind.calm) return "↑";
+  if (!Number.isFinite(wind.speed) || !Number.isFinite(wind.direction) || !Number.isFinite(runwayHdg)) {
+    return "↑";
+  }
+  const selectedRunwayHdg = pickRunwayDirection(runwayHdg, wind.direction);
+  const relative = ((wind.direction - selectedRunwayHdg + 540) % 360) - 180;
+  const crosswindComponent = wind.speed * Math.sin((relative * Math.PI) / 180);
+  if (crosswindComponent > 0) return "←";
+  if (crosswindComponent < 0) return "→";
+  return "↑";
 }
 
 function formatVisibilityValue(value, rawText) {
@@ -53,7 +72,15 @@ function hasSpecialWeather(observation) {
   return ["TS", "FG", "BR", "SN"].some((token) => raw.includes(token));
 }
 
-export default function MetarCard({ metarData, icao, airportMeta = null, metarTime = "", version = "v2", onVersionToggle, tz = "UTC" }) {
+export default function MetarCard({
+  metarData,
+  icao,
+  airportMeta = null,
+  metarTime = "",
+  version = "v2",
+  onVersionToggle,
+  tz = "UTC",
+}) {
   const target = metarData?.airports?.[icao];
 
   if (!target) {
@@ -71,7 +98,7 @@ export default function MetarCard({ metarData, icao, airportMeta = null, metarTi
   const issueTime = target.header?.issue_time || target.header?.observation_time;
   const obsTime = target.header?.observation_time || issueTime;
   const rain1h = target.observation?.rainfall_1h || null;
-  const rainText = (rain1h?.mm == null || rain1h.mm <= 0) ? null : `${rain1h.mm.toFixed(1)} mm/h`;
+  const rainText = rain1h?.mm == null || rain1h.mm <= 0 ? null : `${rain1h.mm.toFixed(1)} mm/h`;
   const feelsLike = computeFeelsLikeC({
     tempC: target.observation?.temperature?.air,
     dewpointC: target.observation?.temperature?.dewpoint,
@@ -111,7 +138,7 @@ export default function MetarCard({ metarData, icao, airportMeta = null, metarTi
       `Temp: ${safe(target.observation?.display?.temperature)}`,
       `Relative Humidity: ${rhDisplay}`,
       `Rainfall(1h @ ${rainHourText}): ${rainText || "-"}`,
-      `Feels Like: ${feelsLike.value == null ? "-" : feelsLike.value.toFixed(1) + "C"}`,
+      `Feels Like: ${feelsLike.value == null ? "-" : `${feelsLike.value.toFixed(1)}C`}`,
       `QNH: ${safe(target.observation?.display?.qnh)}`,
     ];
     return (
@@ -125,11 +152,12 @@ export default function MetarCard({ metarData, icao, airportMeta = null, metarTi
   }
 
   const iconKey = resolveIconKey(target.observation, issueTime);
-  const barb = resolveWindBarb(wind);
   const weatherKorean = convertWeatherToKorean(target.observation?.display?.weather, target.observation?.cavok);
   const windDirectionText = getWindDirectionLabel(wind);
-  const windSpeedText = wind?.calm ? "0" : (Number.isFinite(windSpeed) ? String(windSpeed) : "-");
-  const crosswindText = formatCrosswindText(wind, airportMeta?.runway_hdg ?? null);
+  const windSpeedText = wind?.calm ? "0" : Number.isFinite(windSpeed) ? String(windSpeed) : "-";
+  const windGustText = Number.isFinite(windGust) ? `Gust ${windGust}kt` : null;
+  const crosswindValue = formatCrosswindValue(wind, airportMeta?.runway_hdg ?? null);
+  const crosswindArrow = getCrosswindArrow(wind, airportMeta?.runway_hdg ?? null);
   const visibilityCategory = classifyVisibilityCategory(visibility);
   const ceilingCategory = classifyCeilingCategory(ceilingFt);
   const flightCategory = getFlightCategory(visibility, ceilingFt);
@@ -177,7 +205,7 @@ export default function MetarCard({ metarData, icao, airportMeta = null, metarTi
                     <span className="metar-wind-speed">{windSpeedText}</span>
                     <span className="metar-wind-unit">kt</span>
                   </div>
-                  <div className="metar-wind-layer metar-wind-layer--crosswind">{crosswindText}</div>
+                  {windGustText && <div className="metar-wind-layer metar-wind-layer--gust">{windGustText}</div>}
                 </div>
               </article>
             </div>
@@ -191,10 +219,10 @@ export default function MetarCard({ metarData, icao, airportMeta = null, metarTi
                       <path d="M12 10v7" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
                     </svg>
                   </div>
-                  <div className="metar-side-text">기온</div>
+                  <div className="metar-side-text">기온 /<br />상대습도</div>
                 </div>
                 <div className="metar-side-value">
-                  <div className="metar-compact-value">{tempDisplay}</div>
+                  <div className="metar-compact-value metar-compact-value--paired">{tempDisplay} / {rhDisplay}</div>
                   <div className="metar-compact-sub">{feelsLikeText}</div>
                 </div>
               </article>
@@ -202,14 +230,12 @@ export default function MetarCard({ metarData, icao, airportMeta = null, metarTi
               <article className="metar-surface-card metar-surface-card--compact">
                 <div className="metar-side-label">
                   <div className="metar-side-icon metar-side-icon--metric">
-                    <svg viewBox="0 0 24 24" role="presentation">
-                      <path d="M12 3C9.2 6.7 7 9.4 7 13a5 5 0 0 0 10 0c0-3.6-2.2-6.3-5-10Z" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" />
-                    </svg>
+                    <span className="metar-crosswind-arrow" aria-hidden="true">{crosswindArrow}</span>
                   </div>
-                  <div className="metar-side-text">상대습도</div>
+                  <div className="metar-side-text">측풍</div>
                 </div>
                 <div className="metar-side-value">
-                  <div className="metar-compact-value">{rhDisplay}</div>
+                  <div className="metar-compact-value">{crosswindValue}</div>
                 </div>
               </article>
             </div>
