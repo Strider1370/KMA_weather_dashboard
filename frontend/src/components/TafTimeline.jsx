@@ -69,9 +69,13 @@ export default function TafTimeline({ tafData, icao, version = "v2", onVersionTo
       const ceil = getCeiling(slot);
       return getFlightCategory(vis, ceil).category;
     });
-    const weatherGroups = groupElementsByValue(timeline, (slot) =>
-      convertWeatherToKorean(slot.display?.weather, slot.cavok)
-    );
+    const weatherGroups = groupElementsByValue(timeline, (slot) => {
+      const weatherVisual = resolveWeatherVisual(slot, slot.time);
+      const weatherText = convertWeatherToKorean(slot.display?.weather, slot.cavok, slot.clouds || []);
+      const baseIconId = String(weatherVisual?.iconId || "unknown")
+        .replace(/-(day|night)$/, "");
+      return `${baseIconId}|${weatherText}`;
+    });
     const windGroups = groupElementsByValue(timeline, (slot) => {
       const wind = slot.wind;
       return `${wind?.direction ?? "VRB"}_${wind?.speed ?? 0}_${wind?.gust ?? 0}`;
@@ -150,14 +154,24 @@ export default function TafTimeline({ tafData, icao, version = "v2", onVersionTo
             <div className="taf-new-label">날씨</div>
             <div className="taf-new-timeline">
               {weatherGroups.map((group, i) => (
-                <div
-                  key={i}
-                  className={`taf-new-seg taf-new-seg--weather${hasSpecialWeather(group.data) ? " taf-new-seg--special-weather" : ""}`}
-                  style={{ width: `${group.width}%`, ...WEATHER_STYLE }}
-                >
-                  <WeatherIcon visual={resolveWeatherVisual(group.data, group.data.time)} className="mini" />
-                  {group.hourCount >= 2 && <span className="segment-label">{group.value}</span>}
-                </div>
+                (() => {
+                  const weatherVisual = resolveWeatherVisual(group.data, group.data.time);
+                  const miniWeatherVisual = weatherVisual
+                    ? { ...weatherVisual, intensityOverlay: null }
+                    : weatherVisual;
+                  const [, weatherLabel = group.value] = String(group.value).split("|");
+
+                  return (
+                    <div
+                      key={i}
+                      className={`taf-new-seg taf-new-seg--weather${hasSpecialWeather(group.data) ? " taf-new-seg--special-weather" : ""}`}
+                      style={{ width: `${group.width}%`, ...WEATHER_STYLE }}
+                    >
+                      <WeatherIcon visual={miniWeatherVisual} className="mini" />
+                      {group.hourCount >= 2 && <span className="segment-label">{weatherLabel}</span>}
+                    </div>
+                  );
+                })()
               ))}
             </div>
           </div>

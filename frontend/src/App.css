@@ -551,12 +551,6 @@ body {
   color: var(--accent);
 }
 
-.metar-side-icon--wind svg,
-.metar-side-icon--metric svg {
-  width: 60px;
-  height: 60px;
-}
-
 .metar-side-icon--metric img {
   display: block;
   width: 30px;
@@ -569,28 +563,13 @@ body {
   height: 45px;
 }
 
-.runway-crosswind-title-icon {
-  position: relative;
+.metar-direction-arrow {
   display: inline-flex;
   width: 60px;
   height: 60px;
   align-items: center;
   justify-content: center;
-}
-
-.runway-crosswind-title-icon svg {
-  width: 60px;
-  height: 60px;
-}
-
-.runway-crosswind-title-plane {
-  position: absolute;
-  left: 49%;
-  top: 82%;
-  width: 1em;
-  text-align: center;
-  transform: translate(-50%, -50%) rotate(-90deg);
-  font-size: 33px;
+  font-size: 42px;
   line-height: 1;
   color: currentColor;
 }

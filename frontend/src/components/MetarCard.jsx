@@ -9,7 +9,7 @@ import {
   getFlightCategory,
 } from "../utils/helpers";
 import WeatherIcon from "./WeatherIcon";
-import { resolveWindBarb, convertWeatherToKorean } from "../utils/visual-mapper";
+import { convertWeatherToKorean } from "../utils/visual-mapper";
 import { resolveWeatherVisual } from "../utils/weather-visual-resolver";
 import tempIcon from "../../../temp_icon.png";
 
@@ -56,8 +56,8 @@ function getCrosswindArrow(wind, runwayHdg) {
   const selectedRunwayHdg = pickRunwayDirection(runwayHdg, wind.direction);
   const relative = ((wind.direction - selectedRunwayHdg + 540) % 360) - 180;
   const crosswindComponent = wind.speed * Math.sin((relative * Math.PI) / 180);
-  if (crosswindComponent > 0) return "→";
-  if (crosswindComponent < 0) return "←";
+  if (crosswindComponent > 0) return "←";
+  if (crosswindComponent < 0) return "→";
   return "↑";
 }
 
@@ -66,54 +66,7 @@ function getWindDirectionRotation(wind) {
     return 0;
   }
   const normalized = ((wind.direction % 360) + 360) % 360;
-  return normalized;
-}
-
-function RunwayWindTitleIcon({ runwayHeading, windRotation }) {
-  const runwayRotation = Number.isFinite(runwayHeading) ? runwayHeading : 0;
-  const runwayColor = "#111111";
-
-  return (
-    <svg viewBox="0 0 64 64" aria-hidden="true">
-      <g transform={`rotate(${runwayRotation} 32 32)`}>
-        <rect x="25" y="10" width="14" height="44" rx="4" fill="none" stroke={runwayColor} strokeWidth="2.4" />
-        <line x1="32" y1="15" x2="32" y2="49" stroke={runwayColor} strokeWidth="1.4" strokeDasharray="4 3" />
-      </g>
-      <g transform={`rotate(${windRotation} 32 32)`}>
-        <line x1="32" y1="2" x2="32" y2="32" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
-        <path d="M32 32 L26 22 H38 Z" fill="currentColor" />
-      </g>
-    </svg>
-  );
-}
-
-function RunwayCrosswindTitleIcon({ side }) {
-  const sideDir = side === "left" ? -1 : side === "right" ? 1 : 0;
-  const arrowY = 28;
-  const arrowStartX = sideDir < 0 ? 2 : 62;
-  const arrowEndX = sideDir < 0 ? 20 : 44;
-  const runwayColor = "#111111";
-  const arrowHead = sideDir < 0
-    ? "20 28 11 22 11 34"
-    : "44 28 53 22 53 34";
-
-  return (
-    <span className="runway-crosswind-title-icon" aria-hidden="true">
-      <svg viewBox="0 0 64 64">
-        <rect x="25" y="10" width="14" height="40" rx="4" fill="none" stroke={runwayColor} strokeWidth="2.4" />
-        <line x1="32" y1="14" x2="32" y2="46" stroke={runwayColor} strokeWidth="1.4" strokeDasharray="4 3" />
-        {sideDir !== 0 ? (
-          <g>
-            <line x1={arrowStartX} y1={arrowY} x2={arrowEndX} y2={arrowY} stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
-            <polygon points={arrowHead} fill="currentColor" />
-          </g>
-        ) : (
-          <line x1="8" y1={arrowY} x2="56" y2={arrowY} stroke="currentColor" strokeWidth="2" strokeLinecap="round" opacity="0.4" />
-        )}
-      </svg>
-      <span className="runway-crosswind-title-plane">✈</span>
-    </span>
-  );
+  return (normalized + 180) % 360;
 }
 
 function formatVisibilityValue(value, rawText) {
@@ -209,14 +162,17 @@ export default function MetarCard({
   }
 
   const weatherVisual = resolveWeatherVisual(target.observation, issueTime);
-  const weatherKorean = convertWeatherToKorean(target.observation?.display?.weather, target.observation?.cavok);
+  const weatherKorean = convertWeatherToKorean(
+    target.observation?.display?.weather,
+    target.observation?.cavok,
+    target.observation?.clouds || []
+  );
   const windDirectionText = getWindDirectionLabel(wind);
   const windSpeedText = wind?.calm ? "0" : Number.isFinite(windSpeed) ? String(windSpeed) : "-";
   const windGustText = Number.isFinite(windGust) ? `Gust ${windGust}kt` : null;
   const windDirectionRotation = getWindDirectionRotation(wind);
   const crosswindValue = formatCrosswindValue(wind, airportMeta?.runway_hdg ?? null);
   const crosswindArrow = getCrosswindArrow(wind, airportMeta?.runway_hdg ?? null);
-  const crosswindSide = crosswindArrow === "←" ? "left" : crosswindArrow === "→" ? "right" : "center";
   const visibilityCategory = classifyVisibilityCategory(visibility);
   const ceilingCategory = classifyCeilingCategory(ceilingFt);
   const flightCategory = getFlightCategory(visibility, ceilingFt);
@@ -322,7 +278,13 @@ export default function MetarCard({
               <article className="metar-surface-card metar-surface-card--wind">
                 <div className="metar-side-label">
                   <div className="metar-side-icon metar-side-icon--wind">
-                    <RunwayWindTitleIcon runwayHeading={airportMeta?.runway_hdg ?? null} windRotation={windDirectionRotation} />
+                    <span
+                      className="metar-direction-arrow"
+                      aria-hidden="true"
+                      style={{ transform: `rotate(${windDirectionRotation}deg)` }}
+                    >
+                      ↑
+                    </span>
                   </div>
                   <div className="metar-side-text">바람</div>
                 </div>
@@ -364,7 +326,7 @@ export default function MetarCard({
               <article className="metar-surface-card metar-surface-card--compact">
                 <div className="metar-side-label">
                   <div className="metar-side-icon metar-side-icon--metric">
-                    <RunwayCrosswindTitleIcon side={crosswindSide} />
+                    <span className="metar-direction-arrow" aria-hidden="true">{crosswindArrow}</span>
                   </div>
                   <div className="metar-side-text">측풍</div>
                 </div>

@@ -12,9 +12,29 @@ export function isDaytime(isoString) {
 /**
  * 영문 기상 현상을 한글로 변환
  */
-export function convertWeatherToKorean(weatherStr, cavok) {
+function getCloudKorean(clouds) {
+  if (!Array.isArray(clouds) || clouds.length === 0) return "맑음";
+
+  const cloudPriority = { OVC: 5, BKN: 4, SCT: 3, FEW: 2, SKC: 1, CLR: 1 };
+  const topLayer = clouds.reduce((prev, curr) =>
+    (cloudPriority[curr.amount] || 0) > (cloudPriority[prev.amount] || 0) ? curr : prev
+  );
+
+  const cloudMapping = {
+    FEW: "맑음",
+    SCT: "구름 조금",
+    BKN: "구름 많음",
+    OVC: "흐림",
+    SKC: "맑음",
+    CLR: "맑음"
+  };
+
+  return cloudMapping[topLayer?.amount] || "맑음";
+}
+
+export function convertWeatherToKorean(weatherStr, cavok, clouds = []) {
   if (cavok) return "맑음/양호";
-  if (!weatherStr || weatherStr === "NSW") return "맑음";
+  if (!weatherStr || weatherStr === "NSW") return getCloudKorean(clouds);
   
   const mapping = {
     "RA": "비", "-RA": "약한 비", "+RA": "강한 비",

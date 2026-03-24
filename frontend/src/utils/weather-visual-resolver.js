@@ -69,17 +69,21 @@ function mapWeatherCodeToIconId(iconKey, day) {
   if (!iconKey || iconKey === "UNKNOWN" || iconKey === "NSW") return null;
   if (iconKey === "CAVOK") return `clear-${suffix}`;
 
-  if (iconKey.startsWith("TS")) return `thunderstorm-${suffix}`;
+  if (iconKey.startsWith("TS")) {
+    if (iconKey.includes("SN")) return "thunderstorms-snow";
+    if (iconKey.includes("RA") || iconKey.includes("DZ")) return "thunderstorms-rain";
+    return `thunderstorm-${suffix}`;
+  }
   if (iconKey === "FZFG") return `fog-${suffix}`;
   if (iconKey.startsWith("FZ")) return "freezing-rain";
   if (iconKey.startsWith("SH")) {
-    if (iconKey.includes("SN")) return `snow-${suffix}`;
+    if (iconKey.includes("SN")) return "snow";
     if (iconKey.includes("GR") || iconKey.includes("GS")) return "hail";
-    return `showers-${suffix}`;
+    return "rain";
   }
 
-  if (["RA", "DZ", "UP"].includes(iconKey)) return `rain-${suffix}`;
-  if (["SN", "SG", "IC", "PL"].includes(iconKey)) return `snow-${suffix}`;
+  if (["RA", "DZ", "UP"].includes(iconKey)) return "rain";
+  if (["SN", "SG", "IC", "PL"].includes(iconKey)) return "snow";
   if (["GR", "GS"].includes(iconKey)) return "hail";
   if (["FG", "MIFG", "BCFG", "PRFG", "BR"].includes(iconKey)) return `fog-${suffix}`;
   if (["HZ", "FU", "DU", "SA", "VA"].includes(iconKey)) return `haze-${suffix}`;
@@ -100,7 +104,7 @@ function mapCloudsToIconId(clouds, day) {
 
   switch (topLayer?.amount) {
     case "FEW":
-      return `few-clouds-${day ? "day" : "night"}`;
+      return `clear-${day ? "day" : "night"}`;
     case "SCT":
       return `scattered-clouds-${day ? "day" : "night"}`;
     case "BKN":
@@ -113,6 +117,21 @@ function mapCloudsToIconId(clouds, day) {
     default:
       return null;
   }
+}
+
+function mapDisplayCloudsToIconId(displayClouds, day) {
+  const normalized = String(displayClouds || "").toUpperCase().trim();
+
+  if (!normalized) return null;
+  if (normalized === "NSC" || normalized === "NCD" || normalized === "SKC" || normalized === "CLR") {
+    return `clear-${day ? "day" : "night"}`;
+  }
+  if (normalized.includes("OVC")) return "overcast";
+  if (normalized.includes("BKN")) return "broken-clouds";
+  if (normalized.includes("SCT")) return `scattered-clouds-${day ? "day" : "night"}`;
+  if (normalized.includes("FEW")) return `clear-${day ? "day" : "night"}`;
+
+  return null;
 }
 
 export function resolveWeatherVisual(data, time) {
@@ -151,6 +170,17 @@ export function resolveWeatherVisual(data, time) {
       intensityOverlay: null,
       source: "clouds",
       code: null,
+      isDay: day
+    };
+  }
+
+  const displayCloudId = mapDisplayCloudsToIconId(data?.display?.clouds, day);
+  if (displayCloudId) {
+    return {
+      iconId: displayCloudId,
+      intensityOverlay: null,
+      source: "display-clouds",
+      code: data?.display?.clouds || null,
       isDay: day
     };
   }
