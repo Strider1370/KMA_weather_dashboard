@@ -2,7 +2,15 @@ import { useState, useEffect, useMemo, useRef, useCallback, useReducer } from "r
 import { MapContainer, GeoJSON, CircleMarker, Circle, Marker, Pane, ImageOverlay, Polygon, Tooltip, useMap } from "react-leaflet";
 import L from "leaflet";
 import { feature as topoFeature } from "topojson-client";
-import { bbox as turfBbox, circle as turfCircle, featureCollection, union as turfUnion } from "@turf/turf";
+import {
+  bbox as turfBbox,
+  booleanPointInPolygon as turfBooleanPointInPolygon,
+  centerOfMass as turfCenterOfMass,
+  circle as turfCircle,
+  featureCollection,
+  pointOnFeature as turfPointOnFeature,
+  union as turfUnion,
+} from "@turf/turf";
 import "leaflet/dist/leaflet.css";
 
 const ZONE_RADII = [
@@ -306,7 +314,7 @@ function advisoryPhenomenonLabel(code) {
   return code.replace(/^SEV_/, "").replace(/^MOD_/, "").slice(0, 8);
 }
 
-function advisoryStyle(item, kind, hovered) {
+function advisoryColor(item, kind) {
   const code = String(item?.phenomenon_code || "");
   const isSigmet = kind === "sigmet";
   let color = isSigmet ? "#ef4444" : "#fb923c";
@@ -316,6 +324,13 @@ function advisoryStyle(item, kind, hovered) {
   else if (code.includes("TS") || code.includes("CB")) color = isSigmet ? "#ef4444" : "#f43f5e";
   else if (code.includes("VA")) color = isSigmet ? "#7c3aed" : "#8b5cf6";
   else if (code.includes("IFR") || code.includes("OBSC")) color = isSigmet ? "#64748b" : "#94a3b8";
+
+  return color;
+}
+
+function advisoryStyle(item, kind, hovered) {
+  const color = advisoryColor(item, kind);
+  const isSigmet = kind === "sigmet";
 
   return {
     color,
@@ -363,18 +378,55 @@ function geometryToLeafletPositions(geometry) {
   return null;
 }
 
+function advisoryGeometryFeature(item) {
+  const geometry = item?.geometry;
+  if (!geometry || (geometry.type !== "Polygon" && geometry.type !== "MultiPolygon")) {
+    return null;
+  }
+
+  return {
+    type: "Feature",
+    properties: {
+      id: item?.id || null,
+    },
+    geometry,
+  };
+}
+
+function featurePointToLeaflet(pointFeature) {
+  const coords = pointFeature?.geometry?.coordinates;
+  if (!Array.isArray(coords) || coords.length < 2) return null;
+  const [lon, lat] = coords;
+  if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
+  return [lat, lon];
+}
+
 function advisoryCenter(item) {
+  const feature = advisoryGeometryFeature(item);
+  if (feature) {
+    try {
+      const centerCandidate = turfCenterOfMass(feature);
+      if (centerCandidate && turfBooleanPointInPolygon(centerCandidate, feature)) {
+        return featurePointToLeaflet(centerCandidate);
+      }
+    } catch {
+      // Fall through to point-on-feature and bbox fallback.
+    }
+
+    try {
+      const surfacePoint = turfPointOnFeature(feature);
+      const leafletPoint = featurePointToLeaflet(surfacePoint);
+      if (leafletPoint) {
+        return leafletPoint;
+      }
+    } catch {
+      // Fall through to bbox fallback.
+    }
+  }
+
   const bbox = item?.bbox;
   if (bbox && [bbox.min_lon, bbox.min_lat, bbox.max_lon, bbox.max_lat].every((v) => Number.isFinite(v))) {
     return [(bbox.min_lat + bbox.max_lat) / 2, (bbox.min_lon + bbox.max_lon) / 2];
-  }
-
-  const geometry = item?.geometry;
-  if (geometry?.type === "Polygon" && Array.isArray(geometry.coordinates?.[0])) {
-    const coords = geometry.coordinates[0];
-    if (!coords.length) return null;
-    const sum = coords.reduce((acc, [lon, lat]) => ({ lon: acc.lon + lon, lat: acc.lat + lat }), { lon: 0, lat: 0 });
-    return [sum.lat / coords.length, sum.lon / coords.length];
   }
 
   return null;
@@ -382,11 +434,13 @@ function advisoryCenter(item) {
 
 function createAdvisoryIcon(item, kind) {
   const label = advisoryPhenomenonLabel(item?.phenomenon_code);
+  const color = advisoryColor(item, kind);
+  const width = Math.max(53, Math.min(88, 15 + label.length * 7));
   return L.divIcon({
     className: `leaflet-advisory-icon leaflet-advisory-icon--${kind}`,
-    html: `<span class="leaflet-advisory-icon-badge">${label}</span>`,
-    iconSize: [58, 24],
-    iconAnchor: [29, 12]
+    html: `<span class="leaflet-advisory-icon-badge" style="background:${color};">${label}</span>`,
+    iconSize: [width, 24],
+    iconAnchor: [Math.round(width / 2), 12]
   });
 }
 
@@ -849,7 +903,6 @@ export default function InteractiveMap({
   return (
     <aside className={`panel lightning-panel interactive-map-panel ${isNationwide ? "interactive-map-panel--korea" : "interactive-map-panel--airport"}`}>
       <div className="lightning-head">
-        <div className="lightning-head-title">기상 레이더</div>
         <div className="panel-switch map-scope-switch" role="tablist" aria-label="Map scope">
           <button
             type="button"
@@ -1167,7 +1220,15 @@ export default function InteractiveMap({
                 const centerPoint = advisoryCenter(item);
                 if (!centerPoint) return null;
                 return (
-                  <Marker key={`sigmet-icon-${item.id}`} position={centerPoint} icon={createAdvisoryIcon(item, "sigmet")}>
+                  <Marker
+                    key={`sigmet-icon-${item.id}`}
+                    position={centerPoint}
+                    icon={createAdvisoryIcon(item, "sigmet")}
+                    eventHandlers={{
+                      mouseover: () => setHoveredAdvisoryId(item.id),
+                      mouseout: () => setHoveredAdvisoryId((prev) => (prev === item.id ? null : prev))
+                    }}
+                  >
                     <Tooltip direction="top" offset={[0, -10]} opacity={0.96} className="advisory-tooltip">
                       <div className="advisory-tooltip-body">
                         <strong>{advisoryLabel(item)}</strong>
@@ -1183,7 +1244,15 @@ export default function InteractiveMap({
                 const centerPoint = advisoryCenter(item);
                 if (!centerPoint) return null;
                 return (
-                  <Marker key={`airmet-icon-${item.id}`} position={centerPoint} icon={createAdvisoryIcon(item, "airmet")}>
+                  <Marker
+                    key={`airmet-icon-${item.id}`}
+                    position={centerPoint}
+                    icon={createAdvisoryIcon(item, "airmet")}
+                    eventHandlers={{
+                      mouseover: () => setHoveredAdvisoryId(item.id),
+                      mouseout: () => setHoveredAdvisoryId((prev) => (prev === item.id ? null : prev))
+                    }}
+                  >
                     <Tooltip direction="top" offset={[0, -10]} opacity={0.96} className="advisory-tooltip">
                       <div className="advisory-tooltip-body">
                         <strong>{advisoryLabel(item)}</strong>
