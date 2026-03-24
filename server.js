@@ -75,6 +75,11 @@ function sendText(req, res, status, body, contentType = "text/plain; charset=utf
   res.end(body);
 }
 
+function readJsonFile(file) {
+  const raw = fs.readFileSync(file, "utf8").replace(/^\uFEFF/, "");
+  return JSON.parse(raw);
+}
+
 function readLatest(category) {
   const file = path.join(DATA_ROOT, category, "latest.json");
   const cached = store.getCached(category);
@@ -82,7 +87,7 @@ function readLatest(category) {
   if (!fs.existsSync(file)) return cached;
 
   try {
-    const latest = JSON.parse(fs.readFileSync(file, "utf8"));
+    const latest = readJsonFile(file);
     const diskHash = latest?.content_hash || store.canonicalHash(latest);
     const cachedHash = cached?.content_hash || (cached ? store.canonicalHash(cached) : null);
 
@@ -105,7 +110,7 @@ function readSnapshotHash(category) {
   if (!fs.existsSync(file)) return null;
 
   try {
-    const latest = JSON.parse(fs.readFileSync(file, "utf8"));
+    const latest = readJsonFile(file);
     return latest?.content_hash || null;
   } catch {
     return null;
@@ -116,8 +121,7 @@ function readTst1Override(category) {
   const file = path.join(TST1_ROOT, `${category}.json`);
   if (!fs.existsSync(file)) return null;
   try {
-    const raw = fs.readFileSync(file, "utf8").replace(/^\uFEFF/, "");
-    return JSON.parse(raw);
+    return readJsonFile(file);
   } catch (error) {
     console.warn(`[TST1] Invalid JSON for ${category}: ${error.message}`);
     return null;
@@ -184,7 +188,7 @@ function readLightning() {
     }
   };
   if (fs.existsSync(latestFile)) {
-    payload = JSON.parse(fs.readFileSync(latestFile, "utf8"));
+    payload = readJsonFile(latestFile);
     if (!payload.airports) payload.airports = {};
     if (!payload.nationwide) {
       payload.nationwide = {
@@ -335,7 +339,7 @@ const server = http.createServer(async (req, res) => {
       let echoTm = null;
       try {
         if (fs.existsSync(echoMetaPath)) {
-          const echoMeta = JSON.parse(fs.readFileSync(echoMetaPath, "utf8"));
+          const echoMeta = readJsonFile(echoMetaPath);
           echoTm = echoMeta.tm || null;
         }
       } catch {

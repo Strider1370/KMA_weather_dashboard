@@ -10,10 +10,10 @@ import {
 } from "../utils/helpers";
 import WeatherIcon from "./WeatherIcon";
 import {
-  resolveIconKey,
   groupElementsByValue,
   convertWeatherToKorean,
 } from "../utils/visual-mapper";
+import { resolveWeatherVisual } from "../utils/weather-visual-resolver";
 
 const FC_COLORS = { VFR: "#15803d", MVFR: "#2563eb", IFR: "#f59e0b", LIFR: "#7c3aed" };
 const WEATHER_STYLE = { backgroundColor: "rgba(234, 179, 8, 0.10)", color: "#92400e" };
@@ -155,7 +155,7 @@ export default function TafTimeline({ tafData, icao, version = "v2", onVersionTo
                   className={`taf-new-seg taf-new-seg--weather${hasSpecialWeather(group.data) ? " taf-new-seg--special-weather" : ""}`}
                   style={{ width: `${group.width}%`, ...WEATHER_STYLE }}
                 >
-                  <WeatherIcon iconKey={resolveIconKey(group.data, group.data.time)} className="mini" />
+                  <WeatherIcon visual={resolveWeatherVisual(group.data, group.data.time)} className="mini" />
                   {group.hourCount >= 2 && <span className="segment-label">{group.value}</span>}
                 </div>
               ))}
@@ -244,14 +244,14 @@ export default function TafTimeline({ tafData, icao, version = "v2", onVersionTo
           </div>
           <div className="taf-v3-grid">
             {timeline.map((slot, i) => {
-              const iconKey = resolveIconKey(slot, slot.time);
+              const weatherVisual = resolveWeatherVisual(slot, slot.time);
               const wind = slot.wind;
               const rotation = (wind?.direction || 0) + 180;
               const windText = `${wind?.speed}${wind?.gust ? `G${wind.gust}` : ""}kt`;
               return (
                 <div key={i} className="taf-v3-card">
                   <div className="taf-v3-data-time">{getDisplayDate(slot.time, tz).getUTCHours()}시</div>
-                  <div className="taf-v3-data-icon"><WeatherIcon iconKey={iconKey} /></div>
+                  <div className="taf-v3-data-icon"><WeatherIcon visual={weatherVisual} /></div>
                   <div className="taf-v3-data-wind">
                     <span className="wind-arrow-inline" style={{ transform: `rotate(${rotation}deg)` }}>↑</span>
                     {windText}
