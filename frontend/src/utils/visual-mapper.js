@@ -35,7 +35,7 @@ function getCloudKorean(clouds) {
 export function convertWeatherToKorean(weatherStr, cavok, clouds = []) {
   if (cavok) return "맑음/양호";
   if (!weatherStr || weatherStr === "NSW") return getCloudKorean(clouds);
-  
+
   const mapping = {
     "RA": "비", "-RA": "약한 비", "+RA": "강한 비",
     "SN": "눈", "-SN": "약한 눈", "+SN": "강한 눈",
@@ -43,8 +43,26 @@ export function convertWeatherToKorean(weatherStr, cavok, clouds = []) {
     "TS": "뇌전", "TSRA": "뇌우", "SHRA": "소나기",
     "SCT": "구름 조금", "BKN": "구름 많음", "OVC": "흐림", "FEW": "구름 약간"
   };
-  
-  return mapping[weatherStr] || weatherStr;
+
+  const normalized = String(weatherStr || "").toUpperCase().trim();
+  if (mapping[normalized]) {
+    return mapping[normalized];
+  }
+
+  const tokens = normalized.split(/\s+/).filter(Boolean);
+  const precipitationPriority = [
+    "TSRA", "SHRA", "+RA", "-RA", "RA",
+    "+SN", "-SN", "SN",
+    "DZ", "TS"
+  ];
+
+  const primaryToken = precipitationPriority.find((token) => tokens.includes(token));
+  if (primaryToken && mapping[primaryToken]) {
+    return mapping[primaryToken];
+  }
+
+  const firstMappedToken = tokens.find((token) => mapping[token]);
+  return (firstMappedToken && mapping[firstMappedToken]) || weatherStr;
 }
 
 /**
