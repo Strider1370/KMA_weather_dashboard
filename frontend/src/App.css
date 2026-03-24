@@ -198,6 +198,11 @@ body {
   flex-shrink: 0;
 }
 
+.warning-banner-label {
+  flex-shrink: 0;
+  font-weight: 700;
+}
+
 .warning-banner-icon--alert {
   animation: warning-icon-blink 1s steps(1, end) infinite;
 }

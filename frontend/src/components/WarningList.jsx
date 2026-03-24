@@ -32,7 +32,7 @@ export default function WarningList({ warningData, icao, warningTypes, tz = "UTC
     return (
       <div className="warning-banner warning-banner--ok">
         <span className="warning-banner-icon">&#10003;</span>
-        <span>경보 없음</span>
+        <span>공항경보 없음</span>
       </div>
     );
   }
@@ -40,6 +40,7 @@ export default function WarningList({ warningData, icao, warningTypes, tz = "UTC
   return (
     <div className="warning-banner warning-banner--danger">
       <span className="warning-banner-icon warning-banner-icon--alert">&#9888;</span>
+      <span className="warning-banner-label">공항경보:</span>
       <span className="warning-banner-text">
         {list.map((item, i) => {
           const meta = warningMeta(item.wrng_type, warningTypes || {}) || {};

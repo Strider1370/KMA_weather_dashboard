@@ -74,7 +74,7 @@ function mapWeatherCodeToIconId(iconKey, day) {
     if (iconKey.includes("RA") || iconKey.includes("DZ")) return "thunderstorms-rain";
     return `thunderstorm-${suffix}`;
   }
-  if (iconKey === "FZFG") return `fog-${suffix}`;
+  if (iconKey === "FZFG") return "fog";
   if (iconKey.startsWith("FZ")) return "freezing-rain";
   if (iconKey.startsWith("SH")) {
     if (iconKey.includes("SN")) return "snow";
@@ -85,8 +85,9 @@ function mapWeatherCodeToIconId(iconKey, day) {
   if (["RA", "DZ", "UP"].includes(iconKey)) return "rain";
   if (["SN", "SG", "IC", "PL"].includes(iconKey)) return "snow";
   if (["GR", "GS"].includes(iconKey)) return "hail";
-  if (["FG", "MIFG", "BCFG", "PRFG", "BR"].includes(iconKey)) return `fog-${suffix}`;
-  if (["HZ", "FU", "DU", "SA", "VA"].includes(iconKey)) return `haze-${suffix}`;
+  if (["FG", "MIFG", "BCFG", "PRFG"].includes(iconKey)) return "fog";
+  if (iconKey === "BR") return "mist";
+  if (["HZ", "FU", "DU", "SA", "VA"].includes(iconKey)) return "haze";
   if (["PO", "SQ", "FC", "SS", "DS", "BLSN", "BLSA", "BLDU", "DRSN", "DRSA", "DRDU"].includes(iconKey)) {
     return "severe-wind";
   }

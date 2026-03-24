@@ -3,12 +3,11 @@ import clearDay from "../assets/weather-icons/basmilius/clear-day.svg";
 import clearNight from "../assets/weather-icons/basmilius/clear-night.svg";
 import fewCloudsDay from "../assets/weather-icons/basmilius/few-clouds-day.svg";
 import fewCloudsNight from "../assets/weather-icons/basmilius/few-clouds-night.svg";
-import fogDay from "../assets/weather-icons/basmilius/fog-day.svg";
-import fogNight from "../assets/weather-icons/basmilius/fog-night.svg";
+import fog from "../assets/weather-icons/basmilius/fog.svg";
 import freezingRain from "../assets/weather-icons/basmilius/freezing-rain.svg";
 import hail from "../assets/weather-icons/basmilius/hail.svg";
-import hazeDay from "../assets/weather-icons/basmilius/haze-day.svg";
-import hazeNight from "../assets/weather-icons/basmilius/haze-night.svg";
+import haze from "../assets/weather-icons/basmilius/haze.svg";
+import mist from "../assets/weather-icons/basmilius/mist.svg";
 import overcast from "../assets/weather-icons/basmilius/overcast.svg";
 import rain from "../assets/weather-icons/basmilius/rain.svg";
 import rainDay from "../assets/weather-icons/basmilius/rain-day.svg";
@@ -33,12 +32,11 @@ export const WEATHER_ICON_REGISTRY = {
   "clear-night": clearNight,
   "few-clouds-day": fewCloudsDay,
   "few-clouds-night": fewCloudsNight,
-  "fog-day": fogDay,
-  "fog-night": fogNight,
+  fog,
   "freezing-rain": freezingRain,
   hail,
-  "haze-day": hazeDay,
-  "haze-night": hazeNight,
+  haze,
+  mist,
   overcast,
   rain,
   "rain-day": rainDay,
