@@ -82,8 +82,15 @@ function hasSpecialWeather(observation) {
   return ["TS", "FG", "SN"].some((token) => raw.includes(token));
 }
 
+function getMetarBadgeText(header, fallbackType) {
+  const reportType = String(header?.report_type || fallbackType || "METAR").trim().toUpperCase();
+  if (reportType === "SPECI") return "SPECI";
+  return "METAR";
+}
+
 export default function MetarCard({
   metarData,
+  amosData,
   icao,
   airportMeta = null,
   metarTime = "",
@@ -92,6 +99,7 @@ export default function MetarCard({
   tz = "UTC",
 }) {
   const target = metarData?.airports?.[icao];
+  const amosTarget = amosData?.airports?.[icao] || null;
 
   if (!target) {
     return (
@@ -107,8 +115,8 @@ export default function MetarCard({
   const visibility = target.observation?.visibility?.value;
   const issueTime = target.header?.issue_time || target.header?.observation_time;
   const obsTime = target.header?.observation_time || issueTime;
-  const rain1h = target.observation?.rainfall_1h || null;
-  const rainText = rain1h?.mm == null || rain1h.mm <= 0 ? null : `${rain1h.mm.toFixed(1)} mm/h`;
+  const dailyRain = amosTarget?.daily_rainfall || null;
+  const rainText = dailyRain?.mm == null || dailyRain.mm <= 0 ? null : `일강수량 ${dailyRain.mm.toFixed(1)} mm`;
   const feelsLike = computeFeelsLikeC({
     tempC: target.observation?.temperature?.air,
     dewpointC: target.observation?.temperature?.dewpoint,
@@ -135,8 +143,8 @@ export default function MetarCard({
 
   if (version === "v1") {
     const level = getSeverityLevel({ visibility, wind: windSpeed, gust: windGust });
-    const rainHourText = /^\d{12}$/.test(rain1h?.target_hour_kst || "")
-      ? `${rain1h.target_hour_kst.slice(8, 10)}:00 KST`
+    const rainObservedText = /^\d{12}$/.test(dailyRain?.observed_tm_kst || "")
+      ? `${dailyRain.observed_tm_kst.slice(8, 10)}:${dailyRain.observed_tm_kst.slice(10, 12)} KST`
       : "-";
     const lines = [
       `Report Type: ${safe(target.header?.report_type || metarData?.type || "METAR")}`,
@@ -147,7 +155,7 @@ export default function MetarCard({
       `Clouds: ${safe(target.observation?.display?.clouds)}`,
       `Temp: ${safe(target.observation?.display?.temperature)}`,
       `Relative Humidity: ${rhDisplay}`,
-      `Rainfall(1h @ ${rainHourText}): ${rainText || "-"}`,
+      `Daily Rainfall(@ ${rainObservedText}): ${rainText || "-"}`,
       `Feels Like: ${feelsLike.value == null ? "-" : `${feelsLike.value.toFixed(1)}C`}`,
       `QNH: ${safe(target.observation?.display?.qnh)}`,
     ];
@@ -176,7 +184,8 @@ export default function MetarCard({
   const visibilityCategory = classifyVisibilityCategory(visibility);
   const ceilingCategory = classifyCeilingCategory(ceilingFt);
   const flightCategory = getFlightCategory(visibility, ceilingFt);
-  const metarTimeText = metarTime.replace(/\s+METAR$/, "").trim();
+  const metarTimeText = metarTime.trim();
+  const metarBadgeText = getMetarBadgeText(target.header, metarData?.type);
   const specialWeather = hasSpecialWeather(target.observation);
 
   return (
@@ -185,7 +194,7 @@ export default function MetarCard({
         <div className="metar-section">
           <div className="metar-section-head">
             <div className="metar-section-time">
-              <span className="panel-kind-badge">METAR</span>
+              <span className="panel-kind-badge">{metarBadgeText}</span>
               <span>{metarTimeText}</span>
             </div>
           </div>

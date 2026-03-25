@@ -78,7 +78,7 @@ export default function App() {
   const prevDataRef = useRef(null);
   const pollingRef = useRef(null);
   const pollingInFlightRef = useRef(false);
-  const snapshotHashRef = useRef({ metar: null, taf: null, warning: null, sigmet: null, airmet: null, lightning: null, adsb: null, echo: null });
+  const snapshotHashRef = useRef({ metar: null, taf: null, warning: null, sigmet: null, airmet: null, amos: null, lightning: null, adsb: null, echo: null });
 
   // 디스패처 콜백 등록
   useEffect(() => {
@@ -119,6 +119,7 @@ export default function App() {
         warning: result.warning?.content_hash || null,
         sigmet: result.sigmet?.content_hash || null,
         airmet: result.airmet?.content_hash || null,
+        amos: result.amos?.content_hash || null,
         lightning: result.lightning?.content_hash || null,
         adsb: result.adsb?.content_hash || null,
         echo: result.echoMeta?.tm || null,
@@ -149,6 +150,7 @@ export default function App() {
         warning: snapshot.warning?.hash == null || snapshot.warning.hash !== saved.warning,
         sigmet: snapshot.sigmet?.hash == null || snapshot.sigmet.hash !== saved.sigmet,
         airmet: snapshot.airmet?.hash == null || snapshot.airmet.hash !== saved.airmet,
+        amos: snapshot.amos?.hash == null || snapshot.amos.hash !== saved.amos,
         lightning: snapshot.lightning?.hash == null || snapshot.lightning.hash !== saved.lightning,
         adsb: snapshot.adsb?.hash == null || snapshot.adsb.hash !== saved.adsb,
         echoMeta: snapshot.echo?.tm == null || snapshot.echo.tm !== saved.echo,
@@ -176,6 +178,9 @@ export default function App() {
         airmet: changes.airmet && changedData.airmet?.content_hash != null
           ? changedData.airmet.content_hash
           : (snapshot.airmet?.hash ?? saved.airmet),
+        amos: changes.amos && changedData.amos?.content_hash != null
+          ? changedData.amos.content_hash
+          : (snapshot.amos?.hash ?? saved.amos),
         lightning: changes.lightning && changedData.lightning?.content_hash != null
           ? changedData.lightning.content_hash
           : (snapshot.lightning?.hash ?? saved.lightning),
@@ -306,8 +311,7 @@ export default function App() {
   const metarTime = (() => {
     const t = metarTarget?.header?.issue_time || metarTarget?.header?.observation_time;
     if (!t) return "";
-    const reportType = metarTarget?.header?.report_type || "METAR";
-    return `${formatUtc(t, timeZone)} ${reportType}`;
+    return formatUtc(t, timeZone);
   })();
   const airportLabel = (() => {
     const icao = selectedAirport || "----";
@@ -383,6 +387,7 @@ export default function App() {
 
             <MetarCard
               metarData={data.metar}
+              amosData={data.amos}
               icao={selectedAirport}
               airportMeta={selectedAirportMeta}
               metarTime={metarTime}
@@ -416,6 +421,7 @@ export default function App() {
               echoMeta={data.echoMeta}
               radarOpacity={radarOpacity}
               mapTheme={mapTheme}
+              tz={timeZone}
             />
           </div>
         </div>
