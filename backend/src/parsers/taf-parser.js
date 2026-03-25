@@ -381,10 +381,11 @@ function parse(xmlString) {
         text(item.airportName) ||
         text(taf?.["iwxxm:aerodrome"]?.["aixm:AirportHeliport"]?.["aixm:timeSlice"]?.["aixm:AirportHeliportTimeSlice"]?.["aixm:name"]) ||
         null,
+      report_type: "TAF",
       issued,
       valid_start: valid.start,
       valid_end: valid.end,
-      report_status: text(taf?.["iwxxm:reportStatus"]) || null,
+      report_status: text(taf?.["iwxxm:reportStatus"]) || text(taf?.["@_reportStatus"]) || null,
       temperatures: parseTemperatureHeader(taf, baseForecastNode, issued)
     },
     timeline

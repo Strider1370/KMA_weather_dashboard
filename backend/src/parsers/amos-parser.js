@@ -32,7 +32,7 @@ function parseTmToMs(tm) {
   return Date.UTC(y, m - 1, d, hh - 9, mi, 0, 0);
 }
 
-function pickRainfallForHour(rows, targetTm, toleranceMinutes = 60) {
+function pickDailyRainfallAtTime(rows, targetTm, toleranceMinutes = 60) {
   if (!Array.isArray(rows) || rows.length === 0) {
     return null;
   }
@@ -56,7 +56,7 @@ function pickRainfallForHour(rows, targetTm, toleranceMinutes = 60) {
       mm: null,
       rn_raw: candidate.rn_raw,
       observed_tm_kst: candidate.tm,
-      target_hour_kst: targetTm,
+      target_tm_kst: targetTm,
       stale
     };
   }
@@ -65,12 +65,12 @@ function pickRainfallForHour(rows, targetTm, toleranceMinutes = 60) {
     mm: candidate.rn_raw / 10,
     rn_raw: candidate.rn_raw,
     observed_tm_kst: candidate.tm,
-    target_hour_kst: targetTm,
+    target_tm_kst: targetTm,
     stale
   };
 }
 
 module.exports = {
   parseAmosRows,
-  pickRainfallForHour
+  pickDailyRainfallAtTime
 };
