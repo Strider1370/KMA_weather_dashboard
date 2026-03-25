@@ -81,6 +81,7 @@ module.exports = {
     warning_interval: "*/5 * * * *",
     sigmet_interval: "*/5 * * * *",
     airmet_interval: "*/5 * * * *",
+    amos_interval: "*/10 * * * *",
     lightning_interval: "*/5 * * * *",
     radar_echo_interval: "*/5 * * * *",
     adsb_interval: "*/5 * * * *"

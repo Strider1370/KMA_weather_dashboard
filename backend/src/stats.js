@@ -3,7 +3,7 @@
 const fs = require("fs");
 const path = require("path");
 
-const TYPES = ["metar", "taf", "warning", "lightning", "radar"];
+const TYPES = ["metar", "taf", "warning", "lightning", "radar", "amos"];
 const MAX_RECENT_RUNS = 50;
 
 // METAR 정시 전문 지연 판단 기준 (분)
