@@ -18,6 +18,11 @@ import { resolveWeatherVisual } from "../utils/weather-visual-resolver";
 const FC_COLORS = { VFR: "#15803d", MVFR: "#2563eb", IFR: "#f59e0b", LIFR: "#7c3aed" };
 const WEATHER_STYLE = { backgroundColor: "rgba(234, 179, 8, 0.10)", color: "#92400e" };
 const WIND_STYLE = { backgroundColor: "var(--card-bg)", color: "var(--muted)" };
+const TAF_SEGMENT_DENSITY = {
+  SOLO: "solo",
+  COMPACT: "compact",
+  FULL: "full",
+};
 const TINT_STYLE = {
   VFR: { backgroundColor: "rgba(21, 128, 61, 0.08)", borderLeft: "3px solid #15803d", color: "#166534" },
   MVFR: { backgroundColor: "rgba(37, 99, 235, 0.08)", borderLeft: "3px solid #2563eb", color: "#1d4ed8" },
@@ -46,9 +51,91 @@ function formatVisibility(vis, displayValue) {
   return "-";
 }
 
+function formatVisibilityValue(vis, displayValue) {
+  const meters = parseVisibilityMeters(vis, displayValue);
+  if (!Number.isFinite(meters)) return "-";
+  return `${meters}m`;
+}
+
+function parseVisibilityMeters(vis, displayValue) {
+  if (Number.isFinite(vis)) return vis;
+  if (displayValue && displayValue !== "//" && displayValue !== "-") {
+    const numeric = Number(displayValue.replace(/\D/g, ""));
+    return Number.isFinite(numeric) && numeric > 0 ? numeric : null;
+  }
+  return null;
+}
+
+function formatCompactVisibility(vis, displayValue) {
+  const meters = parseVisibilityMeters(vis, displayValue);
+  // Compact cells stay readable by accepting the original display string when parsing fails.
+  if (!Number.isFinite(meters)) return formatVisibility(vis, displayValue);
+  return `${meters}m`;
+}
+
+function getSegmentDensity(hourCount) {
+  if (hourCount <= 1) return TAF_SEGMENT_DENSITY.SOLO;
+  if (hourCount === 2) return TAF_SEGMENT_DENSITY.COMPACT;
+  return TAF_SEGMENT_DENSITY.FULL;
+}
+
+function getDensityContainerClass(density) {
+  if (density === TAF_SEGMENT_DENSITY.SOLO) return " taf-new-seg--solo";
+  if (density === TAF_SEGMENT_DENSITY.COMPACT) return " taf-new-seg--compact";
+  return "";
+}
+
+function getBasicLabelClass(density) {
+  if (density === TAF_SEGMENT_DENSITY.FULL) return "segment-label";
+  return "segment-label taf-new-seg-small";
+}
+
+function shouldShowWeatherText(density) {
+  return density !== TAF_SEGMENT_DENSITY.SOLO;
+}
+
+function shouldShowWindText(density) {
+  return density !== TAF_SEGMENT_DENSITY.SOLO;
+}
+
+function getWeatherLabelClass(density) {
+  if (density === TAF_SEGMENT_DENSITY.COMPACT) return "segment-label taf-new-seg-small";
+  return "segment-label";
+}
+
+function getWindLabelClass(_density) {
+  return "segment-label";
+}
+
+function getVisibilityText(vis, displayValue, density) {
+  if (density === TAF_SEGMENT_DENSITY.FULL) return formatVisibilityValue(vis, displayValue);
+  return formatCompactVisibility(vis, displayValue);
+}
+
+function getVisibilityLabelClass(density) {
+  if (density === TAF_SEGMENT_DENSITY.SOLO) return "segment-label taf-new-seg-xsmall";
+  if (density === TAF_SEGMENT_DENSITY.COMPACT) return "segment-label taf-new-seg-medium";
+  return "segment-label";
+}
+
+function getVisibilitySegmentExtraClass(density) {
+  return density === TAF_SEGMENT_DENSITY.SOLO ? " taf-new-seg--visibility-solo" : "";
+}
+
+function getSegmentClassName(baseClass, density, extraClasses = "") {
+  return `taf-new-seg ${baseClass}${getDensityContainerClass(density)}${extraClasses}`;
+}
+
 function hasSpecialWeather(slot) {
   const raw = String(slot?.display?.weather || "").toUpperCase();
   return ["TS", "SH", "SN", "FG"].some((token) => raw.includes(token));
+}
+
+function getTafBadgeText(header) {
+  const combined = `${header?.report_type || ""} ${header?.report_status || ""}`.toUpperCase();
+  if (combined.includes("CORR") || /\bCOR\b/.test(combined)) return "TAF COR";
+  if (combined.includes("AMEND") || /\bAMD\b/.test(combined)) return "TAF AMD";
+  return "TAF";
 }
 
 export default function TafTimeline({ tafData, icao, version = "v2", onVersionToggle, tz = "UTC" }) {
@@ -85,14 +172,12 @@ export default function TafTimeline({ tafData, icao, version = "v2", onVersionTo
 
     const lastEnd = target.header?.valid_end;
     const tafTime = formatUtc(target.header?.valid_start, tz);
-    const isAmd = target.header?.report_status === "AMENDMENT";
     const tafTimeText = tafTime || "";
-    const tafBadgeText = isAmd ? "TAF AMD" : "TAF";
+    const tafBadgeText = getTafBadgeText(target.header);
 
     return (
       <section className="taf-new-panel">
         <div className="taf-new-header">
-          <span className="taf-new-title">공항예보(TAF) 타임라인</span>
           <span className="taf-new-validity">
             <span className="panel-kind-badge">{tafBadgeText}</span>
             <span>{tafTimeText}</span>
@@ -101,13 +186,13 @@ export default function TafTimeline({ tafData, icao, version = "v2", onVersionTo
         <div className="taf-new-container">
           <div className="taf-new-row time-row">
             <div className="taf-new-label"></div>
-            <div className="taf-new-scale">
+            <div className="taf-new-scale" style={{ "--taf-hour-count": String(timeline.length) }}>
               {timeline.map((slot, i) => {
                 const dateObj = getDisplayDate(slot.time, tz);
                 const hour = dateObj.getUTCHours();
                 const isFirst = i === 0;
                 const isNewDay = hour === 0;
-                if (i % 3 === 0 || isFirst || isNewDay) {
+                if (hour % 3 === 0 || isFirst || isNewDay) {
                   return (
                     <div key={i} className="taf-scale-item" style={{ left: `${(i / timeline.length) * 100}%` }}>
                       {(isFirst || isNewDay) && <span className="taf-scale-date">{dateObj.getUTCDate()}일</span>}
@@ -133,17 +218,19 @@ export default function TafTimeline({ tafData, icao, version = "v2", onVersionTo
             <div className="taf-new-timeline">
               {flightCatGroups.map((group, i) => {
                 const category = group.value;
+                const density = getSegmentDensity(group.hourCount);
                 return (
                   <div
                     key={i}
-                    className="taf-new-seg taf-new-seg--flight"
+                    className={getSegmentClassName("taf-new-seg--flight", density)}
                     style={{
                       width: `${group.width}%`,
                       backgroundColor: FC_COLORS[category] || FC_COLORS.VFR,
                       color: "#fff",
                     }}
+                    title={category}
                   >
-                    <span className="segment-label">{category}</span>
+                    <span className={getBasicLabelClass(density)}>{category}</span>
                   </div>
                 );
               })}
@@ -155,6 +242,7 @@ export default function TafTimeline({ tafData, icao, version = "v2", onVersionTo
             <div className="taf-new-timeline">
               {weatherGroups.map((group, i) => (
                 (() => {
+                  const density = getSegmentDensity(group.hourCount);
                   const weatherVisual = resolveWeatherVisual(group.data, group.data.time);
                   const miniWeatherVisual = weatherVisual
                     ? { ...weatherVisual, intensityOverlay: null }
@@ -164,11 +252,16 @@ export default function TafTimeline({ tafData, icao, version = "v2", onVersionTo
                   return (
                     <div
                       key={i}
-                      className={`taf-new-seg taf-new-seg--weather${hasSpecialWeather(group.data) ? " taf-new-seg--special-weather" : ""}`}
+                      className={getSegmentClassName(
+                        "taf-new-seg--weather",
+                        density,
+                        hasSpecialWeather(group.data) ? " taf-new-seg--special-weather" : ""
+                      )}
                       style={{ width: `${group.width}%`, ...WEATHER_STYLE }}
+                      title={weatherLabel}
                     >
                       <WeatherIcon visual={miniWeatherVisual} className="mini" />
-                      {group.hourCount >= 2 && <span className="segment-label">{weatherLabel}</span>}
+                      {shouldShowWeatherText(density) && <span className={getWeatherLabelClass(density)}>{weatherLabel}</span>}
                     </div>
                   );
                 })()
@@ -180,18 +273,19 @@ export default function TafTimeline({ tafData, icao, version = "v2", onVersionTo
             <div className="taf-new-label">바람</div>
             <div className="taf-new-timeline">
               {windGroups.map((group, i) => {
+                const density = getSegmentDensity(group.hourCount);
                 const wind = group.data.wind;
                 const windText = `${wind?.speed ?? 0}${wind?.gust ? `G${wind.gust}` : ""}kt`;
                 const rotation = (wind?.direction || 0) + 180;
                 return (
                   <div
                     key={i}
-                    className="taf-new-seg taf-new-seg--wind"
+                    className={getSegmentClassName("taf-new-seg--wind", density)}
                     style={{ width: `${group.width}%`, ...WIND_STYLE }}
                     title={`${wind?.direction ?? "VRB"}° ${windText}`}
                   >
                     <span className="wind-arrow-inline" style={{ transform: `rotate(${rotation}deg)` }}>↑</span>
-                    {group.hourCount >= 2 && <span className="segment-label">{windText}</span>}
+                    {shouldShowWindText(density) && <span className={getWindLabelClass(density)}>{windText}</span>}
                   </div>
                 );
               })}
@@ -202,17 +296,18 @@ export default function TafTimeline({ tafData, icao, version = "v2", onVersionTo
             <div className="taf-new-label">시정</div>
             <div className="taf-new-timeline">
               {visibilityGroups.map((group, i) => {
+                const density = getSegmentDensity(group.hourCount);
                 const vis = group.data.visibility?.value ?? null;
                 const style = TINT_STYLE[classifyVisibilityCategory(vis).category];
+                const visibilityText = getVisibilityText(vis, group.data.display?.visibility, density);
                 return (
                   <div
                     key={i}
-                    className="taf-new-seg taf-new-seg--tint"
+                    className={getSegmentClassName("taf-new-seg--tint", density, getVisibilitySegmentExtraClass(density))}
                     style={{ width: `${group.width}%`, ...style }}
+                    title={visibilityText}
                   >
-                    {group.hourCount >= 2
-                      ? <span className="segment-label">{formatVisibility(vis, group.data.display?.visibility)}</span>
-                      : <span className="segment-label taf-new-seg-small">{formatVisibility(vis, group.data.display?.visibility)}</span>}
+                    <span className={getVisibilityLabelClass(density)}>{visibilityText}</span>
                   </div>
                 );
               })}
@@ -223,17 +318,18 @@ export default function TafTimeline({ tafData, icao, version = "v2", onVersionTo
             <div className="taf-new-label">운고</div>
             <div className="taf-new-timeline">
               {ceilingGroups.map((group, i) => {
+                const density = getSegmentDensity(group.hourCount);
                 const ceiling = getCeiling(group.data);
                 const style = TINT_STYLE[classifyCeilingCategory(ceiling).category];
+                const ceilingText = formatCeiling(ceiling);
                 return (
                   <div
                     key={i}
-                    className="taf-new-seg taf-new-seg--tint"
+                    className={getSegmentClassName("taf-new-seg--tint", density)}
                     style={{ width: `${group.width}%`, ...style }}
+                    title={ceilingText}
                   >
-                    {group.hourCount >= 2
-                      ? <span className="segment-label">{formatCeiling(ceiling)}</span>
-                      : <span className="segment-label taf-new-seg-small">{formatCeiling(ceiling)}</span>}
+                    <span className={getBasicLabelClass(density)}>{ceilingText}</span>
                   </div>
                 );
               })}

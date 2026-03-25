@@ -31,17 +31,21 @@ export default function WarningList({ warningData, icao, warningTypes, tz = "UTC
   if (list.length === 0) {
     return (
       <div className="warning-banner warning-banner--ok">
-        <span className="warning-banner-icon">&#10003;</span>
-        <span>공항경보 없음</span>
+        <div className="warning-banner-side warning-banner-side--single">
+          <span className="warning-banner-icon">&#10003;</span>
+          <span className="warning-banner-label">공항경보 없음</span>
+        </div>
       </div>
     );
   }
 
   return (
     <div className="warning-banner warning-banner--danger">
-      <span className="warning-banner-icon warning-banner-icon--alert">&#9888;</span>
-      <span className="warning-banner-label">공항경보:</span>
-      <span className="warning-banner-text">
+      <div className="warning-banner-side">
+        <span className="warning-banner-icon warning-banner-icon--alert">&#9888;</span>
+        <span className="warning-banner-label">공항경보</span>
+      </div>
+      <div className="warning-banner-text">
         {list.map((item, i) => {
           const meta = warningMeta(item.wrng_type, warningTypes || {}) || {};
           const key = item.wrng_type_key === "UNKNOWN" && meta.key ? meta.key : item.wrng_type_key;
@@ -49,7 +53,7 @@ export default function WarningList({ warningData, icao, warningTypes, tz = "UTC
           return (
             <span key={i} className="warning-banner-item">
               {i > 0 && <span className="warning-banner-separator">|</span>}
-              <strong>{name}</strong>
+              <strong className="warning-banner-name">{name}</strong>
               {" "}
               <span className="warning-banner-time">
                 {formatValidTime(item.valid_start, tz)} ~ {formatValidTime(item.valid_end, tz)}
@@ -57,7 +61,7 @@ export default function WarningList({ warningData, icao, warningTypes, tz = "UTC
             </span>
           );
         })}
-      </span>
+      </div>
     </div>
   );
 }
