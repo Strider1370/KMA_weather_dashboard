@@ -11,6 +11,7 @@ import {
   pointOnFeature as turfPointOnFeature,
   union as turfUnion,
 } from "@turf/turf";
+import { formatDateTimeRange } from "../utils/helpers";
 import "leaflet/dist/leaflet.css";
 
 const ZONE_RADII = [
@@ -354,10 +355,24 @@ function advisoryAltitudeLabel(item) {
   return `BLW FL${String(upper).padStart(3, "0")}`;
 }
 
-function advisoryValidLabel(item) {
-  const from = item?.valid_from ? new Date(item.valid_from).toISOString().slice(11, 16) : "--:--";
-  const to = item?.valid_to ? new Date(item.valid_to).toISOString().slice(11, 16) : "--:--";
-  return `${from}Z - ${to}Z`;
+function advisoryShowsAltitude(item) {
+  const code = String(item?.phenomenon_code || "").toUpperCase();
+  const label = String(item?.phenomenon_label || "").toUpperCase();
+  if (code.includes("SFC_VIS") || code.includes("VIS")) return false;
+  if (label.includes("SURFACE VIS") || label.includes("SFC VIS") || label.includes("지상 시정")) return false;
+  return true;
+}
+
+function advisoryValidLabel(item, tz) {
+  return formatDateTimeRange(item?.valid_from, item?.valid_to, tz);
+}
+
+function advisoryItemKey(kind, item, index) {
+  return String(
+    item?.id ||
+    item?.sequence_number ||
+    `${kind}-${item?.phenomenon_code || "adv"}-${item?.valid_from || "na"}-${index}`
+  );
 }
 
 function advisoryStatusLabel(item) {
@@ -455,6 +470,7 @@ export default function InteractiveMap({
   echoMeta = null,
   radarOpacity = 0.6,
   mapTheme = "dark",
+  tz = "UTC",
 }) {
   const [mapScope, setMapScope] = useState("airport");
   const [boundaryLevel, setBoundaryLevel] = useState("sido");
@@ -467,6 +483,7 @@ export default function InteractiveMap({
   const [showTraffic, setShowTraffic] = useState(false);
   const [hoveredAdvisoryId, setHoveredAdvisoryId] = useState(null);
   const [openAdvisoryPanel, setOpenAdvisoryPanel] = useState(null);
+  const [hiddenAdvisoryKeys, setHiddenAdvisoryKeys] = useState({ sigmet: [], airmet: [] });
   const [frameIndex, setFrameIndex] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
   const [playbackMs, setPlaybackMs] = useState(DEFAULT_FRAME_MS);
@@ -598,8 +615,16 @@ export default function InteractiveMap({
     ) <= AIRCRAFT_AIRPORT_RANGE_KM);
   }, [aircraft, arp, isNationwide]);
 
-  const sigmetItems = useMemo(() => (sigmetData?.items || []).filter((item) => item?.geometry), [sigmetData]);
-  const airmetItems = useMemo(() => (airmetData?.items || []).filter((item) => item?.geometry), [airmetData]);
+  const sigmetItems = useMemo(() => (
+    (sigmetData?.items || [])
+      .filter((item) => item?.geometry)
+      .map((item, index) => ({ ...item, mapKey: advisoryItemKey("sigmet", item, index) }))
+  ), [sigmetData]);
+  const airmetItems = useMemo(() => (
+    (airmetData?.items || [])
+      .filter((item) => item?.geometry)
+      .map((item, index) => ({ ...item, mapKey: advisoryItemKey("airmet", item, index) }))
+  ), [airmetData]);
   const showFirDraft = isNationwide && (showSigmet || showAirmet) && firDraftGeoData;
   const advisoryBadgeItems = useMemo(() => ([
     showSigmet ? { key: "sigmet", label: "SIGMET", count: sigmetItems.length } : null,
@@ -610,11 +635,47 @@ export default function InteractiveMap({
     if (openAdvisoryPanel === "airmet") return airmetItems;
     return [];
   }, [openAdvisoryPanel, sigmetItems, airmetItems]);
+  const visibleSigmetItems = useMemo(() => {
+    const hidden = new Set(hiddenAdvisoryKeys.sigmet);
+    return sigmetItems.filter((item) => !hidden.has(item.mapKey));
+  }, [hiddenAdvisoryKeys.sigmet, sigmetItems]);
+  const visibleAirmetItems = useMemo(() => {
+    const hidden = new Set(hiddenAdvisoryKeys.airmet);
+    return airmetItems.filter((item) => !hidden.has(item.mapKey));
+  }, [hiddenAdvisoryKeys.airmet, airmetItems]);
 
   useEffect(() => {
     if (openAdvisoryPanel === "sigmet" && !showSigmet) setOpenAdvisoryPanel(null);
     if (openAdvisoryPanel === "airmet" && !showAirmet) setOpenAdvisoryPanel(null);
   }, [openAdvisoryPanel, showSigmet, showAirmet]);
+
+  useEffect(() => {
+    setHiddenAdvisoryKeys((prev) => {
+      const sigmetKeySet = new Set(sigmetItems.map((item) => item.mapKey));
+      const airmetKeySet = new Set(airmetItems.map((item) => item.mapKey));
+      const nextSigmet = prev.sigmet.filter((key) => sigmetKeySet.has(key));
+      const nextAirmet = prev.airmet.filter((key) => airmetKeySet.has(key));
+      if (nextSigmet.length === prev.sigmet.length && nextAirmet.length === prev.airmet.length) {
+        return prev;
+      }
+      return { sigmet: nextSigmet, airmet: nextAirmet };
+    });
+  }, [sigmetItems, airmetItems]);
+
+  function toggleAdvisoryVisibility(kind, mapKey) {
+    setHiddenAdvisoryKeys((prev) => {
+      const current = new Set(prev[kind] || []);
+      if (current.has(mapKey)) {
+        current.delete(mapKey);
+      } else {
+        current.add(mapKey);
+      }
+      return {
+        ...prev,
+        [kind]: Array.from(current),
+      };
+    });
+  }
 
   // Zone counts from per-airport data in airport mode; total always from nationwide
   const summary = useMemo(() => {
@@ -989,20 +1050,30 @@ export default function InteractiveMap({
               </div>
             )}
             {openAdvisoryPanel && advisoryPanelItems.length > 0 && (
-              <div className="advisory-detail-panel" aria-label={`${openAdvisoryPanel} details`}>
-                <div className="advisory-detail-panel-head">{openAdvisoryPanel.toUpperCase()}</div>
+              <div className={`advisory-detail-panel advisory-detail-panel--${openAdvisoryPanel}`} aria-label={`${openAdvisoryPanel} details`}>
                 <div className="advisory-detail-list">
-                  {advisoryPanelItems.map((item) => (
-                    <article key={`${openAdvisoryPanel}-${item.id}`} className="advisory-detail-item">
+                  {advisoryPanelItems.map((item) => {
+                    const kind = openAdvisoryPanel;
+                    const isVisible = !hiddenAdvisoryKeys[kind]?.includes(item.mapKey);
+                    const showAltitude = advisoryShowsAltitude(item);
+                    return (
+                    <article key={`${openAdvisoryPanel}-${item.mapKey}`} className="advisory-detail-item">
                       <div className="advisory-detail-icon" aria-hidden="true">{advisoryPhenomenonIcon(item.phenomenon_code)}</div>
                       <div className="advisory-detail-main">
                         <div className="advisory-detail-title">{advisoryLabel(item)}</div>
-                        <div className="advisory-detail-time">{advisoryValidLabel(item)}</div>
-                        <div className="advisory-detail-meta">{advisoryStatusLabel(item)}</div>
-                        <div className="advisory-detail-altitude">{advisoryAltitudeLabel(item)}</div>
+                        <div className="advisory-detail-time">{advisoryValidLabel(item, tz)}</div>
+                        {showAltitude ? <div className="advisory-detail-altitude">{advisoryAltitudeLabel(item)}</div> : null}
                       </div>
+                      <label className="advisory-detail-toggle" title="지도 표시">
+                        <input
+                          type="checkbox"
+                          checked={isVisible}
+                          onChange={() => toggleAdvisoryVisibility(kind, item.mapKey)}
+                          aria-label={`${advisoryLabel(item)} 지도 표시`}
+                        />
+                      </label>
                     </article>
-                  ))}
+                  );})}
                 </div>
               </div>
             )}
@@ -1163,24 +1234,24 @@ export default function InteractiveMap({
             </Pane>
 
             <Pane name="advisory-pane" style={{ zIndex: 520 }}>
-              {showSigmet && sigmetItems.map((item) => {
+              {showSigmet && visibleSigmetItems.map((item) => {
                 const positions = geometryToLeafletPositions(item.geometry);
                 if (!positions) return null;
-                const hovered = hoveredAdvisoryId === item.id;
+                const hovered = hoveredAdvisoryId === item.mapKey;
                 return (
                   <Polygon
-                    key={`sigmet-${item.id}`}
+                    key={`sigmet-${item.mapKey}`}
                     positions={positions}
                     pathOptions={advisoryStyle(item, "sigmet", hovered)}
                     eventHandlers={{
-                      mouseover: () => setHoveredAdvisoryId(item.id),
-                      mouseout: () => setHoveredAdvisoryId((prev) => (prev === item.id ? null : prev))
+                      mouseover: () => setHoveredAdvisoryId(item.mapKey),
+                      mouseout: () => setHoveredAdvisoryId((prev) => (prev === item.mapKey ? null : prev))
                     }}
                   >
                     <Tooltip sticky opacity={0.96} className="advisory-tooltip">
                       <div className="advisory-tooltip-body">
                         <strong>{advisoryLabel(item)}</strong>
-                        <div>{advisoryValidLabel(item)}</div>
+                        <div>{advisoryValidLabel(item, tz)}</div>
                         <div>{advisoryAltitudeLabel(item)}</div>
                         <div>{item.sequence_number || "-"}</div>
                       </div>
@@ -1188,24 +1259,24 @@ export default function InteractiveMap({
                   </Polygon>
                 );
               })}
-              {showAirmet && airmetItems.map((item) => {
+              {showAirmet && visibleAirmetItems.map((item) => {
                 const positions = geometryToLeafletPositions(item.geometry);
                 if (!positions) return null;
-                const hovered = hoveredAdvisoryId === item.id;
+                const hovered = hoveredAdvisoryId === item.mapKey;
                 return (
                   <Polygon
-                    key={`airmet-${item.id}`}
+                    key={`airmet-${item.mapKey}`}
                     positions={positions}
                     pathOptions={advisoryStyle(item, "airmet", hovered)}
                     eventHandlers={{
-                      mouseover: () => setHoveredAdvisoryId(item.id),
-                      mouseout: () => setHoveredAdvisoryId((prev) => (prev === item.id ? null : prev))
+                      mouseover: () => setHoveredAdvisoryId(item.mapKey),
+                      mouseout: () => setHoveredAdvisoryId((prev) => (prev === item.mapKey ? null : prev))
                     }}
                   >
                     <Tooltip sticky opacity={0.96} className="advisory-tooltip">
                       <div className="advisory-tooltip-body">
                         <strong>{advisoryLabel(item)}</strong>
-                        <div>{advisoryValidLabel(item)}</div>
+                        <div>{advisoryValidLabel(item, tz)}</div>
                         <div>{advisoryAltitudeLabel(item)}</div>
                         <div>{item.sequence_number || "-"}</div>
                       </div>
@@ -1216,23 +1287,23 @@ export default function InteractiveMap({
             </Pane>
 
             <Pane name="advisory-icon-pane" style={{ zIndex: 530 }}>
-              {showSigmet && sigmetItems.map((item) => {
+              {showSigmet && visibleSigmetItems.map((item) => {
                 const centerPoint = advisoryCenter(item);
                 if (!centerPoint) return null;
                 return (
                   <Marker
-                    key={`sigmet-icon-${item.id}`}
+                    key={`sigmet-icon-${item.mapKey}`}
                     position={centerPoint}
                     icon={createAdvisoryIcon(item, "sigmet")}
                     eventHandlers={{
-                      mouseover: () => setHoveredAdvisoryId(item.id),
-                      mouseout: () => setHoveredAdvisoryId((prev) => (prev === item.id ? null : prev))
+                      mouseover: () => setHoveredAdvisoryId(item.mapKey),
+                      mouseout: () => setHoveredAdvisoryId((prev) => (prev === item.mapKey ? null : prev))
                     }}
                   >
                     <Tooltip direction="top" offset={[0, -10]} opacity={0.96} className="advisory-tooltip">
                       <div className="advisory-tooltip-body">
                         <strong>{advisoryLabel(item)}</strong>
-                        <div>{advisoryValidLabel(item)}</div>
+                        <div>{advisoryValidLabel(item, tz)}</div>
                         <div>{advisoryAltitudeLabel(item)}</div>
                         <div>{item.sequence_number || "-"}</div>
                       </div>
@@ -1240,23 +1311,23 @@ export default function InteractiveMap({
                   </Marker>
                 );
               })}
-              {showAirmet && airmetItems.map((item) => {
+              {showAirmet && visibleAirmetItems.map((item) => {
                 const centerPoint = advisoryCenter(item);
                 if (!centerPoint) return null;
                 return (
                   <Marker
-                    key={`airmet-icon-${item.id}`}
+                    key={`airmet-icon-${item.mapKey}`}
                     position={centerPoint}
                     icon={createAdvisoryIcon(item, "airmet")}
                     eventHandlers={{
-                      mouseover: () => setHoveredAdvisoryId(item.id),
-                      mouseout: () => setHoveredAdvisoryId((prev) => (prev === item.id ? null : prev))
+                      mouseover: () => setHoveredAdvisoryId(item.mapKey),
+                      mouseout: () => setHoveredAdvisoryId((prev) => (prev === item.mapKey ? null : prev))
                     }}
                   >
                     <Tooltip direction="top" offset={[0, -10]} opacity={0.96} className="advisory-tooltip">
                       <div className="advisory-tooltip-body">
                         <strong>{advisoryLabel(item)}</strong>
-                        <div>{advisoryValidLabel(item)}</div>
+                        <div>{advisoryValidLabel(item, tz)}</div>
                         <div>{advisoryAltitudeLabel(item)}</div>
                         <div>{item.sequence_number || "-"}</div>
                       </div>

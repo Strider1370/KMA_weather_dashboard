@@ -18,6 +18,33 @@ export function formatUtc(value, tz = 'UTC') {
   return value.replace("T", " ").replace("Z", " UTC");
 }
 
+export function formatDateTimeRange(start, end, tz = 'UTC') {
+  if (!start && !end) return "-";
+  if (!start) return formatUtc(end, tz);
+  if (!end) return formatUtc(start, tz);
+
+  const startDate = getDisplayDate(start, tz);
+  const endDate = getDisplayDate(end, tz);
+  if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime())) {
+    return `${formatUtc(start, tz)} - ${formatUtc(end, tz)}`;
+  }
+
+  const pad = (n) => String(n).padStart(2, '0');
+  const formatDate = (date) => `${date.getUTCMonth() + 1}/${date.getUTCDate()}`;
+  const formatTime = (date) => `${pad(date.getUTCHours())}:${pad(date.getUTCMinutes())}`;
+  const zoneLabel = tz === 'KST' ? 'KST' : 'UTC';
+  const sameDay =
+    startDate.getUTCFullYear() === endDate.getUTCFullYear() &&
+    startDate.getUTCMonth() === endDate.getUTCMonth() &&
+    startDate.getUTCDate() === endDate.getUTCDate();
+
+  if (sameDay) {
+    return `${formatDate(startDate)}, ${formatTime(startDate)} ~ ${formatTime(endDate)} ${zoneLabel}`;
+  }
+
+  return `${formatDate(startDate)} ${formatTime(startDate)} ~ ${formatTime(endDate)} ${zoneLabel}`;
+}
+
 export function getSeverityLevel({ visibility, wind, gust }) {
   if (visibility != null && visibility < 800) return "danger";
   if (gust != null && gust >= 35) return "danger";
