@@ -52,6 +52,7 @@ Use repo root unless noted.
 - Run a single collector test target:
   - `node backend/test/run-once.js metar`
   - `node backend/test/run-once.js taf`
+  - `node backend/test/run-once.js amos`
   - `node backend/test/run-once.js warning`
   - `node backend/test/run-once.js lightning`
   - `node backend/test/run-once.js radar-echo`
@@ -61,6 +62,7 @@ Use repo root unless noted.
 ### Lint / Format
 
 - No dedicated lint command is currently configured in `package.json`.
+- Frontend has `@biomejs/biome` as a dev dependency for local diagnostics/tooling.
 - No Prettier/ESLint config is committed in this repo.
 - Respect `.editorconfig` and existing formatting style manually.
 
@@ -133,6 +135,7 @@ Derived from `.editorconfig` + existing source files.
 - Snapshot polling metadata is served at `/api/snapshot-meta`.
 - `server.js` also serves SPA entry points for both `/` and `/test`.
 - Static data served under `/data/*` from `backend/data`.
+- AMOS daily rainfall is served separately at `/api/amos` and stored under `backend/data/amos/latest.json`.
 - Persisted category files generally follow:
   - `backend/data/<type>/latest.json`
   - historical JSON files with prefixed timestamps.
@@ -164,6 +167,7 @@ Derived from `.editorconfig` + existing source files.
 - Network calls use external KMA APIs; failures are expected and should degrade gracefully.
 - Some collectors are intentionally independent (not all use `api-client.js`).
 - ADS-B uses OpenSky `states/all` with bounding-box filtering and has a TLS fallback path for environments that surface `SELF_SIGNED_CERT_IN_CHAIN`.
+- AMOS `RN` should be treated as daily rainfall; current dashboard polling reads it through the separate `amos` dataset rather than embedding it in METAR hashes.
 - `server.js` binds to `127.0.0.1`; expose externally via reverse proxy (nginx/LB), not direct app port.
 - If nginx serves `frontend/dist` directly, keep both `.geojson` (`application/geo+json`) and `.topojson` (`application/topo+json`) MIME handling correct and enable gzip/brotli for `.geojson`, `.topojson`, `.json`, `.js`, and `.css`.
 - InteractiveMap boundary detail is auto-switched by zoom (`zoom >= 9`: sigungu, `zoom < 9`: sido); there is no user setting toggle anymore.

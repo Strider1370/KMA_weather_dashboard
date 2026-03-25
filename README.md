@@ -2,7 +2,7 @@
 
 KMA 항공기상 수집기 + 대시보드 프로젝트입니다.
 
-이 프로젝트는 KMA 항공/기상 피드(METAR, TAF, 특보, 낙뢰, 레이더, 레이더 에코)와 OpenSky ADS-B 항공기 위치를 주기적으로 수집하고, 정규화된 결과를 `backend/data/`에 저장한 뒤 React 대시보드로 제공합니다.
+이 프로젝트는 KMA 항공/기상 피드(METAR, TAF, AMOS 강수, 특보, 낙뢰, 레이더, 레이더 에코)와 OpenSky ADS-B 항공기 위치를 주기적으로 수집하고, 정규화된 결과를 `backend/data/`에 저장한 뒤 React 대시보드로 제공합니다.
 
 ## 프로젝트가 하는 일
 
@@ -37,7 +37,7 @@ KMA APIs
   ├─ typ02/openApi (METAR/TAF/WARNING XML)
   ├─ typ01/url/lgt_pnt.php (낙뢰)
   ├─ typ04/url/rdr_cmp_file.php (레이더 바이너리 / 에코 생성용)
-  └─ typ01/url/amos.php (강수량)
+  └─ typ01/url/amos.php (AMOS 일강수량)
 
 OpenSky Network
   └─ states/all (ADS-B 현재 항공기 위치)
@@ -69,6 +69,7 @@ frontend/src (React 대시보드)
 │   ├── data/                         # 저장 결과물(생성 파일)
 │   │   ├── metar/
 │   │   ├── taf/
+│   │   ├── amos/
 │   │   ├── warning/
 │   │   ├── lightning/
 │   │   ├── adsb/
@@ -77,6 +78,7 @@ frontend/src (React 대시보드)
 │   │   ├── processors/
 │   │   │   ├── metar-processor.js
 │   │   │   ├── taf-processor.js
+│   │   │   ├── amos-processor.js
 │   │   │   ├── warning-processor.js
 │   │   │   ├── lightning-processor.js
 │   │   │   ├── radar-echo-processor.js
@@ -114,6 +116,7 @@ frontend/src (React 대시보드)
 
 - METAR: `*/10 * * * *`
 - TAF: `*/30 * * * *`
+- AMOS: `*/10 * * * *`
 - WARNING: `*/5 * * * *`
 - LIGHTNING: `*/5 * * * *`
 - RADAR_ECHO: `*/5 * * * *`
@@ -125,6 +128,7 @@ frontend/src (React 대시보드)
 
 - 카테고리별 결과는 `backend/data/<type>/`에 저장됩니다.
 - 각 카테고리 `latest.json`은 항상 최신으로 갱신됩니다.
+- AMOS 일강수량은 `backend/data/amos/latest.json`에 별도 저장되며, METAR payload와 분리된 snapshot hash를 가집니다.
 - 레이더 이미지/에코 에셋은 `backend/data/radar/`에 저장되며 `/data/radar/*`로 제공됩니다.
 - ADS-B 현재 위치 스냅샷은 `backend/data/adsb/latest.json`에 저장되며 `/api/adsb`로 제공됩니다.
 - 지도 경계는 `frontend/public/geo/korea_boundaries.v1.topojson`(시도/시군구 통합)과 `frontend/public/geo/korea_neighbors_masked.v1.geojson`을 사용합니다.
@@ -133,6 +137,7 @@ frontend/src (React 대시보드)
 
 - `backend/data/metar/latest.json`
 - `backend/data/taf/latest.json`
+- `backend/data/amos/latest.json`
 - `backend/data/warning/latest.json`
 - `backend/data/lightning/latest.json`
 - `backend/data/adsb/latest.json`
@@ -146,6 +151,7 @@ frontend/src (React 대시보드)
 
 - `/api/metar`
 - `/api/taf`
+- `/api/amos`
 - `/api/warning`
 - `/api/lightning`
 - `/api/adsb`
@@ -236,6 +242,8 @@ npm run geo:sigungu
 npm run geo:topo
 ```
 
+프론트엔드 개발 의존성으로 `@biomejs/biome`가 포함되어 있어 CSS/JS 진단에 활용할 수 있습니다.
+
 ## 테스트
 
 전체 수집 스모크 테스트:
@@ -249,6 +257,7 @@ npm test
 ```bash
 node backend/test/run-once.js metar
 node backend/test/run-once.js taf
+node backend/test/run-once.js amos
 node backend/test/run-once.js warning
 node backend/test/run-once.js lightning
 node backend/test/run-once.js radar-echo
@@ -270,6 +279,7 @@ $env:NODE_TLS_REJECT_UNAUTHORIZED="0"; node backend/test/run-once.js adsb
 ## 프론트 동작 메모
 
 - 기본 맵 테마는 `화이트(기본)`입니다.
+- METAR 카드의 강수량은 `/api/metar`에 포함된 값이 아니라 `/api/amos`에서 별도로 폴링하는 `일강수량`입니다.
 - 지도 경계는 확대/축소에 따라 자동 전환됩니다 (`zoom >= 9`: 시군구, `zoom < 9`: 시도).
 - 경계 데이터(`.v1.topojson`/`.v1.geojson`)는 브라우저 HTTP 캐시 + 프론트 메모리 캐시를 함께 사용해 전환 시 재요청을 최소화합니다.
 - 레이더 루프는 첫 진입 시 최신 프레임에서 일시정지 상태로 시작합니다.
