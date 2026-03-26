@@ -471,6 +471,8 @@ export default function InteractiveMap({
   radarOpacity = 0.6,
   mapTheme = "dark",
   tz = "UTC",
+  trafficCallsignFilter = "",
+  trafficAltitudeBands = [],
 }) {
   const [mapScope, setMapScope] = useState("airport");
   const [boundaryLevel, setBoundaryLevel] = useState("sido");
@@ -599,12 +601,41 @@ export default function InteractiveMap({
   }, [lightningData, timeRangeMin]);
 
   const aircraft = useMemo(() => {
+    const normalizedFilters = String(trafficCallsignFilter || "")
+      .split(",")
+      .map((value) => value.trim().toUpperCase())
+      .filter(Boolean);
+    const selectedBands = Array.isArray(trafficAltitudeBands) ? trafficAltitudeBands : [];
     return (adsbData?.aircraft || []).filter((item) => (
       typeof item?.lat === "number" &&
       typeof item?.lon === "number" &&
-      item.on_ground !== true
+      item.on_ground !== true &&
+      (
+        normalizedFilters.length === 0 ||
+        normalizedFilters.some((filterValue) =>
+          String(item?.callsign || "").trim().toUpperCase().includes(filterValue)
+        )
+      ) &&
+      (
+        selectedBands.length === 0 ||
+        (() => {
+          const altitudeMeters = Number.isFinite(item?.baro_altitude)
+            ? item.baro_altitude
+            : (Number.isFinite(item?.geo_altitude) ? item.geo_altitude : null);
+          if (!Number.isFinite(altitudeMeters)) return false;
+
+          const altitudeFeet = altitudeMeters * 3.28084;
+          return selectedBands.some((band) => {
+            const [minText, maxText] = String(band).split("-");
+            const min = Number(minText);
+            const max = Number(maxText);
+            if (!Number.isFinite(min) || !Number.isFinite(max)) return false;
+            return altitudeFeet >= min && altitudeFeet < max;
+          });
+        })()
+      )
     ));
-  }, [adsbData]);
+  }, [adsbData, trafficCallsignFilter, trafficAltitudeBands]);
 
   const visibleAircraft = useMemo(() => {
     if (isNationwide) return aircraft;
@@ -1016,6 +1047,13 @@ export default function InteractiveMap({
               onClick={() => setShowAirmet((v) => !v)}
             >
               AIRMET
+            </button>
+            <button
+              type="button"
+              className={`range-btn traffic-toggle ${showTraffic ? "active" : ""}`}
+              onClick={() => setShowTraffic((v) => !v)}
+            >
+              TRAFFIC
             </button>
           </div>
       </div>

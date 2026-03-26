@@ -128,7 +128,7 @@ function getSegmentClassName(baseClass, density, extraClasses = "") {
 
 function hasSpecialWeather(slot) {
   const raw = String(slot?.display?.weather || "").toUpperCase();
-  return ["TS", "SH", "SN", "FG"].some((token) => raw.includes(token));
+  return ["TS", "SN", "FG"].some((token) => raw.includes(token));
 }
 
 function getTafBadgeText(header) {
@@ -138,9 +138,71 @@ function getTafBadgeText(header) {
   return "TAF";
 }
 
+function buildTafTableSegments(timeline) {
+  const segments = [];
+
+  for (const slot of timeline) {
+    const ceiling = getCeiling(slot);
+    const flightCategory = getFlightCategory(slot.visibility?.value ?? null, ceiling).category;
+    const signature = JSON.stringify({
+      flightCategory,
+      wind: slot.display?.wind || "",
+      visibility: slot.display?.visibility || "",
+      weather: slot.display?.weather || "",
+      clouds: slot.display?.clouds || "",
+    });
+
+    const previous = segments[segments.length - 1];
+    if (previous && previous.signature === signature) {
+      previous.end = slot.time;
+      previous.hourCount += 1;
+      continue;
+    }
+
+    segments.push({
+      signature,
+      start: slot.time,
+      end: slot.time,
+      hourCount: 1,
+      slot,
+    });
+  }
+
+  return segments;
+}
+
+function formatTafRange(start, end, tz) {
+  const startDate = getDisplayDate(start, tz);
+  const endDate = getDisplayDate(end, tz);
+
+  if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime())) {
+    return "-";
+  }
+
+  const startDay = startDate.getUTCDate();
+  const endDay = endDate.getUTCDate();
+  const startHour = String(startDate.getUTCHours()).padStart(2, "0");
+  const endHourExclusive = String((endDate.getUTCHours() + 1) % 24).padStart(2, "0");
+  const endDayLabel = endDay !== startDay || endDate.getUTCHours() === 23
+    ? ` ${endDay}일`
+    : "";
+
+  if (start === end) {
+    return `${startDay}일 ${startHour}시`;
+  }
+
+  return `${startDay}일 ${startHour}시 ~${endDayLabel} ${endHourExclusive}시`;
+}
+
 export default function TafTimeline({ tafData, icao, version = "v2", onVersionToggle, tz = "UTC" }) {
   const target = tafData?.airports?.[icao];
   const timeline = target?.timeline || [];
+  const isTimelineView = version === "v2";
+  const tableSegments = buildTafTableSegments(timeline);
+  const lastEnd = target?.header?.valid_end;
+  const tafTime = formatUtc(target?.header?.valid_start, tz);
+  const tafTimeText = tafTime || "";
+  const tafBadgeText = getTafBadgeText(target?.header);
 
   if (timeline.length === 0) {
     return (
@@ -170,11 +232,6 @@ export default function TafTimeline({ tafData, icao, version = "v2", onVersionTo
     const ceilingGroups = groupElementsByValue(timeline, (slot) => String(getCeiling(slot) ?? "null"));
     const visibilityGroups = groupElementsByValue(timeline, (slot) => String(slot.visibility?.value ?? "null"));
 
-    const lastEnd = target.header?.valid_end;
-    const tafTime = formatUtc(target.header?.valid_start, tz);
-    const tafTimeText = tafTime || "";
-    const tafBadgeText = getTafBadgeText(target.header);
-
     return (
       <section className="taf-new-panel">
         <div className="taf-new-header">
@@ -182,6 +239,24 @@ export default function TafTimeline({ tafData, icao, version = "v2", onVersionTo
             <span className="panel-kind-badge">{tafBadgeText}</span>
             <span>{tafTimeText}</span>
           </span>
+          <div className="taf-view-toggle" role="tablist" aria-label="TAF view mode">
+            <button
+              type="button"
+              className={`taf-view-toggle-btn${isTimelineView ? " active" : ""}`}
+              onClick={() => onVersionToggle?.("v2")}
+              aria-pressed={isTimelineView}
+            >
+              타임라인
+            </button>
+            <button
+              type="button"
+              className={`taf-view-toggle-btn${!isTimelineView ? " active" : ""}`}
+              onClick={() => onVersionToggle?.("table")}
+              aria-pressed={!isTimelineView}
+            >
+              테이블
+            </button>
+          </div>
         </div>
         <div className="taf-new-container">
           <div className="taf-new-row time-row">
@@ -379,32 +454,96 @@ export default function TafTimeline({ tafData, icao, version = "v2", onVersionTo
 
   return (
     <section className="panel">
-      <h3>공항예보 (TAF) 상세 테이블 - {icao}</h3>
+      <div className="taf-legacy-header">
+        <span className="taf-new-validity">
+          <span className="panel-kind-badge">{tafBadgeText}</span>
+          <span>{tafTimeText}</span>
+        </span>
+        <div className="taf-view-toggle" role="tablist" aria-label="TAF view mode">
+          <button
+            type="button"
+            className={`taf-view-toggle-btn${isTimelineView ? " active" : ""}`}
+            onClick={() => onVersionToggle?.("v2")}
+            aria-pressed={isTimelineView}
+          >
+            타임라인
+          </button>
+          <button
+            type="button"
+            className={`taf-view-toggle-btn${!isTimelineView ? " active" : ""}`}
+            onClick={() => onVersionToggle?.("table")}
+            aria-pressed={!isTimelineView}
+          >
+            테이블
+          </button>
+        </div>
+      </div>
       <div className="table-wrap">
-        <table>
+        <table className="taf-compact-table">
           <thead>
             <tr>
-              <th>Time ({tz})</th>
-              <th>Wind</th>
-              <th>Visibility</th>
-              <th>Weather</th>
-              <th>Clouds</th>
+              <th>시간 ({tz})</th>
+              <th>비행조건</th>
+              <th>시정</th>
+              <th>운고</th>
+              <th>바람</th>
+              <th>날씨</th>
             </tr>
           </thead>
           <tbody>
-            {timeline.map((slot, i) => {
+            {tableSegments.map((segment, i) => {
+              const slot = segment.slot;
+              const visibilityValue = slot.visibility?.value ?? null;
+              const ceiling = getCeiling(slot);
+              const flightCategory = getFlightCategory(visibilityValue, ceiling).category;
+              const visibilityStyle = TINT_STYLE[classifyVisibilityCategory(visibilityValue).category];
+              const ceilingStyle = TINT_STYLE[classifyCeilingCategory(ceiling).category];
+              const weatherVisual = resolveWeatherVisual(slot, slot.time);
+              const weatherLabel = convertWeatherToKorean(
+                slot.display?.weather,
+                slot.visibility?.cavok,
+                slot.clouds || []
+              );
+              const isSpecialWeather = hasSpecialWeather(slot);
+              const windRotation = (slot.wind?.direction || 0) + 180;
               const level = getSeverityLevel({
-                visibility: slot.visibility?.value,
+                visibility: visibilityValue,
                 wind: slot.wind?.speed,
                 gust: slot.wind?.gust,
               });
+
               return (
                 <tr key={i} className={`row-${level}`}>
-                  <td>{formatUtc(slot.time, tz)}</td>
-                  <td>{safe(slot.display?.wind)}</td>
-                  <td>{safe(slot.display?.visibility)}</td>
-                  <td>{safe(slot.display?.weather)}</td>
-                  <td>{safe(slot.display?.clouds)}</td>
+                  <td>{formatTafRange(segment.start, segment.end, tz)}</td>
+                  <td className="taf-compact-table-cell taf-compact-table-cell--flight">
+                    <span
+                      className="taf-flight-badge"
+                      style={{
+                        backgroundColor: FC_COLORS[flightCategory] || FC_COLORS.VFR,
+                        color: "#fff",
+                      }}
+                    >
+                      {flightCategory}
+                    </span>
+                  </td>
+                  <td className="taf-compact-table-cell" style={visibilityStyle}>
+                    {formatVisibilityValue(visibilityValue, slot.display?.visibility)}
+                  </td>
+                  <td className="taf-compact-table-cell" style={ceilingStyle}>
+                    {formatCeiling(ceiling)}
+                  </td>
+                  <td className="taf-table-center">
+                    <span className="taf-wind-cell">
+                      <span className="wind-arrow-inline" style={{ transform: `rotate(${windRotation}deg)` }}>↑</span>
+                      <span>{safe(slot.display?.wind)}</span>
+                    </span>
+                  </td>
+                  <td className="taf-table-center">
+                    <span className={`taf-weather-cell${isSpecialWeather ? " taf-weather-cell--special" : ""}`}>
+                      <WeatherIcon visual={weatherVisual} className="mini" />
+                      <span>{weatherLabel}</span>
+                    </span>
+                  </td>
                 </tr>
               );
             })}

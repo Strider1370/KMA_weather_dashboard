@@ -16,6 +16,14 @@ const TRIGGER_LABELS = {
   lightning_detected: "낙뢰 감지",
 };
 
+const TRAFFIC_ALTITUDE_OPTIONS = [
+  "0-10000",
+  "10000-20000",
+  "20000-30000",
+  "30000-40000",
+  "40000-50000",
+];
+
 export default function Settings({
   defaults,
   onClose,
@@ -24,6 +32,10 @@ export default function Settings({
   setTimeZone,
   mapTheme,
   setMapTheme,
+  trafficCallsignFilter,
+  setTrafficCallsignFilter,
+  trafficAltitudeBands,
+  setTrafficAltitudeBands,
 }) {
   const current = resolveSettings(defaults);
 
@@ -39,10 +51,10 @@ export default function Settings({
   const [volume, setVolume] = useState(current.dispatchers.sound.volume);
   const [marqueeEnabled, setMarqueeEnabled] = useState(current.dispatchers.marquee.enabled);
 
-  const [metarVersion, setMetarVersion] = useState(() => localStorage.getItem("metar_version") || "v1");
-  const [tafVersion, setTafVersion] = useState(() => localStorage.getItem("taf_version") || "v1");
   const [localTimeZone, setLocalTimeZone] = useState(timeZone || "KST");
   const [localMapTheme, setLocalMapTheme] = useState(mapTheme || localStorage.getItem("map_theme") || "light");
+  const [localTrafficCallsignFilter, setLocalTrafficCallsignFilter] = useState(trafficCallsignFilter || "");
+  const [localTrafficAltitudeBands, setLocalTrafficAltitudeBands] = useState(trafficAltitudeBands || []);
   const [activeTab, setActiveTab] = useState("general");
 
   const [triggers, setTriggers] = useState(() => {
@@ -87,12 +99,14 @@ export default function Settings({
     };
 
     savePersonalSettings(overrides);
-    localStorage.setItem("metar_version", metarVersion);
-    localStorage.setItem("taf_version", tafVersion);
     localStorage.setItem("time_zone", localTimeZone);
     localStorage.setItem("map_theme", localMapTheme);
+    localStorage.setItem("traffic_callsign_filter", localTrafficCallsignFilter);
+    localStorage.setItem("traffic_altitude_bands", JSON.stringify(localTrafficAltitudeBands));
     setTimeZone?.(localTimeZone);
     setMapTheme?.(localMapTheme);
+    setTrafficCallsignFilter?.(localTrafficCallsignFilter);
+    setTrafficAltitudeBands?.(localTrafficAltitudeBands);
 
     onSettingsChange?.(overrides);
     onClose();
@@ -100,14 +114,24 @@ export default function Settings({
 
   function handleReset() {
     clearPersonalSettings();
-    localStorage.removeItem("metar_version");
-    localStorage.removeItem("taf_version");
     localStorage.removeItem("time_zone");
     localStorage.removeItem("map_theme");
+    localStorage.removeItem("traffic_callsign_filter");
+    localStorage.removeItem("traffic_altitude_bands");
     setTimeZone?.("KST");
     setMapTheme?.("light");
+    setTrafficCallsignFilter?.("");
+    setTrafficAltitudeBands?.([]);
     onSettingsChange?.(null);
     onClose();
+  }
+
+  function toggleTrafficAltitudeBand(band) {
+    setLocalTrafficAltitudeBands((prev) => (
+      prev.includes(band)
+        ? prev.filter((item) => item !== band)
+        : [...prev, band]
+    ));
   }
 
   return (
@@ -132,27 +156,18 @@ export default function Settings({
             >
               알림
             </button>
+            <button
+              className={`alert-settings-tab-btn${activeTab === "traffic" ? " active" : ""}`}
+              onClick={() => setActiveTab("traffic")}
+            >
+              항적
+            </button>
           </div>
 
           <div className="alert-settings-body">
             {activeTab === "general" && (
               <fieldset className="alert-settings-section">
                 <legend>표시 설정</legend>
-                <label className="alert-settings-row">
-                  <span>METAR 표시 모드</span>
-                  <select value={metarVersion} onChange={(e) => setMetarVersion(e.target.value)}>
-                    <option value="v1">텍스트 리스트 (기본)</option>
-                    <option value="v2">사이드바 요약</option>
-                  </select>
-                </label>
-                <label className="alert-settings-row">
-                  <span>TAF 표시 모드</span>
-                  <select value={tafVersion} onChange={(e) => setTafVersion(e.target.value)}>
-                    <option value="v1">상세 테이블 (기본)</option>
-                    <option value="v2">시간 막대 타임라인</option>
-                    <option value="v3">시간별 상세 그리드</option>
-                  </select>
-                </label>
                 <label className="alert-settings-row">
                   <span>시간대 표시</span>
                   <select value={localTimeZone} onChange={(e) => setLocalTimeZone(e.target.value)}>
@@ -177,10 +192,6 @@ export default function Settings({
                   <label className="alert-settings-row">
                     <span>알림 활성화</span>
                     <input type="checkbox" checked={globalEnabled} onChange={(e) => setGlobalEnabled(e.target.checked)} />
-                  </label>
-                  <label className="alert-settings-row">
-                    <span>폴링 간격 (초)</span>
-                    <input type="number" min={10} max={300} value={pollInterval} onChange={(e) => setPollInterval(e.target.value)} />
                   </label>
                   <label className="alert-settings-row">
                     <span>쿨다운 (초)</span>
@@ -295,6 +306,34 @@ export default function Settings({
                   ))}
                 </fieldset>
               </>
+            )}
+
+            {activeTab === "traffic" && (
+              <fieldset className="alert-settings-section">
+                <legend>TRAFFIC 표시 설정</legend>
+                <label className="alert-settings-row">
+                  <span>호출부호 필터</span>
+                  <input
+                    type="text"
+                    value={localTrafficCallsignFilter}
+                    onChange={(e) => setLocalTrafficCallsignFilter(e.target.value.toUpperCase())}
+                    placeholder="예: KAL, AAR123, JJA"
+                  />
+                </label>
+                <fieldset className="alert-settings-section">
+                  <legend>고도 필터 (ft)</legend>
+                  {TRAFFIC_ALTITUDE_OPTIONS.map((band) => (
+                    <label key={band} className="alert-settings-row">
+                      <span>{band}</span>
+                      <input
+                        type="checkbox"
+                        checked={localTrafficAltitudeBands.includes(band)}
+                        onChange={() => toggleTrafficAltitudeBand(band)}
+                      />
+                    </label>
+                  ))}
+                </fieldset>
+              </fieldset>
             )}
           </div>
         </div>

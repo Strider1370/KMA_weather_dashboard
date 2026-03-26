@@ -172,6 +172,7 @@ Derived from `.editorconfig` + existing source files.
 - If nginx serves `frontend/dist` directly, keep both `.geojson` (`application/geo+json`) and `.topojson` (`application/topo+json`) MIME handling correct and enable gzip/brotli for `.geojson`, `.topojson`, `.json`, `.js`, and `.css`.
 - InteractiveMap boundary detail is auto-switched by zoom (`zoom >= 9`: sigungu, `zoom < 9`: sido); there is no user setting toggle anymore.
 - InteractiveMap renders nationwide lightning strikes in both Airport/Korea modes; Airport mode zone counters (8/16/32km) must remain based on selected-airport strikes.
+- InteractiveMap `Traffic` layer is toggleable again and supports settings-driven callsign substring filtering plus altitude-band filtering (`baro_altitude` first, `geo_altitude` fallback, compare in feet after converting from meters).
 - Nationwide radar echo currently uses `cmp=hsr`, converts `dBZ` to `mm/h`, and reprojects to full radar-domain bounds before writing `/data/radar/echo_korea_<tm>.png`.
 - In Korea mode, InteractiveMap draws a unioned KMA radar-coverage boundary from site radius metadata and can dim only the area outside that union boundary.
 - Rain-rate colors follow the in-app `mm/h` legend, and sub-`0.1 mm/h` pixels should remain transparent so dark mode does not show a bright fringe.

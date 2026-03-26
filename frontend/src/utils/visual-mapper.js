@@ -33,7 +33,7 @@ function getCloudKorean(clouds) {
 }
 
 export function convertWeatherToKorean(weatherStr, cavok, clouds = []) {
-  if (cavok) return "맑음/양호";
+  if (cavok) return "맑음";
   if (!weatherStr || weatherStr === "NSW") return getCloudKorean(clouds);
 
   const mapping = {

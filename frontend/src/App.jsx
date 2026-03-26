@@ -56,10 +56,21 @@ export default function App() {
 
   // UI Version states (kept for dead-code paths in MetarCard/TafTimeline)
   const [metarVersion] = useState("v2");
-  const [tafVersion] = useState("v2");
+  const [tafVersion, setTafVersion] = useState(() => localStorage.getItem("taf_view_mode") || "v2");
   const [timeZone, setTimeZone] = useState(() => localStorage.getItem("time_zone") || "KST");
   const radarOpacity = 1;
   const [mapTheme, setMapTheme] = useState(() => localStorage.getItem("map_theme") || "light");
+  const [trafficCallsignFilter, setTrafficCallsignFilter] = useState(() => localStorage.getItem("traffic_callsign_filter") || "");
+  const [trafficAltitudeBands, setTrafficAltitudeBands] = useState(() => {
+    const raw = localStorage.getItem("traffic_altitude_bands");
+    if (!raw) return [];
+    try {
+      const parsed = JSON.parse(raw);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  });
 
   useEffect(() => {
     localStorage.setItem("time_zone", timeZone);
@@ -68,6 +79,18 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem("map_theme", mapTheme);
   }, [mapTheme]);
+
+  useEffect(() => {
+    localStorage.setItem("taf_view_mode", tafVersion);
+  }, [tafVersion]);
+
+  useEffect(() => {
+    localStorage.setItem("traffic_callsign_filter", trafficCallsignFilter);
+  }, [trafficCallsignFilter]);
+
+  useEffect(() => {
+    localStorage.setItem("traffic_altitude_bands", JSON.stringify(trafficAltitudeBands));
+  }, [trafficAltitudeBands]);
 
   useEffect(() => {
     if (selectedAirport) {
@@ -399,6 +422,7 @@ export default function App() {
               tafData={data.taf}
               icao={selectedAirport}
               version={tafVersion}
+              onVersionToggle={setTafVersion}
               tz={timeZone}
             />
           </div>
@@ -422,6 +446,8 @@ export default function App() {
               radarOpacity={radarOpacity}
               mapTheme={mapTheme}
               tz={timeZone}
+              trafficCallsignFilter={trafficCallsignFilter}
+              trafficAltitudeBands={trafficAltitudeBands}
             />
           </div>
         </div>
@@ -436,6 +462,10 @@ export default function App() {
           setTimeZone={setTimeZone}
           mapTheme={mapTheme}
           setMapTheme={setMapTheme}
+          trafficCallsignFilter={trafficCallsignFilter}
+          setTrafficCallsignFilter={setTrafficCallsignFilter}
+          trafficAltitudeBands={trafficAltitudeBands}
+          setTrafficAltitudeBands={setTrafficAltitudeBands}
         />
       )}
     </>
