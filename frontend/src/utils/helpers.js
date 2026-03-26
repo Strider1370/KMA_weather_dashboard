@@ -176,34 +176,86 @@ export const FLIGHT_CATEGORY_META = {
   },
   LIFR: {
     category: "LIFR",
-    color: "#7c3aed",
-    labelKo: "저계기비행규칙",
-    bg: "#f5f3ff",
-    border: "#7c3aed",
-    borderSoft: "#ddd6fe",
-    valueColor: "#6d28d9",
+    color: "#dc2626",
+    labelKo: "최저기상제한치 미만",
+    bg: "#fef2f2",
+    border: "#dc2626",
+    borderSoft: "#fecaca",
+    valueColor: "#b91c1c",
   },
 };
+
+export const DEFAULT_AIRPORT_MINIMA_RULES = {
+  RKSI: { visibilityM: 175, ceilingFt: null },
+  RKSS: { visibilityM: 175, ceilingFt: null },
+  RKPC: { visibilityM: 300, ceilingFt: 100 },
+  RKPK: { visibilityM: 300, ceilingFt: 100 },
+  RKJY: { visibilityM: 550, ceilingFt: 200 },
+  RKJB: { visibilityM: 550, ceilingFt: 200 },
+  RKPU: { visibilityM: 550, ceilingFt: 200 },
+  RKNY: { visibilityM: 550, ceilingFt: 200 },
+};
+
+function normalizeNullableNumber(value) {
+  if (value === "" || value == null) return null;
+  const next = Number(value);
+  return Number.isFinite(next) ? next : null;
+}
+
+export function normalizeAirportMinimaSettings(raw) {
+  const next = {};
+  for (const [icao, defaults] of Object.entries(DEFAULT_AIRPORT_MINIMA_RULES)) {
+    const source = raw?.[icao] || defaults;
+    next[icao] = {
+      visibilityM: normalizeNullableNumber(source.visibilityM) ?? defaults.visibilityM,
+      ceilingFt: normalizeNullableNumber(source.ceilingFt),
+    };
+  }
+  return next;
+}
+
+export function getAirportMinimaRule(icao, minimaSettings = null) {
+  const rules = minimaSettings || DEFAULT_AIRPORT_MINIMA_RULES;
+  return rules[String(icao || "").toUpperCase()] || null;
+}
 
 function getFlightCategoryMeta(category) {
   return FLIGHT_CATEGORY_META[category] || FLIGHT_CATEGORY_META.VFR;
 }
 
-export function classifyVisibilityCategory(visibilityM) {
+export function classifyVisibilityCategory(visibilityM, icao = null, minimaSettings = null) {
   const vis = Number.isFinite(visibilityM) ? visibilityM : 99999;
+  const minima = getAirportMinimaRule(icao, minimaSettings);
+  if (minima && Number.isFinite(minima.visibilityM) && vis < minima.visibilityM) {
+    return getFlightCategoryMeta("LIFR");
+  }
   if (vis < 5000) return getFlightCategoryMeta("IFR");
   return getFlightCategoryMeta("VFR");
 }
 
-export function classifyCeilingCategory(ceilingFt) {
+export function classifyCeilingCategory(ceilingFt, icao = null, minimaSettings = null) {
   const ceil = Number.isFinite(ceilingFt) ? ceilingFt : 99999;
+  const minima = getAirportMinimaRule(icao, minimaSettings);
+  if (minima && Number.isFinite(minima.ceilingFt) && ceil < minima.ceilingFt) {
+    return getFlightCategoryMeta("LIFR");
+  }
   if (ceil < 1500) return getFlightCategoryMeta("IFR");
   return getFlightCategoryMeta("VFR");
 }
 
-export function getFlightCategory(visibilityM, ceilingFt) {
+export function getFlightCategory(visibilityM, ceilingFt, icao = null, minimaSettings = null) {
   const vis = Number.isFinite(visibilityM) ? visibilityM : 99999;
   const ceil = Number.isFinite(ceilingFt) ? ceilingFt : 99999;
+  const minima = getAirportMinimaRule(icao, minimaSettings);
+
+  if (minima) {
+    const visibilityBelowMinima = Number.isFinite(minima.visibilityM) && vis < minima.visibilityM;
+    const ceilingBelowMinima = Number.isFinite(minima.ceilingFt) && ceil < minima.ceilingFt;
+    if (visibilityBelowMinima || ceilingBelowMinima) {
+      return FLIGHT_CATEGORY_META.LIFR;
+    }
+  }
+
   if (vis < 5000 || ceil < 1500) {
     return FLIGHT_CATEGORY_META.IFR;
   }

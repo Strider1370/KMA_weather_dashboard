@@ -474,7 +474,7 @@ export default function InteractiveMap({
   trafficCallsignFilter = "",
   trafficAltitudeBands = [],
 }) {
-  const [mapScope, setMapScope] = useState("airport");
+  const [mapScope, setMapScope] = useState("nationwide");
   const [boundaryLevel, setBoundaryLevel] = useState("sido");
   const [currentZoom, setCurrentZoom] = useState(NATIONWIDE_ZOOM);
   const [, forceRender] = useReducer((x) => x + 1, 0);
@@ -998,16 +998,6 @@ export default function InteractiveMap({
         <div className="panel-switch map-scope-switch" role="tablist" aria-label="Map scope">
           <button
             type="button"
-            className={`panel-switch-btn ${!isNationwide ? "active" : ""}`}
-            onClick={() => {
-              setMapScope("airport");
-              setRecenterKey((prev) => prev + 1);
-            }}
-          >
-            공항
-          </button>
-          <button
-            type="button"
             className={`panel-switch-btn ${isNationwide ? "active" : ""}`}
             onClick={() => {
               setMapScope("nationwide");
@@ -1015,6 +1005,16 @@ export default function InteractiveMap({
             }}
           >
             전국
+          </button>
+          <button
+            type="button"
+            className={`panel-switch-btn ${!isNationwide ? "active" : ""}`}
+            onClick={() => {
+              setMapScope("airport");
+              setRecenterKey((prev) => prev + 1);
+            }}
+          >
+            공항
           </button>
         </div>
           <div className="time-range">

@@ -11,7 +11,6 @@ import {
 import WeatherIcon from "./WeatherIcon";
 import { convertWeatherToKorean } from "../utils/visual-mapper";
 import { resolveWeatherVisual } from "../utils/weather-visual-resolver";
-import tempIcon from "../../../temp_icon.png";
 
 function getWindDirectionLabel(wind) {
   if (!wind) return "-";
@@ -92,6 +91,7 @@ export default function MetarCard({
   metarData,
   amosData,
   icao,
+  minimaSettings = null,
   airportMeta = null,
   metarTime = "",
   version = "v2",
@@ -181,9 +181,9 @@ export default function MetarCard({
   const windDirectionRotation = getWindDirectionRotation(wind);
   const crosswindValue = formatCrosswindValue(wind, airportMeta?.runway_hdg ?? null);
   const crosswindArrow = getCrosswindArrow(wind, airportMeta?.runway_hdg ?? null);
-  const visibilityCategory = classifyVisibilityCategory(visibility);
-  const ceilingCategory = classifyCeilingCategory(ceilingFt);
-  const flightCategory = getFlightCategory(visibility, ceilingFt);
+  const visibilityCategory = classifyVisibilityCategory(visibility, icao, minimaSettings);
+  const ceilingCategory = classifyCeilingCategory(ceilingFt, icao, minimaSettings);
+  const flightCategory = getFlightCategory(visibility, ceilingFt, icao, minimaSettings);
   const metarTimeText = metarTime.trim();
   const metarBadgeText = getMetarBadgeText(target.header, metarData?.type);
   const specialWeather = hasSpecialWeather(target.observation);
@@ -316,7 +316,7 @@ export default function MetarCard({
               <article className="metar-surface-card metar-surface-card--compact">
                 <div className="metar-side-label">
                   <div className="metar-side-icon metar-side-icon--metric metar-side-icon--temp">
-                    <img src={tempIcon} alt="" aria-hidden="true" />
+                    <img src="/temp_icon.png" alt="" aria-hidden="true" />
                   </div>
                   <div className="metar-side-text">온도/습도</div>
                 </div>

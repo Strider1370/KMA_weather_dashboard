@@ -15,7 +15,7 @@ import {
 } from "../utils/visual-mapper";
 import { resolveWeatherVisual } from "../utils/weather-visual-resolver";
 
-const FC_COLORS = { VFR: "#15803d", MVFR: "#2563eb", IFR: "#f59e0b", LIFR: "#7c3aed" };
+const FC_COLORS = { VFR: "#15803d", MVFR: "#2563eb", IFR: "#f59e0b", LIFR: "#dc2626" };
 const WEATHER_STYLE = { backgroundColor: "rgba(234, 179, 8, 0.10)", color: "#92400e" };
 const WIND_STYLE = { backgroundColor: "var(--card-bg)", color: "var(--muted)" };
 const TAF_SEGMENT_DENSITY = {
@@ -27,7 +27,7 @@ const TINT_STYLE = {
   VFR: { backgroundColor: "rgba(21, 128, 61, 0.08)", borderLeft: "3px solid #15803d", color: "#166534" },
   MVFR: { backgroundColor: "rgba(37, 99, 235, 0.08)", borderLeft: "3px solid #2563eb", color: "#1d4ed8" },
   IFR: { backgroundColor: "rgba(245, 158, 11, 0.08)", borderLeft: "3px solid #f59e0b", color: "#b45309" },
-  LIFR: { backgroundColor: "rgba(124, 58, 237, 0.08)", borderLeft: "3px solid #7c3aed", color: "#6d28d9" },
+  LIFR: { backgroundColor: "rgba(220, 38, 38, 0.08)", borderLeft: "3px solid #dc2626", color: "#b91c1c" },
 };
 
 function getCeiling(slot) {
@@ -138,12 +138,12 @@ function getTafBadgeText(header) {
   return "TAF";
 }
 
-function buildTafTableSegments(timeline) {
+function buildTafTableSegments(timeline, icao, minimaSettings) {
   const segments = [];
 
   for (const slot of timeline) {
     const ceiling = getCeiling(slot);
-    const flightCategory = getFlightCategory(slot.visibility?.value ?? null, ceiling).category;
+    const flightCategory = getFlightCategory(slot.visibility?.value ?? null, ceiling, icao, minimaSettings).category;
     const signature = JSON.stringify({
       flightCategory,
       wind: slot.display?.wind || "",
@@ -194,11 +194,11 @@ function formatTafRange(start, end, tz) {
   return `${startDay}일 ${startHour}시 ~${endDayLabel} ${endHourExclusive}시`;
 }
 
-export default function TafTimeline({ tafData, icao, version = "v2", onVersionToggle, tz = "UTC" }) {
+export default function TafTimeline({ tafData, icao, minimaSettings = null, version = "v2", onVersionToggle, tz = "UTC" }) {
   const target = tafData?.airports?.[icao];
   const timeline = target?.timeline || [];
   const isTimelineView = version === "v2";
-  const tableSegments = buildTafTableSegments(timeline);
+  const tableSegments = buildTafTableSegments(timeline, icao, minimaSettings);
   const lastEnd = target?.header?.valid_end;
   const tafTime = formatUtc(target?.header?.valid_start, tz);
   const tafTimeText = tafTime || "";
@@ -216,7 +216,7 @@ export default function TafTimeline({ tafData, icao, version = "v2", onVersionTo
     const flightCatGroups = groupElementsByValue(timeline, (slot) => {
       const vis = slot.visibility?.value ?? null;
       const ceil = getCeiling(slot);
-      return getFlightCategory(vis, ceil).category;
+      return getFlightCategory(vis, ceil, icao, minimaSettings).category;
     });
     const weatherGroups = groupElementsByValue(timeline, (slot) => {
       const weatherVisual = resolveWeatherVisual(slot, slot.time);
@@ -373,7 +373,7 @@ export default function TafTimeline({ tafData, icao, version = "v2", onVersionTo
               {visibilityGroups.map((group, i) => {
                 const density = getSegmentDensity(group.hourCount);
                 const vis = group.data.visibility?.value ?? null;
-                const style = TINT_STYLE[classifyVisibilityCategory(vis).category];
+                const style = TINT_STYLE[classifyVisibilityCategory(vis, icao, minimaSettings).category];
                 const visibilityText = getVisibilityText(vis, group.data.display?.visibility, density);
                 return (
                   <div
@@ -395,7 +395,7 @@ export default function TafTimeline({ tafData, icao, version = "v2", onVersionTo
               {ceilingGroups.map((group, i) => {
                 const density = getSegmentDensity(group.hourCount);
                 const ceiling = getCeiling(group.data);
-                const style = TINT_STYLE[classifyCeilingCategory(ceiling).category];
+                const style = TINT_STYLE[classifyCeilingCategory(ceiling, icao, minimaSettings).category];
                 const ceilingText = formatCeiling(ceiling);
                 return (
                   <div
@@ -495,9 +495,9 @@ export default function TafTimeline({ tafData, icao, version = "v2", onVersionTo
               const slot = segment.slot;
               const visibilityValue = slot.visibility?.value ?? null;
               const ceiling = getCeiling(slot);
-              const flightCategory = getFlightCategory(visibilityValue, ceiling).category;
-              const visibilityStyle = TINT_STYLE[classifyVisibilityCategory(visibilityValue).category];
-              const ceilingStyle = TINT_STYLE[classifyCeilingCategory(ceiling).category];
+              const flightCategory = getFlightCategory(visibilityValue, ceiling, icao, minimaSettings).category;
+              const visibilityStyle = TINT_STYLE[classifyVisibilityCategory(visibilityValue, icao, minimaSettings).category];
+              const ceilingStyle = TINT_STYLE[classifyCeilingCategory(ceiling, icao, minimaSettings).category];
               const weatherVisual = resolveWeatherVisual(slot, slot.time);
               const weatherLabel = convertWeatherToKorean(
                 slot.display?.weather,

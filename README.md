@@ -359,3 +359,9 @@ types {
 - 코딩 규칙/워크플로는 `AGENTS.md`를 따르세요.
 - 명시적 요청이 없으면 `backend/data/` 생성물은 커밋하지 마세요.
 - 변경 범위는 기능/수집기 단위로 작게 유지하세요.
+
+## LIFR Minima Settings
+
+- LIFR thresholds are configurable per airport in Settings > `MINIMA`.
+- Values are persisted in `localStorage` as `airport_minima_settings`.
+- The configured thresholds are used by both METAR and TAF views for flight category and visibility/ceiling tint classification.

@@ -4,16 +4,20 @@ import {
   savePersonalSettings,
   clearPersonalSettings,
 } from "../../utils/alerts";
+import {
+  DEFAULT_AIRPORT_MINIMA_RULES,
+  normalizeAirportMinimaSettings,
+} from "../../utils/helpers";
 
 const TRIGGER_LABELS = {
-  warning_issued: "기상특보 발표",
-  warning_cleared: "기상특보 해제",
+  warning_issued: "경보 발령",
+  warning_cleared: "경보 해제",
   low_visibility: "저시정",
   high_wind: "강풍",
-  weather_phenomenon: "기상현상 (TS/SN 등)",
+  weather_phenomenon: "특이기상 (TS/SN/FG)",
   low_ceiling: "저운고",
-  taf_adverse_weather: "TAF 악기상 예보",
-  lightning_detected: "낙뢰 감지",
+  taf_adverse_weather: "TAF 악기상",
+  lightning_detected: "낙뢰 탐지",
 };
 
 const TRAFFIC_ALTITUDE_OPTIONS = [
@@ -23,6 +27,8 @@ const TRAFFIC_ALTITUDE_OPTIONS = [
   "30000-40000",
   "40000-50000",
 ];
+
+const MINIMA_AIRPORT_ORDER = ["RKSI", "RKSS", "RKPC", "RKPK", "RKJY", "RKJB", "RKPU", "RKNY"];
 
 export default function Settings({
   defaults,
@@ -36,6 +42,8 @@ export default function Settings({
   setTrafficCallsignFilter,
   trafficAltitudeBands,
   setTrafficAltitudeBands,
+  minimaSettings,
+  setMinimaSettings,
 }) {
   const current = resolveSettings(defaults);
 
@@ -55,6 +63,9 @@ export default function Settings({
   const [localMapTheme, setLocalMapTheme] = useState(mapTheme || localStorage.getItem("map_theme") || "light");
   const [localTrafficCallsignFilter, setLocalTrafficCallsignFilter] = useState(trafficCallsignFilter || "");
   const [localTrafficAltitudeBands, setLocalTrafficAltitudeBands] = useState(trafficAltitudeBands || []);
+  const [localMinimaSettings, setLocalMinimaSettings] = useState(
+    normalizeAirportMinimaSettings(minimaSettings || DEFAULT_AIRPORT_MINIMA_RULES)
+  );
   const [activeTab, setActiveTab] = useState("general");
 
   const [triggers, setTriggers] = useState(() => {
@@ -82,6 +93,24 @@ export default function Settings({
     }));
   }
 
+  function toggleTrafficAltitudeBand(band) {
+    setLocalTrafficAltitudeBands((prev) => (
+      prev.includes(band)
+        ? prev.filter((item) => item !== band)
+        : [...prev, band]
+    ));
+  }
+
+  function updateMinimaValue(icao, key, value) {
+    setLocalMinimaSettings((prev) => ({
+      ...prev,
+      [icao]: {
+        ...prev[icao],
+        [key]: value === "" ? null : Number(value),
+      },
+    }));
+  }
+
   function handleSave() {
     const overrides = {
       global: {
@@ -103,10 +132,13 @@ export default function Settings({
     localStorage.setItem("map_theme", localMapTheme);
     localStorage.setItem("traffic_callsign_filter", localTrafficCallsignFilter);
     localStorage.setItem("traffic_altitude_bands", JSON.stringify(localTrafficAltitudeBands));
+    localStorage.setItem("airport_minima_settings", JSON.stringify(localMinimaSettings));
+
     setTimeZone?.(localTimeZone);
     setMapTheme?.(localMapTheme);
     setTrafficCallsignFilter?.(localTrafficCallsignFilter);
     setTrafficAltitudeBands?.(localTrafficAltitudeBands);
+    setMinimaSettings?.(normalizeAirportMinimaSettings(localMinimaSettings));
 
     onSettingsChange?.(overrides);
     onClose();
@@ -118,20 +150,16 @@ export default function Settings({
     localStorage.removeItem("map_theme");
     localStorage.removeItem("traffic_callsign_filter");
     localStorage.removeItem("traffic_altitude_bands");
+    localStorage.removeItem("airport_minima_settings");
+
     setTimeZone?.("KST");
     setMapTheme?.("light");
     setTrafficCallsignFilter?.("");
     setTrafficAltitudeBands?.([]);
+    setMinimaSettings?.(normalizeAirportMinimaSettings(DEFAULT_AIRPORT_MINIMA_RULES));
+
     onSettingsChange?.(null);
     onClose();
-  }
-
-  function toggleTrafficAltitudeBand(band) {
-    setLocalTrafficAltitudeBands((prev) => (
-      prev.includes(band)
-        ? prev.filter((item) => item !== band)
-        : [...prev, band]
-    ));
   }
 
   return (
@@ -162,6 +190,12 @@ export default function Settings({
             >
               항적
             </button>
+            <button
+              className={`alert-settings-tab-btn${activeTab === "minima" ? " active" : ""}`}
+              onClick={() => setActiveTab("minima")}
+            >
+              MINIMA
+            </button>
           </div>
 
           <div className="alert-settings-body">
@@ -169,16 +203,16 @@ export default function Settings({
               <fieldset className="alert-settings-section">
                 <legend>표시 설정</legend>
                 <label className="alert-settings-row">
-                  <span>시간대 표시</span>
+                  <span>시간대</span>
                   <select value={localTimeZone} onChange={(e) => setLocalTimeZone(e.target.value)}>
-                    <option value="UTC">UTC (국제 표준시)</option>
-                    <option value="KST">KST (한국 표준시, UTC+9)</option>
+                    <option value="UTC">UTC</option>
+                    <option value="KST">KST (UTC+9)</option>
                   </select>
                 </label>
                 <label className="alert-settings-row">
-                  <span>맵 모드</span>
+                  <span>지도 테마</span>
                   <select value={localMapTheme} onChange={(e) => setLocalMapTheme(e.target.value)}>
-                    <option value="light">화이트(기본)</option>
+                    <option value="light">라이트</option>
                     <option value="dark">다크</option>
                   </select>
                 </label>
@@ -188,37 +222,37 @@ export default function Settings({
             {activeTab === "alert" && (
               <>
                 <fieldset className="alert-settings-section">
-                  <legend>전체 설정</legend>
+                  <legend>전역 설정</legend>
                   <label className="alert-settings-row">
-                    <span>알림 활성화</span>
+                    <span>알림 사용</span>
                     <input type="checkbox" checked={globalEnabled} onChange={(e) => setGlobalEnabled(e.target.checked)} />
                   </label>
                   <label className="alert-settings-row">
-                    <span>쿨다운 (초)</span>
+                    <span>쿨다운(초)</span>
                     <input type="number" min={0} max={3600} value={cooldown} onChange={(e) => setCooldown(e.target.value)} />
                   </label>
                   <label className="alert-settings-row">
-                    <span>조용한 시간 시작</span>
+                    <span>야간 시작</span>
                     <input type="time" value={quietStart} onChange={(e) => setQuietStart(e.target.value)} />
                   </label>
                   <label className="alert-settings-row">
-                    <span>조용한 시간 종료</span>
+                    <span>야간 종료</span>
                     <input type="time" value={quietEnd} onChange={(e) => setQuietEnd(e.target.value)} />
                   </label>
                 </fieldset>
 
                 <fieldset className="alert-settings-section">
-                  <legend>알림 방식</legend>
+                  <legend>전달 채널</legend>
                   <label className="alert-settings-row">
-                    <span>팝업 알림</span>
+                    <span>팝업</span>
                     <input type="checkbox" checked={popupEnabled} onChange={(e) => setPopupEnabled(e.target.checked)} />
                   </label>
                   <label className="alert-settings-row">
-                    <span>자동 닫기 (초)</span>
+                    <span>자동 닫힘(초)</span>
                     <input type="number" min={0} max={60} value={autoDismiss} onChange={(e) => setAutoDismiss(e.target.value)} />
                   </label>
                   <label className="alert-settings-row">
-                    <span>사운드 알림</span>
+                    <span>사운드</span>
                     <input type="checkbox" checked={soundEnabled} onChange={(e) => setSoundEnabled(e.target.checked)} />
                   </label>
                   <label className="alert-settings-row">
@@ -226,7 +260,7 @@ export default function Settings({
                     <input type="range" min={0} max={100} value={volume} onChange={(e) => setVolume(Number(e.target.value))} />
                   </label>
                   <label className="alert-settings-row">
-                    <span>마퀴(하단 바)</span>
+                    <span>마키</span>
                     <input type="checkbox" checked={marqueeEnabled} onChange={(e) => setMarqueeEnabled(e.target.checked)} />
                   </label>
                 </fieldset>
@@ -241,7 +275,7 @@ export default function Settings({
                       </label>
                       {cfg.enabled && id === "low_visibility" && (
                         <label className="alert-settings-row alert-settings-sub">
-                          <span>시정 임계값 (m)</span>
+                          <span>시정 임계치(m)</span>
                           <input
                             type="number"
                             min={100}
@@ -255,7 +289,7 @@ export default function Settings({
                       {cfg.enabled && id === "high_wind" && (
                         <>
                           <label className="alert-settings-row alert-settings-sub">
-                            <span>풍속 임계값 (kt)</span>
+                            <span>풍속 임계치(kt)</span>
                             <input
                               type="number"
                               min={10}
@@ -265,7 +299,7 @@ export default function Settings({
                             />
                           </label>
                           <label className="alert-settings-row alert-settings-sub">
-                            <span>돌풍 임계값 (kt)</span>
+                            <span>돌풍 임계치(kt)</span>
                             <input
                               type="number"
                               min={10}
@@ -278,7 +312,7 @@ export default function Settings({
                       )}
                       {cfg.enabled && id === "low_ceiling" && (
                         <label className="alert-settings-row alert-settings-sub">
-                          <span>운고 임계값 (ft)</span>
+                          <span>운고 임계치(ft)</span>
                           <input
                             type="number"
                             min={100}
@@ -291,7 +325,7 @@ export default function Settings({
                       )}
                       {cfg.enabled && id === "taf_adverse_weather" && (
                         <label className="alert-settings-row alert-settings-sub">
-                          <span>예보 시정 임계값 (m)</span>
+                          <span>TAF 시정 임계치(m)</span>
                           <input
                             type="number"
                             min={500}
@@ -310,7 +344,7 @@ export default function Settings({
 
             {activeTab === "traffic" && (
               <fieldset className="alert-settings-section">
-                <legend>TRAFFIC 표시 설정</legend>
+                <legend>TRAFFIC 필터</legend>
                 <label className="alert-settings-row">
                   <span>호출부호 필터</span>
                   <input
@@ -321,7 +355,7 @@ export default function Settings({
                   />
                 </label>
                 <fieldset className="alert-settings-section">
-                  <legend>고도 필터 (ft)</legend>
+                  <legend>고도 필터(ft)</legend>
                   {TRAFFIC_ALTITUDE_OPTIONS.map((band) => (
                     <label key={band} className="alert-settings-row">
                       <span>{band}</span>
@@ -333,6 +367,46 @@ export default function Settings({
                     </label>
                   ))}
                 </fieldset>
+              </fieldset>
+            )}
+
+            {activeTab === "minima" && (
+              <fieldset className="alert-settings-section">
+                <legend>공항별 LIFR(MINIMA) 기준</legend>
+                <div className="minima-grid">
+                  {MINIMA_AIRPORT_ORDER.map((icao) => {
+                    const rule = localMinimaSettings[icao] || { visibilityM: null, ceilingFt: null };
+                    const noDhAirport = icao === "RKSI" || icao === "RKSS";
+                    return (
+                      <div key={icao} className="minima-card">
+                        <div className="minima-card-head">{icao}</div>
+                        <label className="minima-card-row">
+                          <span>시정(m)</span>
+                          <input
+                            type="number"
+                            min={50}
+                            max={5000}
+                            step={25}
+                            value={rule.visibilityM ?? ""}
+                            onChange={(e) => updateMinimaValue(icao, "visibilityM", e.target.value)}
+                          />
+                        </label>
+                        <label className="minima-card-row">
+                          <span>운고(ft)</span>
+                          <input
+                            type="number"
+                            min={50}
+                            max={1000}
+                            step={10}
+                            value={rule.ceilingFt ?? ""}
+                            onChange={(e) => updateMinimaValue(icao, "ceilingFt", e.target.value)}
+                            placeholder={noDhAirport ? "NO DH(기본값)" : ""}
+                          />
+                        </label>
+                      </div>
+                    );
+                  })}
+                </div>
               </fieldset>
             )}
           </div>

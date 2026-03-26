@@ -2581,6 +2581,13 @@ body {
   border-radius: 5px;
   font-size: 0.85rem;
 }
+.alert-settings-row input[type="text"] {
+  min-width: 220px;
+  padding: 4px 6px;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  font-size: 0.85rem;
+}
 .alert-settings-row input[type="range"] {
   width: 120px;
 }
@@ -2603,6 +2610,38 @@ body {
   border-bottom: none;
   margin-bottom: 0;
   padding-bottom: 0;
+}
+.minima-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+.minima-card {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 8px 10px;
+  background: #ffffff;
+}
+.minima-card-head {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--accent);
+  margin-bottom: 6px;
+}
+.minima-card-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 4px 0;
+  font-size: 0.8rem;
+}
+.minima-card-row input[type="number"] {
+  width: 86px;
+  padding: 4px 6px;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  font-size: 0.8rem;
 }
 .alert-settings-footer {
   display: flex;

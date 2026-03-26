@@ -17,7 +17,12 @@ import {
   resolveSettings,
   setAlertCallback,
 } from "./utils/alerts";
-import { formatUtc, getFlightCategory } from "./utils/helpers";
+import {
+  formatUtc,
+  getFlightCategory,
+  DEFAULT_AIRPORT_MINIMA_RULES,
+  normalizeAirportMinimaSettings,
+} from "./utils/helpers";
 import Header from "./components/Header";
 import MetarCard from "./components/MetarCard";
 import WarningList from "./components/WarningList";
@@ -71,6 +76,15 @@ export default function App() {
       return [];
     }
   });
+  const [airportMinimaSettings, setAirportMinimaSettings] = useState(() => {
+    const raw = localStorage.getItem("airport_minima_settings");
+    if (!raw) return normalizeAirportMinimaSettings(DEFAULT_AIRPORT_MINIMA_RULES);
+    try {
+      return normalizeAirportMinimaSettings(JSON.parse(raw));
+    } catch {
+      return normalizeAirportMinimaSettings(DEFAULT_AIRPORT_MINIMA_RULES);
+    }
+  });
 
   useEffect(() => {
     localStorage.setItem("time_zone", timeZone);
@@ -91,6 +105,10 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem("traffic_altitude_bands", JSON.stringify(trafficAltitudeBands));
   }, [trafficAltitudeBands]);
+
+  useEffect(() => {
+    localStorage.setItem("airport_minima_settings", JSON.stringify(airportMinimaSettings));
+  }, [airportMinimaSettings]);
 
   useEffect(() => {
     if (selectedAirport) {
@@ -291,6 +309,12 @@ export default function App() {
     loadAlertDefaults().then((defaults) => setAlertDefaults({ ...defaults }));
     setTimeZone(localStorage.getItem("time_zone") || "KST");
     setMapTheme(localStorage.getItem("map_theme") || "light");
+    try {
+      const raw = localStorage.getItem("airport_minima_settings");
+      setAirportMinimaSettings(normalizeAirportMinimaSettings(raw ? JSON.parse(raw) : DEFAULT_AIRPORT_MINIMA_RULES));
+    } catch {
+      setAirportMinimaSettings(normalizeAirportMinimaSettings(DEFAULT_AIRPORT_MINIMA_RULES));
+    }
   }
 
   const settings = alertDefaults ? resolveSettings(alertDefaults) : null;
@@ -329,7 +353,7 @@ export default function App() {
   const metarCeiling = metarClouds
     .filter(c => c.amount === "BKN" || c.amount === "OVC")
     .sort((a, b) => (a.base ?? Infinity) - (b.base ?? Infinity))[0]?.base ?? null;
-  const flightCat = getFlightCategory(metarVis, metarCeiling);
+  const flightCat = getFlightCategory(metarVis, metarCeiling, selectedAirport, airportMinimaSettings);
 
   const metarTime = (() => {
     const t = metarTarget?.header?.issue_time || metarTarget?.header?.observation_time;
@@ -412,6 +436,7 @@ export default function App() {
               metarData={data.metar}
               amosData={data.amos}
               icao={selectedAirport}
+              minimaSettings={airportMinimaSettings}
               airportMeta={selectedAirportMeta}
               metarTime={metarTime}
               version={metarVersion}
@@ -421,6 +446,7 @@ export default function App() {
             <TafTimeline
               tafData={data.taf}
               icao={selectedAirport}
+              minimaSettings={airportMinimaSettings}
               version={tafVersion}
               onVersionToggle={setTafVersion}
               tz={timeZone}
@@ -466,6 +492,8 @@ export default function App() {
           setTrafficCallsignFilter={setTrafficCallsignFilter}
           trafficAltitudeBands={trafficAltitudeBands}
           setTrafficAltitudeBands={setTrafficAltitudeBands}
+          minimaSettings={airportMinimaSettings}
+          setMinimaSettings={setAirportMinimaSettings}
         />
       )}
     </>
