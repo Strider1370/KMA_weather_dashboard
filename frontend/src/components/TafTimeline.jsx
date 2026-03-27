@@ -199,10 +199,6 @@ function formatTafRange(start, end, tz) {
   const endHourExclusive = isMidnight ? "24" : String(rawExclusiveHour).padStart(2, "0");
   const endDayLabel = endDay !== startDay ? ` ${endDay}일` : "";
 
-  if (start === end) {
-    return `${startDay}일 ${startHour}시`;
-  }
-
   return `${startDay}일 ${startHour}시 ~${endDayLabel} ${endHourExclusive}시`;
 }
 

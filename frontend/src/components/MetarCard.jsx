@@ -332,7 +332,7 @@ export default function MetarCard({
                   >
                     <div className="metar-side-label">
                       <div className="metar-side-icon metar-side-icon--metric">
-                        <span style={{ fontSize: "13px", fontWeight: 700, color: "var(--muted)" }}>RVR</span>
+                        <span style={{ fontSize: "15px", fontWeight: 700, color: "var(--muted)" }}>RVR</span>
                       </div>
                     </div>
                     <div className="rvr-panel-values">

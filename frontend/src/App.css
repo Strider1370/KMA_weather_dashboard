@@ -740,7 +740,7 @@ body {
 }
 
 .metar-side-text {
-  font-size: 13px;
+  font-size: 15px;
   line-height: 1.2;
   color: var(--muted);
   font-weight: 700;
