@@ -103,12 +103,8 @@ function readLatest(category) {
 }
 
 function readSnapshotHash(category) {
-  const cached = store.getCached(category);
-  if (cached?.content_hash) return cached.content_hash;
-
   const file = path.join(DATA_ROOT, category, "latest.json");
   if (!fs.existsSync(file)) return null;
-
   try {
     const latest = readJsonFile(file);
     return latest?.content_hash || null;
