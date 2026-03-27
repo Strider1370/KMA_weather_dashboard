@@ -179,8 +179,8 @@ export const FLIGHT_CATEGORY_META = {
     border: "#f59e0b",
     borderSoft: "#fde68a",
     valueColor: "#b45309",
-    darkBg: "rgba(245,158,11,0.15)",
-    darkBorderSoft: "rgba(245,158,11,0.35)",
+    darkBg: "rgba(245,158,11,0.25)",
+    darkBorderSoft: "rgba(245,158,11,0.45)",
     darkValueColor: "#fbbf24",
   },
   LIFR: {

@@ -32,17 +32,14 @@ const TINT_STYLE = {
 const TINT_STYLE_DARK = {
   VFR:  { backgroundColor: "rgba(21, 128, 61, 0.18)",  borderLeft: "3px solid #15803d", color: "#4ade80" },
   MVFR: { backgroundColor: "rgba(37, 99, 235, 0.18)",  borderLeft: "3px solid #2563eb", color: "#93c5fd" },
-  IFR:  { backgroundColor: "rgba(245, 158, 11, 0.18)", borderLeft: "3px solid #f59e0b", color: "#fbbf24" },
+  IFR:  { backgroundColor: "rgba(245, 158, 11, 0.25)", borderLeft: "3px solid #f59e0b", color: "#fbbf24" },
   LIFR: { backgroundColor: "rgba(220, 38, 38, 0.18)",  borderLeft: "3px solid #dc2626", color: "#f87171" },
 };
-const WEATHER_STYLE_DARK = { backgroundColor: "rgba(234, 179, 8, 0.15)", color: "#fde68a" };
 function getTintStyle(category) {
   return isDarkTheme() ? (TINT_STYLE_DARK[category] || TINT_STYLE_DARK.VFR) : (TINT_STYLE[category] || TINT_STYLE.VFR);
 }
 function getWeatherStyle() {
-  return isDarkTheme()
-    ? WEATHER_STYLE_DARK
-    : { backgroundColor: "rgba(234, 179, 8, 0.10)", color: "#92400e" };
+  return { backgroundColor: "var(--card-bg)", color: isDarkTheme() ? "#ffffff" : "#111111" };
 }
 
 function getCeiling(slot) {

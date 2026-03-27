@@ -1,5 +1,5 @@
 :root {
-  --bg: #f7f4ef;
+  --bg: #e8e8e8;
   --paper: #fffdf8;
   --ink: #1d2430;
   --muted: #5f6775;
@@ -783,16 +783,12 @@ body {
 }
 
 .metar-side-secondary {
-  position: absolute;
-  left: 0;
-  right: 0;
-  top: 100%;
   width: 100%;
   min-height: 16px;
   display: flex;
   align-items: flex-start;
   justify-content: center;
-  margin-top: 2px;
+  margin-top: 0;
 }
 
 .metar-side-secondary--compact {
@@ -995,13 +991,13 @@ body {
 }
 
 .rvr-panel-entry-runway {
-  font-size: 9px;
+  font-size: 9.5px;
   font-weight: 600;
   line-height: 1.1;
 }
 
 .rvr-panel-entry-value {
-  font-size: 12px;
+  font-size: 12.5px;
   font-weight: 700;
   line-height: 1.2;
   font-variant-numeric: tabular-nums;

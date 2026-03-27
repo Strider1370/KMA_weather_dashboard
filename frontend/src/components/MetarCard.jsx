@@ -88,8 +88,8 @@ function formatMinimumVisibilityDetail(minValue, minDirectionDegrees) {
   };
   const dir = toAbbr(minDirectionDegrees);
   return dir
-    ? `최단시정 ${Math.round(minValue)}m ${dir}`
-    : `최단시정 ${Math.round(minValue)}m`;
+    ? `최단시정 ${Math.round(minValue)}${dir}`
+    : `최단시정 ${Math.round(minValue)}`;
 }
 
 function normalizeRunwayLabel(runway) {
@@ -112,10 +112,19 @@ function formatRvrCompact(entry) {
 }
 
 function getRvrEntryStyle(cat) {
+  const dark = isDarkTheme();
   if (cat.category === "LIFR") {
-    return { bg: "rgba(220,38,38,0.15)", labelColor: "rgba(153,27,27,0.9)", valueColor: cat.valueColor };
+    return {
+      bg: dark ? "rgba(220,38,38,0.18)" : "rgba(220,38,38,0.15)",
+      labelColor: dark ? "#ffffff" : "rgba(153,27,27,0.9)",
+      valueColor: dark ? "rgba(252,165,165,0.85)" : cat.valueColor,
+    };
   }
-  return { bg: "rgba(245,158,11,0.15)", labelColor: "rgba(146,64,14,0.9)", valueColor: cat.valueColor };
+  return {
+    bg: dark ? "rgba(245,158,11,0.25)" : "rgba(245,158,11,0.15)",
+    labelColor: dark ? "#ffffff" : "rgba(146,64,14,0.9)",
+    valueColor: dark ? "rgba(253,211,77,0.85)" : cat.valueColor,
+  };
 }
 
 function formatVisibilityValue(value, rawText) {
@@ -297,15 +306,15 @@ export default function MetarCard({
                   <div className="metar-side-value metar-side-value--anchored">
                     <div className="metar-side-anchor">
                       <div className="metar-side-main">
-                        <div className="metar-wind-row">
+                        <div className="metar-wind-row" style={{ minHeight: "unset" }}>
                           <span className="metar-wind-inline-text" style={{ color: catColors(visibilityCategory).valueColor }}>{visibilityValue}</span>
                         </div>
                       </div>
-                      <div className="metar-side-secondary">
-                        {minimumVisibilityDetail ? (
-                          <div className="metar-wind-layer metar-wind-layer--gust">{minimumVisibilityDetail}</div>
-                        ) : null}
-                      </div>
+                      {minimumVisibilityDetail ? (
+                        <div className="metar-side-secondary metar-side-secondary--compact">
+                          <div className="metar-compact-sub">{minimumVisibilityDetail}</div>
+                        </div>
+                      ) : null}
                     </div>
                   </div>
                 </article>
