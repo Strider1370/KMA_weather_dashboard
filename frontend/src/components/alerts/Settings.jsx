@@ -210,7 +210,7 @@ export default function Settings({
                   </select>
                 </label>
                 <label className="alert-settings-row">
-                  <span>지도 테마</span>
+                  <span>사이트 테마</span>
                   <select value={localMapTheme} onChange={(e) => setLocalMapTheme(e.target.value)}>
                     <option value="light">라이트</option>
                     <option value="dark">다크</option>

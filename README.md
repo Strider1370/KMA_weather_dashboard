@@ -289,6 +289,7 @@ $env:NODE_TLS_REJECT_UNAUTHORIZED="0"; node backend/test/run-once.js adsb
 - `Traffic` 레이어는 기본적으로 꺼져 있습니다.
 - `Traffic` 레이어는 설정창 `항적` 탭에서 호출부호(`KAL, AAR123`) 부분일치 필터와 1만 ft 단위 고도 필터를 함께 적용할 수 있습니다. 고도 밴드는 기본적으로 5개 전체가 선택된 상태이며, 아무것도 선택하지 않으면 항적이 전혀 표시되지 않습니다. 호출부호 필터가 비어 있으면 전체 표시, 값이 입력되면 해당 문자열 포함 항적만 표시됩니다. 선택 값은 `localStorage`(`traffic_altitude_bands`, `traffic_callsign_filter`)에 저장됩니다.
 - 공항을 전환하면 열려 있는 모든 알람 팝업과 마키 배너가 즉시 닫힙니다.
+- 설정창 `일반` 탭의 **사이트 테마** (라이트/다크)를 변경하면 사이트 전체 색상과 지도 타일이 함께 전환됩니다. 선택값은 `localStorage` 키 `map_theme`에 저장됩니다.
 - TAF 패널은 상단 토글로 `타임라인`과 `테이블`을 전환할 수 있으며, 테이블 뷰는 연속된 동일 조건을 시간 구간 단위로 병합해 축약 표시합니다.
 - 낙뢰 마커는 Airport/Korea 모드 모두 전국(`nationwide`) 데이터를 표시합니다.
 - Airport 모드의 8km/16km/32km 카운트는 선택 공항 기준 zone 집계를 그대로 유지합니다.

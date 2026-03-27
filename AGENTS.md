@@ -178,6 +178,9 @@ Derived from `.editorconfig` + existing source files.
 - Nationwide radar echo currently uses `cmp=hsr`, converts `dBZ` to `mm/h`, and reprojects to full radar-domain bounds before writing `/data/radar/echo_korea_<tm>.png`.
 - In Korea mode, InteractiveMap draws a unioned KMA radar-coverage boundary from site radius metadata and can dim only the area outside that union boundary.
 - Rain-rate colors follow the in-app `mm/h` legend, and sub-`0.1 mm/h` pixels should remain transparent so dark mode does not show a bright fringe.
+- **Site-wide dark mode** is controlled by a single `mapTheme` state (`localStorage: "map_theme"`). When `mapTheme` changes, `document.documentElement.setAttribute("data-theme", mapTheme)` is called, toggling CSS variable overrides in `[data-theme="dark"]` block of `App.css`. The map tile filter (`.interactive-map-shell--dark`) follows automatically. The settings label is "사이트 테마" (was "지도 테마").
+- `isDarkTheme()` is exported from `helpers.js` and used in `MetarCard.jsx` (`catColors()`) and `TafTimeline.jsx` (`getTintStyle()`, `getWeatherStyle()`) to select dark-aware inline styles for flight-category-tinted panels, since those colors are injected as inline styles and cannot be overridden by CSS variables alone.
+- A FOUC-prevention inline script in `frontend/index.html` applies `data-theme` before React mounts.
 - In PowerShell, Korean UTF-8 files may render incorrectly with plain `Get-Content`.
 - When reading Korean text files, prefer explicit UTF-8 decoding:
   - `[Console]::OutputEncoding = [System.Text.Encoding]::UTF8`

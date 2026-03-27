@@ -10,6 +10,18 @@
   --card-bg: #f5f3ef;
 }
 
+[data-theme="dark"] {
+  --bg: #0f1115;
+  --paper: #1a1d24;
+  --ink: #e5e7eb;
+  --muted: #9ca3af;
+  --accent: #0ea57a;
+  --accent-2: #e07050;
+  --line: #2c313c;
+  --shadow: 0 12px 30px rgba(0, 0, 0, 0.3);
+  --card-bg: #232731;
+}
+
 * { box-sizing: border-box; }
 
 body {
@@ -187,6 +199,7 @@ body {
 .warning-banner--ok {
   background: #ecfdf5;
   color: #15803d;
+  border: 1px solid #86efac;
 }
 
 .warning-banner--danger {
@@ -2909,7 +2922,7 @@ tr.row-danger td { background: #ffe9e7; }
   padding: 4px;
   border: 1px solid var(--line);
   border-radius: 10px;
-  background: #f7f2e9;
+  background: var(--card-bg);
   width: fit-content;
 }
 .panel-switch-btn {
@@ -2934,7 +2947,7 @@ tr.row-danger td { background: #ffe9e7; }
 /* Lightning/range buttons */
 .lightning-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
 .time-range { display: flex; gap: 6px; flex-wrap: wrap; }
-.range-btn { background: #ffffff; color: var(--ink); border: 1px solid var(--line); padding: 5px 10px; font-size: 13px; border-radius: 8px; font-weight: 600; cursor: pointer; }
+.range-btn { background: var(--paper); color: var(--ink); border: 1px solid var(--line); padding: 5px 10px; font-size: 13px; border-radius: 8px; font-weight: 600; cursor: pointer; }
 .range-btn.active { background: #131a24; color: #ffffff; border-color: #131a24; }
 
 /* Dashboard toggle (legacy) */
@@ -2968,4 +2981,115 @@ tr.row-danger td { background: #ffe9e7; }
   .map-panel-wrap .interactive-map-container {
     height: 500px !important;
   }
+}
+
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   DARK MODE OVERRIDES
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+
+/* Warning banner */
+[data-theme="dark"] .warning-banner--ok {
+  background: rgba(21, 128, 61, 0.15);
+  color: #4ade80;
+  border: 1px solid rgba(21, 128, 61, 0.4);
+}
+
+/* METAR/TAF badge — --ink이 다크에서 연회색이 되므로 accent 톤으로 교체 */
+[data-theme="dark"] .panel-kind-badge {
+  background: var(--accent);
+  color: #fff;
+}
+
+/* 전국/공항 탭 active 버튼 — 다크에서 --ink(연회색)가 되면 텍스트 안 보임 */
+[data-theme="dark"] .panel-switch-btn.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+/* 필터/토글 버튼 (range-btn) active — 이미 #131a24로 어두워서 다크 배경과 구분 필요 */
+[data-theme="dark"] .range-btn.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+/* 레이더 컨트롤 +/- 재생 버튼 */
+[data-theme="dark"] .radar-icon-btn {
+  background: var(--card-bg);
+  color: var(--ink);
+  border: 1px solid var(--line);
+}
+
+/* TAF 타임라인/테이블 토글 버튼 */
+[data-theme="dark"] .taf-view-toggle-btn.active {
+  background: var(--accent);
+  color: #fff;
+  box-shadow: none;
+}
+
+[data-theme="dark"] .taf-view-toggle-btn:hover:not(.active) {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--ink);
+}
+
+/* 재생시간 X초 뱃지 */
+[data-theme="dark"] .radar-speed-chip {
+  background: rgba(14, 165, 122, 0.15);
+  border-color: rgba(14, 165, 122, 0.35);
+  color: var(--accent);
+}
+
+/* 재생시간 +/- 버튼 */
+[data-theme="dark"] .radar-speed-step {
+  background: var(--card-bg);
+  color: var(--ink);
+  border-color: var(--line);
+}
+
+/* 레인레이트 범례 */
+[data-theme="dark"] .rainrate-legend {
+  background: rgba(26, 29, 36, 0.92);
+  border-color: rgba(255, 255, 255, 0.1);
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.5);
+}
+
+[data-theme="dark"] .rainrate-legend-title,
+[data-theme="dark"] .rainrate-legend-label {
+  color: #cbd5e1;
+}
+
+[data-theme="dark"] .rainrate-legend-swatch {
+  border-color: rgba(255, 255, 255, 0.15);
+}
+
+/* TAF 테이블 행 강조 */
+[data-theme="dark"] tr.row-warn td {
+  background: rgba(245, 158, 11, 0.12);
+}
+
+[data-theme="dark"] tr.row-danger td {
+  background: rgba(220, 38, 38, 0.12);
+}
+
+/* TAF 테이블 구분선 */
+[data-theme="dark"] .taf-compact-table th,
+[data-theme="dark"] .taf-compact-table td {
+  border-bottom-color: var(--line);
+}
+
+/* 설정창 MINIMA 카드 */
+[data-theme="dark"] .minima-card {
+  background: var(--card-bg);
+}
+
+[data-theme="dark"] .minima-card-row input[type="number"] {
+  background: var(--bg);
+  color: var(--ink);
+  border-color: var(--line);
+}
+
+/* 드롭다운 hover */
+[data-theme="dark"] .airport-dropdown-list li:hover {
+  background: rgba(255, 255, 255, 0.06);
 }

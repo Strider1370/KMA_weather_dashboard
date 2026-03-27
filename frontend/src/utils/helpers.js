@@ -155,6 +155,9 @@ export const FLIGHT_CATEGORY_META = {
     border: "#15803d",
     borderSoft: "#bbf7d0",
     valueColor: "#166534",
+    darkBg: "rgba(21,128,61,0.15)",
+    darkBorderSoft: "rgba(21,128,61,0.35)",
+    darkValueColor: "#4ade80",
   },
   MVFR: {
     category: "MVFR",
@@ -164,6 +167,9 @@ export const FLIGHT_CATEGORY_META = {
     border: "#2563eb",
     borderSoft: "#bfdbfe",
     valueColor: "#1d4ed8",
+    darkBg: "rgba(37,99,235,0.15)",
+    darkBorderSoft: "rgba(37,99,235,0.35)",
+    darkValueColor: "#93c5fd",
   },
   IFR: {
     category: "IFR",
@@ -173,6 +179,9 @@ export const FLIGHT_CATEGORY_META = {
     border: "#f59e0b",
     borderSoft: "#fde68a",
     valueColor: "#b45309",
+    darkBg: "rgba(245,158,11,0.15)",
+    darkBorderSoft: "rgba(245,158,11,0.35)",
+    darkValueColor: "#fbbf24",
   },
   LIFR: {
     category: "LIFR",
@@ -182,8 +191,15 @@ export const FLIGHT_CATEGORY_META = {
     border: "#dc2626",
     borderSoft: "#fecaca",
     valueColor: "#b91c1c",
+    darkBg: "rgba(220,38,38,0.15)",
+    darkBorderSoft: "rgba(220,38,38,0.35)",
+    darkValueColor: "#f87171",
   },
 };
+
+export function isDarkTheme() {
+  return document.documentElement.getAttribute("data-theme") === "dark";
+}
 
 export const DEFAULT_AIRPORT_MINIMA_RULES = {
   RKSI: { visibilityM: 175, ceilingFt: null },

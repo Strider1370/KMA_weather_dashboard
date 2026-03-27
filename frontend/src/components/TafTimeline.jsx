@@ -7,6 +7,7 @@ import {
   getFlightCategory,
   classifyVisibilityCategory,
   classifyCeilingCategory,
+  isDarkTheme,
 } from "../utils/helpers";
 import WeatherIcon from "./WeatherIcon";
 import {
@@ -16,7 +17,6 @@ import {
 import { resolveWeatherVisual } from "../utils/weather-visual-resolver";
 
 const FC_COLORS = { VFR: "#15803d", MVFR: "#2563eb", IFR: "#f59e0b", LIFR: "#dc2626" };
-const WEATHER_STYLE = { backgroundColor: "rgba(234, 179, 8, 0.10)", color: "#92400e" };
 const WIND_STYLE = { backgroundColor: "var(--card-bg)", color: "var(--muted)" };
 const TAF_SEGMENT_DENSITY = {
   SOLO: "solo",
@@ -24,11 +24,26 @@ const TAF_SEGMENT_DENSITY = {
   FULL: "full",
 };
 const TINT_STYLE = {
-  VFR: { backgroundColor: "rgba(21, 128, 61, 0.08)", borderLeft: "3px solid #15803d", color: "#166534" },
-  MVFR: { backgroundColor: "rgba(37, 99, 235, 0.08)", borderLeft: "3px solid #2563eb", color: "#1d4ed8" },
-  IFR: { backgroundColor: "rgba(245, 158, 11, 0.08)", borderLeft: "3px solid #f59e0b", color: "#b45309" },
-  LIFR: { backgroundColor: "rgba(220, 38, 38, 0.08)", borderLeft: "3px solid #dc2626", color: "#b91c1c" },
+  VFR:  { backgroundColor: "rgba(21, 128, 61, 0.08)",  borderLeft: "3px solid #15803d", color: "#166534" },
+  MVFR: { backgroundColor: "rgba(37, 99, 235, 0.08)",  borderLeft: "3px solid #2563eb", color: "#1d4ed8" },
+  IFR:  { backgroundColor: "rgba(245, 158, 11, 0.08)", borderLeft: "3px solid #f59e0b", color: "#b45309" },
+  LIFR: { backgroundColor: "rgba(220, 38, 38, 0.08)",  borderLeft: "3px solid #dc2626", color: "#b91c1c" },
 };
+const TINT_STYLE_DARK = {
+  VFR:  { backgroundColor: "rgba(21, 128, 61, 0.18)",  borderLeft: "3px solid #15803d", color: "#4ade80" },
+  MVFR: { backgroundColor: "rgba(37, 99, 235, 0.18)",  borderLeft: "3px solid #2563eb", color: "#93c5fd" },
+  IFR:  { backgroundColor: "rgba(245, 158, 11, 0.18)", borderLeft: "3px solid #f59e0b", color: "#fbbf24" },
+  LIFR: { backgroundColor: "rgba(220, 38, 38, 0.18)",  borderLeft: "3px solid #dc2626", color: "#f87171" },
+};
+const WEATHER_STYLE_DARK = { backgroundColor: "rgba(234, 179, 8, 0.15)", color: "#fde68a" };
+function getTintStyle(category) {
+  return isDarkTheme() ? (TINT_STYLE_DARK[category] || TINT_STYLE_DARK.VFR) : (TINT_STYLE[category] || TINT_STYLE.VFR);
+}
+function getWeatherStyle() {
+  return isDarkTheme()
+    ? WEATHER_STYLE_DARK
+    : { backgroundColor: "rgba(234, 179, 8, 0.10)", color: "#92400e" };
+}
 
 function getCeiling(slot) {
   return slot.clouds
@@ -332,7 +347,7 @@ export default function TafTimeline({ tafData, icao, minimaSettings = null, vers
                         density,
                         hasSpecialWeather(group.data) ? " taf-new-seg--special-weather" : ""
                       )}
-                      style={{ width: `${group.width}%`, ...WEATHER_STYLE }}
+                      style={{ width: `${group.width}%`, ...getWeatherStyle() }}
                       title={weatherLabel}
                     >
                       <WeatherIcon visual={miniWeatherVisual} className="mini" />
@@ -373,7 +388,7 @@ export default function TafTimeline({ tafData, icao, minimaSettings = null, vers
               {visibilityGroups.map((group, i) => {
                 const density = getSegmentDensity(group.hourCount);
                 const vis = group.data.visibility?.value ?? null;
-                const style = TINT_STYLE[classifyVisibilityCategory(vis, icao, minimaSettings).category];
+                const style = getTintStyle(classifyVisibilityCategory(vis, icao, minimaSettings).category);
                 const visibilityText = getVisibilityText(vis, group.data.display?.visibility, density);
                 return (
                   <div
@@ -395,7 +410,7 @@ export default function TafTimeline({ tafData, icao, minimaSettings = null, vers
               {ceilingGroups.map((group, i) => {
                 const density = getSegmentDensity(group.hourCount);
                 const ceiling = getCeiling(group.data);
-                const style = TINT_STYLE[classifyCeilingCategory(ceiling, icao, minimaSettings).category];
+                const style = getTintStyle(classifyCeilingCategory(ceiling, icao, minimaSettings).category);
                 const ceilingText = formatCeiling(ceiling);
                 return (
                   <div
@@ -496,8 +511,8 @@ export default function TafTimeline({ tafData, icao, minimaSettings = null, vers
               const visibilityValue = slot.visibility?.value ?? null;
               const ceiling = getCeiling(slot);
               const flightCategory = getFlightCategory(visibilityValue, ceiling, icao, minimaSettings).category;
-              const visibilityStyle = TINT_STYLE[classifyVisibilityCategory(visibilityValue, icao, minimaSettings).category];
-              const ceilingStyle = TINT_STYLE[classifyCeilingCategory(ceiling, icao, minimaSettings).category];
+              const visibilityStyle = getTintStyle(classifyVisibilityCategory(visibilityValue, icao, minimaSettings).category);
+              const ceilingStyle = getTintStyle(classifyCeilingCategory(ceiling, icao, minimaSettings).category);
               const weatherVisual = resolveWeatherVisual(slot, slot.time);
               const weatherLabel = convertWeatherToKorean(
                 slot.display?.weather,

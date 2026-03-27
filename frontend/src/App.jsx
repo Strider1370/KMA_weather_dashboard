@@ -93,6 +93,7 @@ export default function App() {
 
   useEffect(() => {
     localStorage.setItem("map_theme", mapTheme);
+    document.documentElement.setAttribute("data-theme", mapTheme);
   }, [mapTheme]);
 
   useEffect(() => {

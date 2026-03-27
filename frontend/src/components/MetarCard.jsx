@@ -9,7 +9,15 @@ import {
   classifyRvrCategory,
   getFlightCategory,
   FLIGHT_CATEGORY_META,
+  isDarkTheme,
 } from "../utils/helpers";
+
+function catColors(cat) {
+  if (isDarkTheme()) {
+    return { bg: cat.darkBg, borderSoft: cat.darkBorderSoft, valueColor: cat.darkValueColor };
+  }
+  return { bg: cat.bg, borderSoft: cat.borderSoft, valueColor: cat.valueColor };
+}
 import WeatherIcon from "./WeatherIcon";
 import { convertWeatherToKorean } from "../utils/visual-mapper";
 import { resolveWeatherVisual } from "../utils/weather-visual-resolver";
@@ -276,11 +284,11 @@ export default function MetarCard({
                 <article
                   className="metar-surface-card metar-surface-card--weather"
                   style={{
-                    backgroundColor: visibilityCategory.bg,
+                    backgroundColor: catColors(visibilityCategory).bg,
                     borderLeft: `3px solid ${visibilityCategory.border}`,
-                    borderTop: `0.5px solid ${visibilityCategory.borderSoft}`,
-                    borderRight: `0.5px solid ${visibilityCategory.borderSoft}`,
-                    borderBottom: `0.5px solid ${visibilityCategory.borderSoft}`,
+                    borderTop: `0.5px solid ${catColors(visibilityCategory).borderSoft}`,
+                    borderRight: `0.5px solid ${catColors(visibilityCategory).borderSoft}`,
+                    borderBottom: `0.5px solid ${catColors(visibilityCategory).borderSoft}`,
                   }}
                 >
                   <div className="metar-side-label">
@@ -290,7 +298,7 @@ export default function MetarCard({
                     <div className="metar-side-anchor">
                       <div className="metar-side-main">
                         <div className="metar-wind-row">
-                          <span className="metar-wind-inline-text" style={{ color: visibilityCategory.valueColor }}>{visibilityValue}</span>
+                          <span className="metar-wind-inline-text" style={{ color: catColors(visibilityCategory).valueColor }}>{visibilityValue}</span>
                         </div>
                       </div>
                       <div className="metar-side-secondary">
@@ -306,11 +314,11 @@ export default function MetarCard({
                   <article
                     className="metar-surface-card metar-surface-card--rvr"
                     style={{
-                      backgroundColor: rvrPanelCategory.bg,
+                      backgroundColor: catColors(rvrPanelCategory).bg,
                       borderLeft: `3px solid ${rvrPanelCategory.border}`,
-                      borderTop: `0.5px solid ${rvrPanelCategory.borderSoft}`,
-                      borderRight: `0.5px solid ${rvrPanelCategory.borderSoft}`,
-                      borderBottom: `0.5px solid ${rvrPanelCategory.borderSoft}`,
+                      borderTop: `0.5px solid ${catColors(rvrPanelCategory).borderSoft}`,
+                      borderRight: `0.5px solid ${catColors(rvrPanelCategory).borderSoft}`,
+                      borderBottom: `0.5px solid ${catColors(rvrPanelCategory).borderSoft}`,
                     }}
                   >
                     <div className="metar-side-label">
@@ -340,11 +348,11 @@ export default function MetarCard({
                 <article
                   className="metar-surface-card metar-surface-card--weather"
                   style={{
-                    backgroundColor: ceilingCategory.bg,
+                    backgroundColor: catColors(ceilingCategory).bg,
                     borderLeft: `3px solid ${ceilingCategory.border}`,
-                    borderTop: `0.5px solid ${ceilingCategory.borderSoft}`,
-                    borderRight: `0.5px solid ${ceilingCategory.borderSoft}`,
-                    borderBottom: `0.5px solid ${ceilingCategory.borderSoft}`,
+                    borderTop: `0.5px solid ${catColors(ceilingCategory).borderSoft}`,
+                    borderRight: `0.5px solid ${catColors(ceilingCategory).borderSoft}`,
+                    borderBottom: `0.5px solid ${catColors(ceilingCategory).borderSoft}`,
                   }}
                 >
                   <div className="metar-side-label">
@@ -354,7 +362,7 @@ export default function MetarCard({
                     <div className="metar-side-anchor">
                       <div className="metar-side-main">
                         <div className="metar-wind-row">
-                          <span className="metar-wind-inline-text" style={{ color: ceilingCategory.valueColor }}>{ceilingValue}</span>
+                          <span className="metar-wind-inline-text" style={{ color: catColors(ceilingCategory).valueColor }}>{ceilingValue}</span>
                         </div>
                       </div>
                     </div>
