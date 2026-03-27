@@ -6,7 +6,9 @@ import {
   computeRelativeHumidity,
   classifyVisibilityCategory,
   classifyCeilingCategory,
+  classifyRvrCategory,
   getFlightCategory,
+  FLIGHT_CATEGORY_META,
 } from "../utils/helpers";
 import WeatherIcon from "./WeatherIcon";
 import { convertWeatherToKorean } from "../utils/visual-mapper";
@@ -66,6 +68,46 @@ function getWindDirectionRotation(wind) {
   }
   const normalized = ((wind.direction % 360) + 360) % 360;
   return (normalized + 180) % 360;
+}
+
+function formatMinimumVisibilityDetail(minValue, minDirectionDegrees) {
+  if (!Number.isFinite(minValue)) return null;
+  const dirs = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"];
+  const toAbbr = (deg) => {
+    if (!Number.isFinite(deg)) return null;
+    const normalized = ((deg % 360) + 360) % 360;
+    return dirs[Math.round(normalized / 45) % 8];
+  };
+  const dir = toAbbr(minDirectionDegrees);
+  return dir
+    ? `최단시정 ${Math.round(minValue)}m ${dir}`
+    : `최단시정 ${Math.round(minValue)}m`;
+}
+
+function normalizeRunwayLabel(runway) {
+  const token = String(runway || "").toUpperCase().replace(/^RWY\s*/, "").trim();
+  const match = token.match(/(\d{2}[LRC]?)/);
+  return match ? match[1] : null;
+}
+
+function formatRvrCompact(entry) {
+  if (!entry || typeof entry !== "object") return null;
+  const runway = normalizeRunwayLabel(entry.runway);
+  const operatorMap = { ABOVE: "P", BELOW: "M" };
+  const tendencyMap = { UPWARD: "U", DOWNWARD: "D", NO_CHANGE: "N" };
+  const operator = operatorMap[String(entry.operator || "").toUpperCase()] || "";
+  const tendency = tendencyMap[String(entry.tendency || "").toUpperCase()] || "";
+  if (Number.isFinite(entry.mean)) {
+    return `${runway ? `R${runway}` : "R--"} ${operator}${Math.round(entry.mean)}${tendency}`;
+  }
+  return null;
+}
+
+function getRvrEntryStyle(cat) {
+  if (cat.category === "LIFR") {
+    return { bg: "rgba(220,38,38,0.15)", labelColor: "rgba(153,27,27,0.9)", valueColor: cat.valueColor };
+  }
+  return { bg: "rgba(245,158,11,0.15)", labelColor: "rgba(146,64,14,0.9)", valueColor: cat.valueColor };
 }
 
 function formatVisibilityValue(value, rawText) {
@@ -133,6 +175,31 @@ export default function MetarCard({
 
   const visibilityRaw = target.observation?.display?.visibility;
   const visibilityValue = formatVisibilityValue(visibility, visibilityRaw);
+  const minimumVisibilityDetail = formatMinimumVisibilityDetail(
+    target.observation?.visibility?.minimum_value,
+    target.observation?.visibility?.minimum_direction_degrees
+  );
+
+  const rvrEntries = Array.isArray(target.observation?.rvr)
+    ? target.observation.rvr
+        .map((entry) => {
+          const formatted = formatRvrCompact(entry);
+          if (!formatted) return null;
+          const sp = formatted.indexOf(" ");
+          const cat = classifyRvrCategory(entry.mean, icao, minimaSettings);
+          return {
+            runway: sp >= 0 ? formatted.slice(0, sp) : formatted,
+            value: sp >= 0 ? formatted.slice(sp + 1) : "",
+            mean: entry.mean,
+            cat,
+          };
+        })
+        .filter(Boolean)
+    : [];
+  const hasRvrDetails = rvrEntries.length > 0;
+  const rvrPanelCategory = rvrEntries.some((e) => e.cat.category === "LIFR")
+    ? FLIGHT_CATEGORY_META.LIFR
+    : FLIGHT_CATEGORY_META.IFR;
 
   const clouds = target.observation?.clouds || [];
   const ceilingCloud = clouds
@@ -205,52 +272,92 @@ export default function MetarCard({
                 <div className="flight-category-panel-label">{flightCategory.labelKo}</div>
               </article>
 
-              <div className="flight-condition-stack">
+              <div className="flight-condition-stack" style={{ gridTemplateRows: hasRvrDetails ? "1fr 1fr 1fr" : "1fr 1fr" }}>
                 <article
-                  className="flight-condition-card"
+                  className="metar-surface-card metar-surface-card--weather"
                   style={{
                     backgroundColor: visibilityCategory.bg,
-                    borderLeftColor: visibilityCategory.border,
-                    borderTopColor: visibilityCategory.borderSoft,
-                    borderRightColor: visibilityCategory.borderSoft,
-                    borderBottomColor: visibilityCategory.borderSoft,
+                    borderLeft: `3px solid ${visibilityCategory.border}`,
+                    borderTop: `0.5px solid ${visibilityCategory.borderSoft}`,
+                    borderRight: `0.5px solid ${visibilityCategory.borderSoft}`,
+                    borderBottom: `0.5px solid ${visibilityCategory.borderSoft}`,
                   }}
                 >
-                  <div className="flight-condition-head">
-                    <span className="flight-condition-label" style={{ color: visibilityCategory.color }}>시정</span>
-                    <span
-                      className="flight-condition-pill"
-                      style={{ color: visibilityCategory.color, backgroundColor: "#ffffffaa" }}
-                    >
-                      {visibilityCategory.category}
-                    </span>
+                  <div className="metar-side-label">
+                    <div className="metar-side-text">시정</div>
                   </div>
-                  <div className="flight-condition-value" style={{ color: visibilityCategory.valueColor }}>
-                    {visibilityValue}
+                  <div className="metar-side-value metar-side-value--anchored">
+                    <div className="metar-side-anchor">
+                      <div className="metar-side-main">
+                        <div className="metar-wind-row">
+                          <span className="metar-wind-inline-text" style={{ color: visibilityCategory.valueColor }}>{visibilityValue}</span>
+                        </div>
+                      </div>
+                      <div className="metar-side-secondary">
+                        {minimumVisibilityDetail ? (
+                          <div className="metar-wind-layer metar-wind-layer--gust">{minimumVisibilityDetail}</div>
+                        ) : null}
+                      </div>
+                    </div>
                   </div>
                 </article>
 
+                {hasRvrDetails && (
+                  <article
+                    className="metar-surface-card metar-surface-card--rvr"
+                    style={{
+                      backgroundColor: rvrPanelCategory.bg,
+                      borderLeft: `3px solid ${rvrPanelCategory.border}`,
+                      borderTop: `0.5px solid ${rvrPanelCategory.borderSoft}`,
+                      borderRight: `0.5px solid ${rvrPanelCategory.borderSoft}`,
+                      borderBottom: `0.5px solid ${rvrPanelCategory.borderSoft}`,
+                    }}
+                  >
+                    <div className="metar-side-label">
+                      <div className="metar-side-icon metar-side-icon--metric">
+                        <span style={{ fontSize: "13px", fontWeight: 700, color: "var(--muted)" }}>RVR</span>
+                      </div>
+                    </div>
+                    <div className="rvr-panel-values">
+                      <div
+                        className="rvr-panel-grid"
+                        style={{ gridTemplateColumns: `repeat(${Math.min(rvrEntries.length, 2)}, minmax(0, 1fr))` }}
+                      >
+                        {rvrEntries.slice(0, 4).map(({ runway, value, cat }, idx) => {
+                          const cs = getRvrEntryStyle(cat);
+                          return (
+                            <div key={`${runway}-${idx}`} className="rvr-panel-entry" style={{ backgroundColor: cs.bg }}>
+                              <div className="rvr-panel-entry-runway" style={{ color: cs.labelColor }}>{runway}</div>
+                              <div className="rvr-panel-entry-value" style={{ color: cs.valueColor }}>{value}</div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </article>
+                )}
+
                 <article
-                  className="flight-condition-card"
+                  className="metar-surface-card metar-surface-card--weather"
                   style={{
                     backgroundColor: ceilingCategory.bg,
-                    borderLeftColor: ceilingCategory.border,
-                    borderTopColor: ceilingCategory.borderSoft,
-                    borderRightColor: ceilingCategory.borderSoft,
-                    borderBottomColor: ceilingCategory.borderSoft,
+                    borderLeft: `3px solid ${ceilingCategory.border}`,
+                    borderTop: `0.5px solid ${ceilingCategory.borderSoft}`,
+                    borderRight: `0.5px solid ${ceilingCategory.borderSoft}`,
+                    borderBottom: `0.5px solid ${ceilingCategory.borderSoft}`,
                   }}
                 >
-                  <div className="flight-condition-head">
-                    <span className="flight-condition-label" style={{ color: ceilingCategory.color }}>운고</span>
-                    <span
-                      className="flight-condition-pill"
-                      style={{ color: ceilingCategory.color, backgroundColor: "#ffffffaa" }}
-                    >
-                      {ceilingCategory.category}
-                    </span>
+                  <div className="metar-side-label">
+                    <div className="metar-side-text">운고</div>
                   </div>
-                  <div className="flight-condition-value" style={{ color: ceilingCategory.valueColor }}>
-                    {ceilingValue}
+                  <div className="metar-side-value metar-side-value--anchored">
+                    <div className="metar-side-anchor">
+                      <div className="metar-side-main">
+                        <div className="metar-wind-row">
+                          <span className="metar-wind-inline-text" style={{ color: ceilingCategory.valueColor }}>{ceilingValue}</span>
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 </article>
               </div>
@@ -262,28 +369,6 @@ export default function MetarCard({
           <div className="metar-section-head" />
           <div className="metar-section-body metar-section-body--weather">
             <div className="metar-weather-grid">
-              <article className={`metar-surface-card metar-surface-card--weather${specialWeather ? " metar-card--special-weather" : ""}`}>
-                <div className="metar-side-label">
-                  <div className="metar-side-icon metar-side-icon--weather-image">
-                    <img src="/weather-title.png" alt="" aria-hidden="true" />
-                  </div>
-                  <div className="metar-side-text">현재 날씨</div>
-                </div>
-                <div className="metar-side-value metar-side-value--anchored">
-                  <div className="metar-side-anchor">
-                    <div className="metar-side-main">
-                      <div className="metar-weather-inline-icon">
-                        <WeatherIcon visual={weatherVisual} />
-                      </div>
-                      <div className="metar-weather-text">{weatherKorean}</div>
-                    </div>
-                    <div className="metar-side-secondary">
-                      {rainText ? <div className="metar-rain-text">{rainText}</div> : null}
-                    </div>
-                  </div>
-                </div>
-              </article>
-
               <article className="metar-surface-card metar-surface-card--wind">
                 <div className="metar-side-label">
                   <div className="metar-side-icon metar-side-icon--wind">
@@ -310,9 +395,43 @@ export default function MetarCard({
                   </div>
                 </div>
               </article>
+
+              <article className={`metar-surface-card metar-surface-card--weather${specialWeather ? " metar-card--special-weather" : ""}`}>
+                <div className="metar-side-label">
+                  <div className="metar-side-icon metar-side-icon--weather-image">
+                    <img src="/weather-title.png" alt="" aria-hidden="true" />
+                  </div>
+                  <div className="metar-side-text">현재 날씨</div>
+                </div>
+                <div className="metar-side-value metar-side-value--anchored">
+                  <div className="metar-side-anchor">
+                    <div className="metar-side-main">
+                      <div className="metar-weather-inline-icon">
+                        <WeatherIcon visual={weatherVisual} />
+                      </div>
+                      <div className="metar-weather-text">{weatherKorean}</div>
+                    </div>
+                    <div className="metar-side-secondary">
+                      {rainText ? <div className="metar-rain-text">{rainText}</div> : null}
+                    </div>
+                  </div>
+                </div>
+              </article>
             </div>
 
             <div className="metar-weather-grid metar-weather-grid--bottom">
+              <article className="metar-surface-card metar-surface-card--compact">
+                <div className="metar-side-label">
+                  <div className="metar-side-icon metar-side-icon--metric">
+                    <span className="metar-direction-arrow" aria-hidden="true">{crosswindArrow}</span>
+                  </div>
+                  <div className="metar-side-text">측풍</div>
+                </div>
+                <div className="metar-side-value">
+                  <div className="metar-compact-value">{crosswindValue}</div>
+                </div>
+              </article>
+
               <article className="metar-surface-card metar-surface-card--compact">
                 <div className="metar-side-label">
                   <div className="metar-side-icon metar-side-icon--metric metar-side-icon--temp">
@@ -329,18 +448,6 @@ export default function MetarCard({
                       {feelsLikeText ? <div className="metar-compact-sub">{feelsLikeText}</div> : null}
                     </div>
                   </div>
-                </div>
-              </article>
-
-              <article className="metar-surface-card metar-surface-card--compact">
-                <div className="metar-side-label">
-                  <div className="metar-side-icon metar-side-icon--metric">
-                    <span className="metar-direction-arrow" aria-hidden="true">{crosswindArrow}</span>
-                  </div>
-                  <div className="metar-side-text">측풍</div>
-                </div>
-                <div className="metar-side-value">
-                  <div className="metar-compact-value">{crosswindValue}</div>
                 </div>
               </article>
               </div>

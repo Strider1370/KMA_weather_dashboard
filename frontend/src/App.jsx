@@ -67,13 +67,14 @@ export default function App() {
   const [mapTheme, setMapTheme] = useState(() => localStorage.getItem("map_theme") || "light");
   const [trafficCallsignFilter, setTrafficCallsignFilter] = useState(() => localStorage.getItem("traffic_callsign_filter") || "");
   const [trafficAltitudeBands, setTrafficAltitudeBands] = useState(() => {
+    const ALL_BANDS = ["0-10000", "10000-20000", "20000-30000", "30000-40000", "40000-50000"];
     const raw = localStorage.getItem("traffic_altitude_bands");
-    if (!raw) return [];
+    if (!raw) return ALL_BANDS;
     try {
       const parsed = JSON.parse(raw);
-      return Array.isArray(parsed) ? parsed : [];
+      return Array.isArray(parsed) && parsed.length > 0 ? parsed : ALL_BANDS;
     } catch {
-      return [];
+      return ALL_BANDS;
     }
   });
   const [airportMinimaSettings, setAirportMinimaSettings] = useState(() => {
@@ -113,6 +114,7 @@ export default function App() {
   useEffect(() => {
     if (selectedAirport) {
       localStorage.setItem(selectedAirportKey, selectedAirport);
+      setActiveAlerts([]);
     }
   }, [selectedAirport, selectedAirportKey]);
 

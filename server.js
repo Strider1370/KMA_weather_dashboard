@@ -213,6 +213,8 @@ function contentTypeFor(filePath) {
   if (filePath.endsWith(".json")) return "application/json; charset=utf-8";
   if (filePath.endsWith(".geojson")) return "application/geo+json; charset=utf-8";
   if (filePath.endsWith(".topojson")) return "application/topo+json; charset=utf-8";
+  if (filePath.endsWith(".svg")) return "image/svg+xml";
+  if (filePath.endsWith(".ico")) return "image/x-icon";
   if (filePath.endsWith(".png")) return "image/png";
   return "text/plain; charset=utf-8";
 }

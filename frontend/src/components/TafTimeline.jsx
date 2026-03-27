@@ -182,10 +182,10 @@ function formatTafRange(start, end, tz) {
   const startDay = startDate.getUTCDate();
   const endDay = endDate.getUTCDate();
   const startHour = String(startDate.getUTCHours()).padStart(2, "0");
-  const endHourExclusive = String((endDate.getUTCHours() + 1) % 24).padStart(2, "0");
-  const endDayLabel = endDay !== startDay || endDate.getUTCHours() === 23
-    ? ` ${endDay}일`
-    : "";
+  const rawExclusiveHour = endDate.getUTCHours() + 1;
+  const isMidnight = rawExclusiveHour === 24;
+  const endHourExclusive = isMidnight ? "24" : String(rawExclusiveHour).padStart(2, "0");
+  const endDayLabel = endDay !== startDay ? ` ${endDay}일` : "";
 
   if (start === end) {
     return `${startDay}일 ${startHour}시`;

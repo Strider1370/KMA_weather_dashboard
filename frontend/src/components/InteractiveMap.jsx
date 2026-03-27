@@ -253,14 +253,12 @@ function haversineKm(a, b) {
 
 function createAircraftIcon(track = 0, mapTheme = "dark") {
   const rotation = (track || 0) - 90;
-  const color = mapTheme === "light" ? "#0f1720" : "#ffffff";
-  const glow = mapTheme === "light"
-    ? "0 0 8px rgba(255,255,255,0.95)"
-    : "0 0 8px rgba(15,23,32,0.45)";
+  const color = "#FFD700";
+  const outline = "-0.5px -0.5px 0 #000, 0.5px -0.5px 0 #000, -0.5px 0.5px 0 #000, 0.5px 0.5px 0 #000";
   const size = 20;
   return L.divIcon({
     className: "leaflet-aircraft-icon",
-    html: `<span style="display:inline-block;transform:rotate(${rotation}deg);color:${color};text-shadow:${glow};font-size:${size}px">&#9992;</span>`,
+    html: `<span style="display:inline-block;transform:rotate(${rotation}deg);color:${color};text-shadow:${outline};font-size:${size}px">&#9992;</span>`,
     iconSize: [size + 2, size + 2],
     iconAnchor: [(size + 2) / 2, (size + 2) / 2],
   });
@@ -617,22 +615,23 @@ export default function InteractiveMap({
         )
       ) &&
       (
-        selectedBands.length === 0 ||
-        (() => {
-          const altitudeMeters = Number.isFinite(item?.baro_altitude)
-            ? item.baro_altitude
-            : (Number.isFinite(item?.geo_altitude) ? item.geo_altitude : null);
-          if (!Number.isFinite(altitudeMeters)) return false;
+        selectedBands.length === 0
+          ? false
+          : (() => {
+              const altitudeMeters = Number.isFinite(item?.baro_altitude)
+                ? item.baro_altitude
+                : (Number.isFinite(item?.geo_altitude) ? item.geo_altitude : null);
+              if (!Number.isFinite(altitudeMeters)) return false;
 
-          const altitudeFeet = altitudeMeters * 3.28084;
-          return selectedBands.some((band) => {
-            const [minText, maxText] = String(band).split("-");
-            const min = Number(minText);
-            const max = Number(maxText);
-            if (!Number.isFinite(min) || !Number.isFinite(max)) return false;
-            return altitudeFeet >= min && altitudeFeet < max;
-          });
-        })()
+              const altitudeFeet = altitudeMeters * 3.28084;
+              return selectedBands.some((band) => {
+                const [minText, maxText] = String(band).split("-");
+                const min = Number(minText);
+                const max = Number(maxText);
+                if (!Number.isFinite(min) || !Number.isFinite(max)) return false;
+                return altitudeFeet >= min && altitudeFeet < max;
+              });
+            })()
       )
     ));
   }, [adsbData, trafficCallsignFilter, trafficAltitudeBands]);
@@ -1414,7 +1413,7 @@ export default function InteractiveMap({
               })}
             </Pane>
 
-            <Pane name="traffic-pane" style={{ zIndex: 620 }}>
+            <Pane name="traffic-pane" style={{ zIndex: 510 }}>
               {showTraffic && visibleAircraft.map((item) => (
                 <Marker
                   key={item.icao24}

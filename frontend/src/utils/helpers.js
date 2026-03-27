@@ -243,6 +243,14 @@ export function classifyCeilingCategory(ceilingFt, icao = null, minimaSettings =
   return getFlightCategoryMeta("VFR");
 }
 
+export function classifyRvrCategory(rvrMean, icao = null, minimaSettings = null) {
+  const minima = getAirportMinimaRule(icao, minimaSettings);
+  if (minima && Number.isFinite(minima.visibilityM) && Number.isFinite(rvrMean) && rvrMean < minima.visibilityM) {
+    return getFlightCategoryMeta("LIFR");
+  }
+  return getFlightCategoryMeta("IFR");
+}
+
 export function getFlightCategory(visibilityM, ceilingFt, icao = null, minimaSettings = null) {
   const vis = Number.isFinite(visibilityM) ? visibilityM : 99999;
   const ceil = Number.isFinite(ceilingFt) ? ceilingFt : 99999;

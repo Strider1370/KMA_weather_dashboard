@@ -81,10 +81,156 @@ function parseWindShear(obs) {
   };
 }
 
+function pickCodeFromHref(value) {
+  const raw = text(value);
+  if (!raw) {
+    return null;
+  }
+  return lastToken(raw).toUpperCase() || null;
+}
+
+function extractRunwayDesignator(value) {
+  const direct = text(value);
+  if (direct) {
+    const m = String(direct).toUpperCase().match(/\b(\d{2}[LRC]?)\b/);
+    if (m) {
+      return m[1];
+    }
+  }
+
+  if (!value || typeof value !== "object") {
+    return null;
+  }
+
+  const nestedDesignator =
+    text(value["aixm:designator"]) ||
+    text(value["aixm:RunwayDirection"]?.["aixm:timeSlice"]?.["aixm:RunwayDirectionTimeSlice"]?.["aixm:designator"]) ||
+    text(value["aixm:RunwayDirection"]?.["aixm:designator"]) ||
+    null;
+
+  if (nestedDesignator) {
+    const m = String(nestedDesignator).toUpperCase().match(/\b(\d{2}[LRC]?)\b/);
+    if (m) {
+      return m[1];
+    }
+  }
+
+  for (const entry of Object.values(value)) {
+    if (entry && typeof entry === "object") {
+      const found = extractRunwayDesignator(entry);
+      if (found) {
+        return found;
+      }
+    }
+  }
+
+  return null;
+}
+
+function parseRvrMagnitude(rawValue) {
+  const raw = text(rawValue);
+  if (!raw) {
+    return { value: null, operator: null };
+  }
+
+  const trimmed = String(raw).trim().toUpperCase();
+  const operator = trimmed.startsWith("P")
+    ? "ABOVE"
+    : trimmed.startsWith("M")
+      ? "BELOW"
+      : null;
+  const numeric = Number(trimmed.replace(/^[PM]/, ""));
+
+  return {
+    value: Number.isFinite(numeric) ? numeric : null,
+    operator
+  };
+}
+
+function collectRunwayVisualRanges(node, result = []) {
+  if (!node || typeof node !== "object") {
+    return result;
+  }
+
+  for (const [key, value] of Object.entries(node)) {
+    if (key === "iwxxm:AerodromeRunwayVisualRange") {
+      toArray(value).forEach((item) => {
+        if (item && typeof item === "object") {
+          result.push(item);
+        }
+      });
+      continue;
+    }
+
+    if (Array.isArray(value)) {
+      value.forEach((entry) => {
+        collectRunwayVisualRanges(entry, result);
+      });
+      continue;
+    }
+
+    if (value && typeof value === "object") {
+      collectRunwayVisualRanges(value, result);
+    }
+  }
+
+  return result;
+}
+
+function parseRunwayVisualRanges(obs) {
+  const rvrNodes = collectRunwayVisualRanges(obs);
+  return rvrNodes
+    .map((node) => {
+      const runway = extractRunwayDesignator(node["iwxxm:runway"]) || extractRunwayDesignator(node);
+
+      const parsedMeanRvr = parseRvrMagnitude(node["iwxxm:meanRVR"]);
+      const parsedMeanRange = parseRvrMagnitude(node["iwxxm:meanRunwayVisualRange"]);
+      const parsedRvr = parseRvrMagnitude(node["iwxxm:rvr"]);
+      const mean =
+        parsedMeanRvr.value ||
+        parsedMeanRange.value ||
+        parsedRvr.value ||
+        null;
+
+      const minimum = number(node["iwxxm:minimumRVR"]);
+      const maximum = number(node["iwxxm:maximumRVR"]);
+      const tendency =
+        pickCodeFromHref(node["@_pastTendency"]) ||
+        pickCodeFromHref(node["iwxxm:pastTendency"]?.["@_xlink:href"]) ||
+        pickCodeFromHref(node["iwxxm:pastTendency"]) ||
+        null;
+      const operator =
+        pickCodeFromHref(node["@_meanRVROperator"]) ||
+        pickCodeFromHref(node["iwxxm:meanRVROperator"]?.["@_xlink:href"]) ||
+        pickCodeFromHref(node["iwxxm:meanRVROperator"]) ||
+        parsedMeanRvr.operator ||
+        parsedMeanRange.operator ||
+        parsedRvr.operator ||
+        null;
+
+      if (!runway && mean == null && minimum == null && maximum == null) {
+        return null;
+      }
+
+      return {
+        runway,
+        mean,
+        minimum,
+        maximum,
+        tendency,
+        operator
+      };
+    })
+    .filter(Boolean);
+}
+
 function buildDisplay(observation, flags) {
   return {
     wind: observation.wind.raw,
     visibility: String(observation.visibility.value ?? "//"),
+    minimum_visibility: observation.visibility.minimum_value != null
+      ? String(observation.visibility.minimum_value)
+      : null,
     weather: observation.weather.map((w) => w.raw).join(" "),
     clouds: (flags.cavok || flags.nsc) ? "NSC" : observation.clouds.map((c) => c.raw).join(" "),
     temperature:
@@ -135,6 +281,14 @@ function parse(xmlString) {
 
   const visibility = {
     value: cavok ? 9999 : number(visibilityNode),
+    minimum_value:
+      number(obs["iwxxm:visibility"]?.["iwxxm:AerodromeHorizontalVisibility"]?.["iwxxm:minimumVisibility"]) ||
+      number(obs["iwxxm:visibility"]?.["iwxxm:minimumVisibility"]) ||
+      number(obs["iwxxm:minimumVisibility"]),
+    minimum_direction_degrees:
+      number(obs["iwxxm:visibility"]?.["iwxxm:AerodromeHorizontalVisibility"]?.["iwxxm:minimumVisibilityDirection"]) ||
+      number(obs["iwxxm:visibility"]?.["iwxxm:minimumVisibilityDirection"]) ||
+      number(obs["iwxxm:minimumVisibilityDirection"]),
     cavok
   };
 
@@ -180,6 +334,7 @@ function parse(xmlString) {
   };
 
   const windShear = parseWindShear(obs);
+  const rvr = parseRunwayVisualRanges(obs);
 
   const observation = {
     wind,
@@ -188,7 +343,8 @@ function parse(xmlString) {
     clouds,
     temperature,
     qnh,
-    wind_shear: windShear
+    wind_shear: windShear,
+    rvr
   };
 
   observation.display = buildDisplay(observation, { cavok, nsc: nscFlag });
