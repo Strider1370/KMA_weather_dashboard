@@ -204,7 +204,11 @@ function formatTafRange(start, end, tz) {
 
 export default function TafTimeline({ tafData, icao, minimaSettings = null, version = "v2", onVersionToggle, tz = "UTC" }) {
   const target = tafData?.airports?.[icao];
-  const timeline = target?.timeline || [];
+  const rawTimeline = target?.timeline || [];
+  const now = Date.now();
+  const timeline = rawTimeline.filter(
+    (slot) => new Date(slot.time).getTime() + 3600 * 1000 > now
+  );
   const isTimelineView = version === "v2";
   const tableSegments = buildTafTableSegments(timeline, icao, minimaSettings);
   const lastEnd = target?.header?.valid_end;
@@ -212,10 +216,18 @@ export default function TafTimeline({ tafData, icao, minimaSettings = null, vers
   const tafTimeText = tafTime || "";
   const tafBadgeText = getTafBadgeText(target?.header);
 
-  if (timeline.length === 0) {
+  if (rawTimeline.length === 0) {
     return (
       <section className="taf-panel-empty">
         <p>No TAF timeline data for selected airport.</p>
+      </section>
+    );
+  }
+
+  if (timeline.length === 0) {
+    return (
+      <section className="taf-panel-empty">
+        <p>TAF 유효 기간이 만료됐습니다.</p>
       </section>
     );
   }

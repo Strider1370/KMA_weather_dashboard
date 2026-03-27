@@ -69,10 +69,10 @@ module.exports = {
     timeout_ms: 20000,
     max_history_frames: 36,
     bounds: {
-      lamin: Number(process.env.ADSB_LAMIN || 33),
+      lamin: Number(process.env.ADSB_LAMIN || 30),
       lamax: Number(process.env.ADSB_LAMAX || 39),
       lomin: Number(process.env.ADSB_LOMIN || 124),
-      lomax: Number(process.env.ADSB_LOMAX || 132)
+      lomax: Number(process.env.ADSB_LOMAX || 134)
     }
   },
   schedule: {

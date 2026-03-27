@@ -4,6 +4,41 @@ const https = require("https");
 const path = require("path");
 const config = require("../config");
 
+// Point-in-polygon (ray casting) for FIR boundary filtering
+let _firPolygon = null;
+function loadFirPolygon() {
+  if (_firPolygon) return _firPolygon;
+  try {
+    const firPath = path.join(__dirname, "../../../frontend/public/geo/rkrr_fir.geojson");
+    const geojson = JSON.parse(fs.readFileSync(firPath, "utf8"));
+    const feature = geojson.features?.[0];
+    if (feature?.geometry?.type === "Polygon") {
+      _firPolygon = feature.geometry.coordinates[0]; // outer ring
+    }
+  } catch (_) {
+    _firPolygon = null;
+  }
+  return _firPolygon;
+}
+
+function pointInPolygon(lon, lat, ring) {
+  let inside = false;
+  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+    const xi = ring[i][0], yi = ring[i][1];
+    const xj = ring[j][0], yj = ring[j][1];
+    if ((yi > lat) !== (yj > lat) && lon < ((xj - xi) * (lat - yi)) / (yj - yi) + xi) {
+      inside = !inside;
+    }
+  }
+  return inside;
+}
+
+function isInFir(lon, lat) {
+  const ring = loadFirPolygon();
+  if (!ring) return true; // FIR 데이터 없으면 필터링 안 함
+  return pointInPolygon(lon, lat, ring);
+}
+
 function canonicalize(value) {
   if (Array.isArray(value)) {
     return value.map((item) => canonicalize(item));
@@ -164,6 +199,7 @@ async function process() {
   const aircraft = (raw.states || [])
     .map(normalizeState)
     .filter(Boolean)
+    .filter((a) => isInFir(a.lon, a.lat))
     .sort((a, b) => {
       const left = `${a.callsign || ""}-${a.icao24 || ""}`;
       const right = `${b.callsign || ""}-${b.icao24 || ""}`;

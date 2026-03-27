@@ -166,7 +166,8 @@ Derived from `.editorconfig` + existing source files.
 - Timezone handling frequently uses KST logic in collectors.
 - Network calls use external KMA APIs; failures are expected and should degrade gracefully.
 - Some collectors are intentionally independent (not all use `api-client.js`).
-- ADS-B uses OpenSky `states/all` with bounding-box filtering and has a TLS fallback path for environments that surface `SELF_SIGNED_CERT_IN_CHAIN`.
+- ADS-B uses OpenSky `states/all` with two-stage filtering: (1) bounding-box query (`lat 30–39, lon 124–134`, covering Incheon FIR extent) and (2) point-in-polygon check against `rkrr_fir.geojson` outer ring (ray casting) to exclude aircraft outside the FIR boundary. If the FIR file is unavailable, the bbox result is used as-is.
+- TLS fallback path exists for environments that surface `SELF_SIGNED_CERT_IN_CHAIN`.
 - AMOS `RN` should be treated as daily rainfall; current dashboard polling reads it through the separate `amos` dataset rather than embedding it in METAR hashes.
 - `server.js` binds to `127.0.0.1`; expose externally via reverse proxy (nginx/LB), not direct app port.
 - If nginx serves `frontend/dist` directly, keep both `.geojson` (`application/geo+json`) and `.topojson` (`application/topo+json`) MIME handling correct and enable gzip/brotli for `.geojson`, `.topojson`, `.json`, `.js`, and `.css`.
@@ -179,7 +180,8 @@ Derived from `.editorconfig` + existing source files.
 - In Korea mode, InteractiveMap draws a unioned KMA radar-coverage boundary from site radius metadata and can dim only the area outside that union boundary.
 - Rain-rate colors follow the in-app `mm/h` legend, and sub-`0.1 mm/h` pixels should remain transparent so dark mode does not show a bright fringe.
 - **Site-wide dark mode** is controlled by a single `mapTheme` state (`localStorage: "map_theme"`). When `mapTheme` changes, `document.documentElement.setAttribute("data-theme", mapTheme)` is called, toggling CSS variable overrides in `[data-theme="dark"]` block of `App.css`. The map tile filter (`.interactive-map-shell--dark`) follows automatically. The settings label is "사이트 테마" (was "지도 테마").
-- `isDarkTheme()` is exported from `helpers.js` and used in `MetarCard.jsx` (`catColors()`) and `TafTimeline.jsx` (`getTintStyle()`, `getWeatherStyle()`) to select dark-aware inline styles for flight-category-tinted panels, since those colors are injected as inline styles and cannot be overridden by CSS variables alone.
+- `isDarkTheme()` is exported from `helpers.js` and used in `MetarCard.jsx` (`catColors()`, `getRvrEntryStyle()`) and `TafTimeline.jsx` (`getTintStyle()`, `getWeatherStyle()`) to select dark-aware inline styles for flight-category-tinted panels, since those colors are injected as inline styles and cannot be overridden by CSS variables alone.
+- TAF timeline and table filter out expired hourly slots at render time: slots whose end time (`slot.time + 1h`) is already past `Date.now()` are removed before `groupElementsByValue` and `buildTafTableSegments` run, so remaining slots proportionally fill the full timeline width automatically. If all slots are expired, a "TAF 유효 기간이 만료됐습니다" message is shown.
 - A FOUC-prevention inline script in `frontend/index.html` applies `data-theme` before React mounts.
 - In PowerShell, Korean UTF-8 files may render incorrectly with plain `Get-Content`.
 - When reading Korean text files, prefer explicit UTF-8 decoding:
