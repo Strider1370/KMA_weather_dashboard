@@ -558,7 +558,7 @@ export default function InteractiveMap({
   const [currentZoom, setCurrentZoom] = useState(NATIONWIDE_ZOOM);
   const [, forceRender] = useReducer((x) => x + 1, 0);
   const [showEcho, setShowEcho] = useState(true);
-  const [showLightning, setShowLightning] = useState(true);
+  const [showLightning, setShowLightning] = useState(false);
   const [showSigwxLow, setShowSigwxLow] = useState(false);
   const [showSigmet, setShowSigmet] = useState(false);
   const [showAirmet, setShowAirmet] = useState(false);
@@ -1142,13 +1142,6 @@ export default function InteractiveMap({
           </button>
         </div>
           <div className="time-range">
-          <button
-            type="button"
-            className={`range-btn ${showLightning ? "active" : ""}`}
-            onClick={() => setShowLightning((v) => !v)}
-          >
-            낙뢰
-          </button>
             <button
               type="button"
               className={`range-btn echo-toggle ${showEcho ? "active" : ""}`}
@@ -1158,13 +1151,13 @@ export default function InteractiveMap({
             >
               강수에코
             </button>
-            <button
-              type="button"
-              className={`range-btn sigwx-toggle ${showSigwxLow ? "active" : ""}`}
-              onClick={() => setShowSigwxLow((value) => !value)}
-            >
-              SIGWX_LOW
-            </button>
+          <button
+            type="button"
+            className={`range-btn ${showLightning ? "active" : ""}`}
+            onClick={() => setShowLightning((v) => !v)}
+          >
+            낙뢰
+          </button>
             <button
               type="button"
               className={`range-btn sigmet-toggle ${showSigmet ? "active" : ""}`}
@@ -1178,6 +1171,13 @@ export default function InteractiveMap({
               onClick={() => setShowAirmet((v) => !v)}
             >
               AIRMET
+            </button>
+            <button
+              type="button"
+              className={`range-btn sigwx-toggle ${showSigwxLow ? "active" : ""}`}
+              onClick={() => setShowSigwxLow((value) => !value)}
+            >
+              SIGWX_LOW
             </button>
             <button
               type="button"
