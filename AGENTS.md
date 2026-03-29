@@ -54,6 +54,7 @@ Use repo root unless noted.
   - `node backend/test/run-once.js taf`
   - `node backend/test/run-once.js amos`
   - `node backend/test/run-once.js warning`
+  - `node backend/test/run-once.js sigwx-low`
   - `node backend/test/run-once.js lightning`
   - `node backend/test/run-once.js radar-echo`
   - `node backend/test/run-once.js adsb`
@@ -136,6 +137,7 @@ Derived from `.editorconfig` + existing source files.
 - `server.js` also serves SPA entry points for both `/` and `/test`.
 - Static data served under `/data/*` from `backend/data`.
 - AMOS daily rainfall is served separately at `/api/amos` and stored under `backend/data/amos/latest.json`.
+- SIGWX LOW is served at `/api/sigwx-low` and stored under `backend/data/sigwx_low/latest.json`.
 - Persisted category files generally follow:
   - `backend/data/<type>/latest.json`
   - historical JSON files with prefixed timestamps.
@@ -164,6 +166,7 @@ Derived from `.editorconfig` + existing source files.
 ## Operational Notes
 
 - Timezone handling frequently uses KST logic in collectors.
+- SIGWX LOW `tmfc` is UTC-based and should follow the latest available cycle from the KMA `amo_sigwx.php` feed (`05/11/17/23 UTC` issue times; prefer probing the newest available cycle before falling back).
 - Network calls use external KMA APIs; failures are expected and should degrade gracefully.
 - Some collectors are intentionally independent (not all use `api-client.js`).
 - ADS-B uses OpenSky `states/all` with two-stage filtering: (1) bounding-box query (`lat 30–39, lon 124–134`, covering Incheon FIR extent) and (2) point-in-polygon check against `rkrr_fir.geojson` outer ring (ray casting) to exclude aircraft outside the FIR boundary. If the FIR file is unavailable, the bbox result is used as-is.
@@ -174,6 +177,7 @@ Derived from `.editorconfig` + existing source files.
 - InteractiveMap boundary detail is auto-switched by zoom (`zoom >= 9`: sigungu, `zoom < 9`: sido); there is no user setting toggle anymore.
 - InteractiveMap renders nationwide lightning strikes in both Airport/Korea modes; Airport mode zone counters (8/16/32km) must remain based on selected-airport strikes.
 - InteractiveMap `Traffic` layer is toggleable again and supports settings-driven callsign substring filtering plus altitude-band filtering (`baro_altitude` first, `geo_altitude` fallback, compare in feet after converting from meters). Altitude bands default to all 5 bands selected; an empty band selection hides all traffic (does not show all). Callsign filter empty = show all; any input = substring match only. Selections are persisted in `localStorage` keys `traffic_altitude_bands` and `traffic_callsign_filter`.
+- InteractiveMap `SIGWX_LOW` uses grouped rendering: contour items (`item_type 4`) are treated as primary regions, while label/icon items (`item_type 7/10/12`) are attached to the nearest matching region using contour/type context plus geometric matching.
 - Switching the selected airport clears all active alert popups and the marquee banner immediately.
 - LIFR (airport-minima-breach) thresholds are now user-configurable in Settings > `MINIMA`; thresholds are persisted in `localStorage` key `airport_minima_settings` and must be passed into METAR/TAF category + visibility/ceiling tint classification helpers.
 - Nationwide radar echo currently uses `cmp=hsr`, converts `dBZ` to `mm/h`, and reprojects to full radar-domain bounds before writing `/data/radar/echo_korea_<tm>.png`.

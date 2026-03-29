@@ -2,7 +2,7 @@
 
 KMA 항공기상 수집기 + 대시보드 프로젝트입니다.
 
-이 프로젝트는 KMA 항공/기상 피드(METAR, TAF, AMOS 강수, 특보, 낙뢰, 레이더, 레이더 에코)와 OpenSky ADS-B 항공기 위치를 주기적으로 수집하고, 정규화된 결과를 `backend/data/`에 저장한 뒤 React 대시보드로 제공합니다.
+이 프로젝트는 KMA 항공/기상 피드(METAR, TAF, AMOS 강수, 특보, 낙뢰, 레이더, 레이더 에코, 저고도 중요기상예보 SIGWX_LOW)와 OpenSky ADS-B 항공기 위치를 주기적으로 수집하고, 정규화된 결과를 `backend/data/`에 저장한 뒤 React 대시보드로 제공합니다.
 
 ## 프로젝트가 하는 일
 
@@ -10,7 +10,7 @@ KMA 항공기상 수집기 + 대시보드 프로젝트입니다.
 - Cron 스케줄 기반으로 수집기를 실행하고, 중복 실행을 잠금으로 방지합니다.
 - 카테고리별 `latest.json`과 시각별 이력 파일을 함께 관리합니다.
 - 단일 Node 서버에서 API와 정적 데이터를 함께 제공합니다.
-- METAR/TAF/특보/낙뢰/레이더 에코를 단일 인터랙티브 지도 패널과 함께 렌더링합니다.
+- METAR/TAF/특보/낙뢰/레이더 에코/SIGWX_LOW를 단일 인터랙티브 지도 패널과 함께 렌더링합니다.
 - ADS-B `Traffic` 레이어로 한국 주변 상공 항공기 현재 위치를 지도에 표시합니다.
 - `/test` 경로에서는 `TST1` 테스트 공항을 선택할 수 있고, 메인 `/`에서는 `TST1`을 숨깁니다.
 
@@ -36,6 +36,7 @@ KMA 항공기상 수집기 + 대시보드 프로젝트입니다.
 KMA APIs
   ├─ typ02/openApi (METAR/TAF/WARNING XML)
   ├─ typ01/url/lgt_pnt.php (낙뢰)
+  ├─ typ01/url/amo_sigwx.php (저고도 SIGWX)
   ├─ typ04/url/rdr_cmp_file.php (레이더 바이너리 / 에코 생성용)
   └─ typ01/url/amos.php (AMOS 일강수량)
 
@@ -80,6 +81,7 @@ frontend/src (React 대시보드)
 │   │   │   ├── taf-processor.js
 │   │   │   ├── amos-processor.js
 │   │   │   ├── warning-processor.js
+│   │   │   ├── sigwx-low-processor.js
 │   │   │   ├── lightning-processor.js
 │   │   │   ├── radar-echo-processor.js
 │   │   │   └── adsb-processor.js
@@ -118,6 +120,7 @@ frontend/src (React 대시보드)
 - TAF: `*/30 * * * *`
 - AMOS: `*/10 * * * *`
 - WARNING: `*/5 * * * *`
+- SIGWX_LOW: `5 5,11,17,23 * * *`
 - LIGHTNING: `*/5 * * * *`
 - RADAR_ECHO: `*/5 * * * *`
 - ADSB: `*/5 * * * *`
@@ -131,6 +134,7 @@ frontend/src (React 대시보드)
 - AMOS 일강수량은 `backend/data/amos/latest.json`에 별도 저장되며, METAR payload와 분리된 snapshot hash를 가집니다.
 - 레이더 이미지/에코 에셋은 `backend/data/radar/`에 저장되며 `/data/radar/*`로 제공됩니다.
 - ADS-B 현재 위치 스냅샷은 `backend/data/adsb/latest.json`에 저장되며 `/api/adsb`로 제공됩니다.
+- SIGWX_LOW 스냅샷은 `backend/data/sigwx_low/latest.json`에 저장되며 `/api/sigwx-low`로 제공됩니다.
 - 지도 경계는 `frontend/public/geo/korea_boundaries.v1.topojson`(시도/시군구 통합)과 `frontend/public/geo/korea_neighbors_masked.v1.geojson`을 사용합니다.
 
 예시:
@@ -141,6 +145,7 @@ frontend/src (React 대시보드)
 - `backend/data/warning/latest.json`
 - `backend/data/lightning/latest.json`
 - `backend/data/adsb/latest.json`
+- `backend/data/sigwx_low/latest.json`
 - `backend/data/radar/echo_meta.json`
 - `backend/data/radar/echo_korea_<tm>.png`
 - `frontend/public/geo/korea_boundaries.v1.topojson`
@@ -155,6 +160,7 @@ frontend/src (React 대시보드)
 - `/api/warning`
 - `/api/lightning`
 - `/api/adsb`
+- `/api/sigwx-low`
 - `/api/snapshot-meta`
 - `/api/airports`
 - `/api/warning-types`
@@ -182,6 +188,7 @@ API_AUTH_KEY=your_kma_key
 # DATA_PATH=backend/data
 # API_BASE_URL=https://apihub.kma.go.kr/api/typ02/openApi
 # LIGHTNING_API_URL=https://apihub.kma.go.kr/api/typ01/url/lgt_pnt.php
+# SIGWX_LOW_API_URL=https://apihub.kma.go.kr/api/typ01/url/amo_sigwx.php
 # AMOS_API_URL=https://apihub.kma.go.kr/api/typ01/url/amos.php
 # RADAR_API_URL=https://apihub.kma.go.kr/api/typ04/url/rdr_cmp_file.php
 # RADAR_CMP_TYPE=hsr
@@ -259,6 +266,7 @@ node backend/test/run-once.js metar
 node backend/test/run-once.js taf
 node backend/test/run-once.js amos
 node backend/test/run-once.js warning
+node backend/test/run-once.js sigwx-low
 node backend/test/run-once.js lightning
 node backend/test/run-once.js radar-echo
 node backend/test/run-once.js adsb
@@ -287,6 +295,8 @@ $env:NODE_TLS_REJECT_UNAUTHORIZED="0"; node backend/test/run-once.js adsb
 - Korea 모드에서는 레이더 사이트 반경 메타데이터를 union한 커버리지 경계를 점선으로 표시하고, 해당 경계 바깥 영역만 약하게 어둡게 표시합니다.
 - 레이더 오버레이의 `0.1 mm/h` 미만 영역은 투명 처리되어 다크 모드에서 밝은 테두리가 보이지 않도록 조정되어 있습니다.
 - `Traffic` 레이어는 기본적으로 꺼져 있습니다.
+- `SIGWX_LOW`는 지도 우상단 토글로 켜고 끌 수 있으며, 전국 모드에서는 인천 FIR 경계와 함께 표시됩니다.
+- `SIGWX_LOW` 아이템은 영역(`item_type 4`)과 배지/텍스트(`item_type 7/10/12`)를 그룹화해 같은 현상으로 취급합니다.
 - `Traffic` 레이어는 설정창 `항적` 탭에서 호출부호(`KAL, AAR123`) 부분일치 필터와 1만 ft 단위 고도 필터를 함께 적용할 수 있습니다. 고도 밴드는 기본적으로 5개 전체가 선택된 상태이며, 아무것도 선택하지 않으면 항적이 전혀 표시되지 않습니다. 호출부호 필터가 비어 있으면 전체 표시, 값이 입력되면 해당 문자열 포함 항적만 표시됩니다. 선택 값은 `localStorage`(`traffic_altitude_bands`, `traffic_callsign_filter`)에 저장됩니다.
 - 공항을 전환하면 열려 있는 모든 알람 팝업과 마키 배너가 즉시 닫힙니다.
 - 설정창 `일반` 탭의 **사이트 테마** (라이트/다크)를 변경하면 사이트 전체 색상과 지도 타일이 함께 전환됩니다. 선택값은 `localStorage` 키 `map_theme`에 저장됩니다.
