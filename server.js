@@ -244,8 +244,8 @@ function serveDataAsset(req, res) {
   }
 
   const body = fs.readFileSync(filePath);
-  const radarFramePattern = /[\\/]radar[\\/]echo_korea_\d{12}\.png$/;
-  const cacheControl = radarFramePattern.test(filePath)
+  const immutableFramePattern = /[\\/](radar[\\/]echo_korea_\d{12}\.png|satellite[\\/]sat_korea_\d{12}\.png)$/;
+  const cacheControl = immutableFramePattern.test(filePath)
     ? "public, max-age=31536000, immutable"
     : "no-cache";
   res.writeHead(200, {
@@ -370,6 +370,16 @@ const server = http.createServer(async (req, res) => {
       } catch {
         echoTm = null;
       }
+      const satMetaPath = path.join(DATA_ROOT, "satellite", "sat_meta.json");
+      let satTm = null;
+      try {
+        if (fs.existsSync(satMetaPath)) {
+          const satMeta = readJsonFile(satMetaPath);
+          satTm = satMeta.tm || null;
+        }
+      } catch {
+        satTm = null;
+      }
       return sendJson(req, res, 200, {
         metar: { hash: readSnapshotHash("metar") },
         taf: { hash: readSnapshotHash("taf") },
@@ -381,6 +391,7 @@ const server = http.createServer(async (req, res) => {
         lightning: { hash: readSnapshotHash("lightning") },
         adsb: { hash: readSnapshotHash("adsb") },
         echo: echoTm != null ? { tm: echoTm } : null,
+        satellite: satTm != null ? { tm: satTm } : null,
       });
     }
 

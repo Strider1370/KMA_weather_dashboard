@@ -122,7 +122,7 @@ export default function App() {
   const prevDataRef = useRef(null);
   const pollingRef = useRef(null);
   const pollingInFlightRef = useRef(false);
-  const snapshotHashRef = useRef({ metar: null, taf: null, warning: null, sigmet: null, airmet: null, sigwxLow: null, amos: null, lightning: null, adsb: null, echo: null });
+  const snapshotHashRef = useRef({ metar: null, taf: null, warning: null, sigmet: null, airmet: null, sigwxLow: null, amos: null, lightning: null, adsb: null, echo: null, satellite: null });
 
   // 디스패처 콜백 등록
   useEffect(() => {
@@ -168,6 +168,7 @@ export default function App() {
         lightning: result.lightning?.content_hash || null,
         adsb: result.adsb?.content_hash || null,
         echo: result.echoMeta?.tm || null,
+        satellite: result.satMeta?.tm || null,
       };
     } catch (err) {
       setError(err.message);
@@ -200,6 +201,7 @@ export default function App() {
         lightning: snapshot.lightning?.hash == null || snapshot.lightning.hash !== saved.lightning,
         adsb: snapshot.adsb?.hash == null || snapshot.adsb.hash !== saved.adsb,
         echoMeta: snapshot.echo?.tm == null || snapshot.echo.tm !== saved.echo,
+        satMeta: snapshot.satellite?.tm == null || snapshot.satellite.tm !== saved.satellite,
       };
 
       const anyChanged = Object.values(changes).some(Boolean);
@@ -239,6 +241,9 @@ export default function App() {
         echo: changes.echoMeta && changedData.echoMeta?.tm != null
           ? changedData.echoMeta.tm
           : (snapshot.echo?.tm ?? saved.echo),
+        satellite: changes.satMeta && changedData.satMeta?.tm != null
+          ? changedData.satMeta.tm
+          : (snapshot.satellite?.tm ?? saved.satellite),
       };
     } finally {
       pollingInFlightRef.current = false;
@@ -479,6 +484,7 @@ export default function App() {
                 return w.direction;
               })()}
               echoMeta={data.echoMeta}
+              satMeta={data.satMeta}
               radarOpacity={radarOpacity}
               mapTheme={mapTheme}
               tz={timeZone}

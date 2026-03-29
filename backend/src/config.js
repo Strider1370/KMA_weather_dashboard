@@ -65,6 +65,16 @@ module.exports = {
     crop_size: 200,
     timeout_ms: 30000
   },
+  satellite: {
+    url: process.env.SATELLITE_API_URL || "https://apihub.kma.go.kr/api/typ05/api/GK2A/LE1B",
+    fog_url: process.env.SATELLITE_FOG_API_URL || "https://apihub.kma.go.kr/api/typ05/api/GK2A/LE2",
+    channel: (process.env.SATELLITE_CHANNEL || "IR105").toUpperCase(),
+    fog_product: "FOG",
+    region: (process.env.SATELLITE_REGION || "KO").toUpperCase(),
+    delay_minutes: 20,
+    max_frames: 18,
+    timeout_ms: 30000,
+  },
   adsb: {
     url: process.env.ADSB_API_URL || "https://opensky-network.org/api/states/all",
     timeout_ms: 20000,
@@ -86,6 +96,7 @@ module.exports = {
     amos_interval: "*/10 * * * *",
     lightning_interval: "*/5 * * * *",
     radar_echo_interval: "*/5 * * * *",
+    satellite_interval: "*/10 * * * *",
     adsb_interval: "*/5 * * * *"
   },
   storage: {
