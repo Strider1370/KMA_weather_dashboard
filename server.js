@@ -113,6 +113,21 @@ function readSnapshotHash(category) {
   }
 }
 
+function readRecent(category, limit = 10) {
+  const dir = path.join(DATA_ROOT, category);
+  if (!fs.existsSync(dir)) return [];
+  try {
+    return fs
+      .readdirSync(dir)
+      .filter((name) => name.endsWith(".json") && name !== "latest.json")
+      .sort((a, b) => b.localeCompare(a))
+      .slice(0, limit)
+      .map((name) => readJsonFile(path.join(dir, name)));
+  } catch {
+    return [];
+  }
+}
+
 function readTst1Override(category) {
   const file = path.join(TST1_ROOT, `${category}.json`);
   if (!fs.existsSync(file)) return null;
@@ -311,6 +326,10 @@ const server = http.createServer(async (req, res) => {
 
     if (req.url === "/api/sigwx-low") {
       return sendJson(req, res, 200, readLatest("sigwx_low"));
+    }
+
+    if (req.url === "/api/sigwx-low-history") {
+      return sendJson(req, res, 200, readRecent("sigwx_low", 10));
     }
 
     if (req.url === "/api/amos") {

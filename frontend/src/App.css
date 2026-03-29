@@ -1954,6 +1954,31 @@ body {
   align-items: center;
   gap: 6px;
 }
+.sigwx-history-control {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.sigwx-history-meta {
+  display: grid;
+  gap: 2px;
+  font-size: 0.74rem;
+  color: var(--muted);
+  font-weight: 700;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.sigwx-history-step {
+  width: 24px;
+  height: 24px;
+  border-radius: 999px;
+  font-size: 0.95rem;
+  line-height: 1;
+}
+
 .radar-speed-step {
   width: 28px;
   height: 28px;

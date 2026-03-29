@@ -467,6 +467,7 @@ export default function App() {
             <InteractiveMap
               lightningData={data.lightning}
               sigwxLowData={data.sigwxLow}
+              sigwxLowHistoryData={data.sigwxLowHistory}
               sigmetData={data.sigmet}
               airmetData={data.airmet}
               adsbData={data.adsb}

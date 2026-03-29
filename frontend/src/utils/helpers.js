@@ -15,7 +15,12 @@ export function formatUtc(value, tz = 'UTC') {
     const pad = (n) => String(n).padStart(2, '0');
     return `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())} ${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())} KST`;
   }
-  return value.replace("T", " ").replace("Z", " UTC");
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) {
+    return String(value).replace("T", " ").replace(/:\d{2}(?:\.\d+)?Z$/, " UTC").replace("Z", " UTC");
+  }
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())} ${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())} UTC`;
 }
 
 export function formatDateTimeRange(start, end, tz = 'UTC') {

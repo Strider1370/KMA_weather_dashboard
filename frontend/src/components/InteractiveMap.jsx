@@ -11,7 +11,7 @@ import {
   pointOnFeature as turfPointOnFeature,
   union as turfUnion,
 } from "@turf/turf";
-import { formatDateTimeRange } from "../utils/helpers";
+import { formatDateTimeRange, formatUtc } from "../utils/helpers";
 import {
   sigwxCenter,
   sigwxLabel,
@@ -510,9 +510,36 @@ function renderSigwxAltitude(item) {
   );
 }
 
+function parseSigwxTmfc(tmfc) {
+  if (!tmfc || !/^\d{10}$/.test(String(tmfc))) return null;
+  const raw = String(tmfc);
+  return new Date(Date.UTC(
+    Number(raw.slice(0, 4)),
+    Number(raw.slice(4, 6)) - 1,
+    Number(raw.slice(6, 8)),
+    Number(raw.slice(8, 10)),
+    0,
+    0,
+    0
+  ));
+}
+
+function sigwxIssueLabel(tmfc, tz) {
+  const issueDate = parseSigwxTmfc(tmfc);
+  return issueDate ? formatUtc(issueDate.toISOString(), tz) : "-";
+}
+
+function sigwxValidLabel(tmfc, tz) {
+  const issueDate = parseSigwxTmfc(tmfc);
+  if (!issueDate) return "-";
+  const validDate = new Date(issueDate.getTime() + (7 * 60 * 60 * 1000));
+  return formatUtc(validDate.toISOString(), tz);
+}
+
 export default function InteractiveMap({
   lightningData,
   sigwxLowData = null,
+  sigwxLowHistoryData = null,
   sigmetData = null,
   airmetData = null,
   adsbData = null,
@@ -545,6 +572,7 @@ export default function InteractiveMap({
   const [recenterKey, setRecenterKey] = useState(0);
   const [loopStart, setLoopStart] = useState(0);
   const [loopEnd, setLoopEnd] = useState(0);
+  const [sigwxHistoryIndex, setSigwxHistoryIndex] = useState(0);
   const loopTrackRef = useRef(null);
   const draggingRef = useRef(null); // "start" | "end" | null
   const isNationwide = mapScope === "nationwide";
@@ -576,6 +604,11 @@ export default function InteractiveMap({
   const airportData = lightningData?.airports?.[selectedAirport] || null;
   const arp = airportData?.arp || (airportMeta ? { lat: airportMeta.lat, lon: airportMeta.lon } : null);
   const strikes = airportData?.strikes || [];
+  const sigwxHistoryEntries = useMemo(() => {
+    if (Array.isArray(sigwxLowHistoryData) && sigwxLowHistoryData.length > 0) return sigwxLowHistoryData;
+    return sigwxLowData ? [sigwxLowData] : [];
+  }, [sigwxLowData, sigwxLowHistoryData]);
+  const selectedSigwxEntry = sigwxHistoryEntries[Math.min(sigwxHistoryIndex, Math.max(0, sigwxHistoryEntries.length - 1))] || null;
 
   const center = useMemo(() => (
     isNationwide
@@ -595,6 +628,10 @@ export default function InteractiveMap({
   useEffect(() => {
     setCurrentZoom(mapZoom);
   }, [mapZoom]);
+
+  useEffect(() => {
+    setSigwxHistoryIndex((prev) => Math.min(prev, Math.max(0, sigwxHistoryEntries.length - 1)));
+  }, [sigwxHistoryEntries]);
 
   useEffect(() => {
     setRecenterKey((prev) => prev + 1);
@@ -702,14 +739,14 @@ export default function InteractiveMap({
   }, [aircraft, arp, isNationwide]);
 
   const sigwxLowItems = useMemo(() => (
-    (sigwxLowData?.items || [])
+    (selectedSigwxEntry?.items || [])
       .filter((item) => item?.lat_lngs?.length > 0)
       .map((item, index) => ({
         ...item,
         mapKey: `sigwx-low-${index}`,
         smoothedLatLngs: smoothSigwxLatLngs(item.lat_lngs, item.curve_tension, item.is_close),
       }))
-  ), [sigwxLowData]);
+  ), [selectedSigwxEntry]);
   const sigwxLowGroups = useMemo(() => buildSigwxGroups(sigwxLowItems), [sigwxLowItems]);
   const sigwxLowParentMap = useMemo(() => {
     const next = new Map();
@@ -1615,7 +1652,34 @@ export default function InteractiveMap({
                     +
                   </button>
                 </div>
-                {showLightning && (
+                {showSigwxLow && selectedSigwxEntry ? (
+                  <div className="sigwx-history-control" aria-label="SIGWX history control">
+                    <button
+                      type="button"
+                      className="radar-speed-step sigwx-history-step"
+                      onClick={() => setSigwxHistoryIndex((prev) => Math.min(prev + 1, sigwxHistoryEntries.length - 1))}
+                      disabled={sigwxHistoryIndex >= sigwxHistoryEntries.length - 1}
+                      aria-label="이전 SIGWX 보기"
+                      title="이전 SIGWX 보기"
+                    >
+                      ‹
+                    </button>
+                    <div className="sigwx-history-meta">
+                      <span>{`발표 : ${sigwxIssueLabel(selectedSigwxEntry.tmfc, tz)}`}</span>
+                      <span>{`유효 : ${sigwxValidLabel(selectedSigwxEntry.tmfc, tz)}`}</span>
+                    </div>
+                    <button
+                      type="button"
+                      className="radar-speed-step sigwx-history-step"
+                      onClick={() => setSigwxHistoryIndex((prev) => Math.max(prev - 1, 0))}
+                      disabled={sigwxHistoryIndex <= 0}
+                      aria-label="다음 SIGWX 보기"
+                      title="다음 SIGWX 보기"
+                    >
+                      ›
+                    </button>
+                  </div>
+                ) : showLightning && (
                   <span className="radar-lightning-summary">
                     {formatLightningSummary(summary, isNationwide)}
                   </span>

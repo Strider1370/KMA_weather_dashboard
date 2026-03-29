@@ -15,7 +15,7 @@ export async function fetchJsonOptional(url) {
 }
 
 export async function loadAllData() {
-  const [metar, taf, warning, airports, warningTypes, lightning, echoMeta, adsb, sigmet, airmet, sigwxLow, amos] = await Promise.all([
+  const [metar, taf, warning, airports, warningTypes, lightning, echoMeta, adsb, sigmet, airmet, sigwxLow, sigwxLowHistory, amos] = await Promise.all([
     fetchJson("/api/metar"),
     fetchJson("/api/taf"),
     fetchJson("/api/warning"),
@@ -27,9 +27,10 @@ export async function loadAllData() {
     fetchJsonOptional("/api/sigmet"),
     fetchJsonOptional("/api/airmet"),
     fetchJsonOptional("/api/sigwx-low"),
+    fetchJsonOptional("/api/sigwx-low-history"),
     fetchJsonOptional("/api/amos"),
   ]);
-  return { metar, taf, warning, airports, warningTypes, lightning, echoMeta, adsb, sigmet, airmet, sigwxLow, amos };
+  return { metar, taf, warning, airports, warningTypes, lightning, echoMeta, adsb, sigmet, airmet, sigwxLow, sigwxLowHistory, amos };
 }
 
 export async function loadAlertDefaults() {
@@ -58,7 +59,12 @@ export async function loadChangedData(changes) {
   if (changes.warning) { fetches.push(fetchJson("/api/warning")); keys.push("warning"); }
   if (changes.sigmet) { fetches.push(fetchJsonOptional("/api/sigmet")); keys.push("sigmet"); }
   if (changes.airmet) { fetches.push(fetchJsonOptional("/api/airmet")); keys.push("airmet"); }
-  if (changes.sigwxLow) { fetches.push(fetchJsonOptional("/api/sigwx-low")); keys.push("sigwxLow"); }
+  if (changes.sigwxLow) {
+    fetches.push(fetchJsonOptional("/api/sigwx-low"));
+    keys.push("sigwxLow");
+    fetches.push(fetchJsonOptional("/api/sigwx-low-history"));
+    keys.push("sigwxLowHistory");
+  }
   if (changes.amos) { fetches.push(fetchJsonOptional("/api/amos")); keys.push("amos"); }
   if (changes.lightning) { fetches.push(fetchJsonOptional("/api/lightning")); keys.push("lightning"); }
   if (changes.adsb) { fetches.push(fetchJsonOptional("/api/adsb")); keys.push("adsb"); }
