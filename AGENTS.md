@@ -58,6 +58,7 @@ Use repo root unless noted.
   - `node backend/test/run-once.js lightning`
   - `node backend/test/run-once.js radar-echo`
   - `node backend/test/run-once.js adsb`
+  - `node backend/test/run-once.js satellite`
 - Valid target values are enforced in `backend/test/run-once.js`.
 
 ### Lint / Format
@@ -143,6 +144,7 @@ Derived from `.editorconfig` + existing source files.
   - historical JSON files with prefixed timestamps.
 - Radar echo uses image/meta outputs in `backend/data/radar/`.
 - ADS-B latest aircraft state is stored at `backend/data/adsb/latest.json` and exposed at `/api/adsb`.
+- GK2A satellite imagery is stored at `backend/data/satellite/sat_meta.json` + `sat_korea_{tm}.png` and served via `/data/satellite/*`. NetCDF(HDF5) files are parsed with `h5wasm` and reprojected from LCC to Web Mercator PNG.
 
 ## Agent Workflow Guidance
 
@@ -172,11 +174,16 @@ Derived from `.editorconfig` + existing source files.
 - ADS-B uses OpenSky `states/all` with two-stage filtering: (1) bounding-box query (`lat 30–39, lon 124–134`, covering Incheon FIR extent) and (2) point-in-polygon check against `rkrr_fir.geojson` outer ring (ray casting) to exclude aircraft outside the FIR boundary. If the FIR file is unavailable, the bbox result is used as-is.
 - TLS fallback path exists for environments that surface `SELF_SIGNED_CERT_IN_CHAIN`.
 - AMOS `RN` should be treated as daily rainfall; current dashboard polling reads it through the separate `amos` dataset rather than embedding it in METAR hashes.
+- GK2A satellite uses KMA API (`typ05/api/GK2A/LE1B/{channel}/{region}/data`) plus LE2 FOG (`typ05/api/GK2A/LE2/{product}/{region}/data`) NetCDF4(HDF5) files. Default IR channel is `IR105`, FOG product is `FOG`, and region `KO` (Korea 900×900 @ 2km). The NC file uses the same LCC projection as radar echo (φ₁=30°, φ₂=60°, φ₀=38°, λ₀=126°) but with easting/northing coordinates.
+- Satellite API requests use UTC `tm`, but stored/displayed `sat_meta.json` `tm` and `sat_korea_{tm}.png` filenames are KST-aligned. Latest request UTC is also persisted as `request_tm_utc`.
+- Satellite IR background rendering now prefers a fixed brightness-temperature stretch (`190K..310K`) when the source values look like Kelvin, so warmer surfaces stay darker and colder cloud tops brighter across frames.
+- Satellite fog overlay colors are matched to the KMA legend (`0 Fog -> red/orange/yellow -> 6 Lower Cloud green`) using interpolated display stops.
 - `server.js` binds to `127.0.0.1`; expose externally via reverse proxy (nginx/LB), not direct app port.
 - If nginx serves `frontend/dist` directly, keep both `.geojson` (`application/geo+json`) and `.topojson` (`application/topo+json`) MIME handling correct and enable gzip/brotli for `.geojson`, `.topojson`, `.json`, `.js`, and `.css`.
 - InteractiveMap boundary detail is auto-switched by zoom (`zoom >= 9`: sigungu, `zoom < 9`: sido); there is no user setting toggle anymore.
 - InteractiveMap renders nationwide lightning strikes in both Airport/Korea modes; Airport mode zone counters (8/16/32km) must remain based on selected-airport strikes.
 - InteractiveMap `Traffic` layer is toggleable again and supports settings-driven callsign substring filtering plus altitude-band filtering (`baro_altitude` first, `geo_altitude` fallback, compare in feet after converting from meters). Altitude bands default to all 5 bands selected; an empty band selection hides all traffic (does not show all). Callsign filter empty = show all; any input = substring match only. Selections are persisted in `localStorage` keys `traffic_altitude_bands` and `traffic_callsign_filter`.
+- InteractiveMap satellite overlay shares the radar timeline when both layers are enabled, uses full opacity, and switches coastline/administrative boundary strokes to yellow while satellite is visible.
 - InteractiveMap `SIGWX_LOW` uses grouped rendering: contour items (`item_type 4`) are treated as primary regions, while label/icon items (`item_type 7/10/12`) are attached to the nearest matching region using contour/type context plus geometric matching.
 - Switching the selected airport clears all active alert popups and the marquee banner immediately.
 - LIFR (airport-minima-breach) thresholds are now user-configurable in Settings > `MINIMA`; thresholds are persisted in `localStorage` key `airport_minima_settings` and must be passed into METAR/TAF category + visibility/ceiling tint classification helpers.

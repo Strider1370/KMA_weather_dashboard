@@ -80,6 +80,8 @@ const BOUNDARY_LINE_DARK = {
   weight: 1.3,
   opacity: 0.98,
 };
+const SATELLITE_BOUNDARY_CASE_COLOR = "#fff59d";
+const SATELLITE_BOUNDARY_LINE_COLOR = "#fff200";
 
 const DEFAULT_CENTER = [36.5, 127.5];
 const DEFAULT_ZOOM = 10;
@@ -547,6 +549,7 @@ export default function InteractiveMap({
   airports,
   windDir = null,
   echoMeta = null,
+  satMeta = null,
   radarOpacity = 0.6,
   mapTheme = "dark",
   tz = "UTC",
@@ -558,6 +561,7 @@ export default function InteractiveMap({
   const [currentZoom, setCurrentZoom] = useState(NATIONWIDE_ZOOM);
   const [, forceRender] = useReducer((x) => x + 1, 0);
   const [showEcho, setShowEcho] = useState(true);
+  const [showSatellite, setShowSatellite] = useState(false);
   const [showLightning, setShowLightning] = useState(false);
   const [showSigwxLow, setShowSigwxLow] = useState(false);
   const [showSigmet, setShowSigmet] = useState(false);
@@ -883,7 +887,14 @@ export default function InteractiveMap({
         }
   ), [mapTheme]);
   const boundaryCaseStyle = useMemo(() => (
-    mapTheme === "light"
+    showSatellite
+      ? {
+          fill: false,
+          color: SATELLITE_BOUNDARY_CASE_COLOR,
+          weight: strokeProfile.caseWeight,
+          opacity: Math.min(1, strokeProfile.caseOpacity + 0.08),
+        }
+      : mapTheme === "light"
       ? {
           fill: false,
           color: "#ffffff",
@@ -895,9 +906,16 @@ export default function InteractiveMap({
           weight: strokeProfile.caseWeight,
           opacity: strokeProfile.caseOpacity,
         }
-  ), [mapTheme, strokeProfile]);
+  ), [mapTheme, showSatellite, strokeProfile]);
   const boundaryLineStyle = useMemo(() => (
-    mapTheme === "light"
+    showSatellite
+      ? {
+          fill: false,
+          color: SATELLITE_BOUNDARY_LINE_COLOR,
+          weight: strokeProfile.lineWeight,
+          opacity: Math.max(0.82, strokeProfile.lineOpacity),
+        }
+      : mapTheme === "light"
       ? {
           fill: false,
           color: "#111111",
@@ -909,9 +927,16 @@ export default function InteractiveMap({
           weight: strokeProfile.lineWeight,
           opacity: strokeProfile.lineOpacity,
         }
-  ), [mapTheme, strokeProfile]);
+  ), [mapTheme, showSatellite, strokeProfile]);
   const neighborBoundaryCaseStyle = useMemo(() => (
-    mapTheme === "light"
+    showSatellite
+      ? {
+          fill: false,
+          color: SATELLITE_BOUNDARY_CASE_COLOR,
+          weight: Math.max(1.5, strokeProfile.caseWeight - 0.4),
+          opacity: Math.max(0.78, strokeProfile.caseOpacity),
+        }
+      : mapTheme === "light"
       ? {
           fill: false,
           color: "#ffffff",
@@ -924,9 +949,16 @@ export default function InteractiveMap({
           weight: Math.max(1.5, strokeProfile.caseWeight - 0.4),
           opacity: Math.max(0.55, strokeProfile.caseOpacity - 0.06),
         }
-  ), [mapTheme, strokeProfile]);
+  ), [mapTheme, showSatellite, strokeProfile]);
   const neighborBoundaryLineStyle = useMemo(() => (
-    mapTheme === "light"
+    showSatellite
+      ? {
+          fill: false,
+          color: SATELLITE_BOUNDARY_LINE_COLOR,
+          weight: Math.max(0.65, strokeProfile.lineWeight - 0.15),
+          opacity: Math.max(0.78, strokeProfile.lineOpacity - 0.02),
+        }
+      : mapTheme === "light"
       ? {
           fill: false,
           color: "#111111",
@@ -938,10 +970,36 @@ export default function InteractiveMap({
           weight: Math.max(0.65, strokeProfile.lineWeight - 0.15),
           opacity: Math.max(0.55, strokeProfile.lineOpacity - 0.12),
         }
-  ), [mapTheme, neighborBoundaryStyle, strokeProfile]);
+  ), [mapTheme, neighborBoundaryStyle, showSatellite, strokeProfile]);
   const echoFrames = useMemo(() => echoMeta?.frames || [], [echoMeta]);
-  const currentFrame = echoFrames[frameIndex] || echoMeta?.nationwide || null;
-  const maxIndex = Math.max(echoFrames.length - 1, 0);
+  const satFrames = useMemo(() => satMeta?.frames || [], [satMeta]);
+
+  // Determine which frame source drives the timeline
+  const activeFrames = useMemo(() => {
+    if (showEcho && echoFrames.length > 0) return echoFrames;
+    if (showSatellite && satFrames.length > 0) return satFrames;
+    return echoFrames;
+  }, [showEcho, showSatellite, echoFrames, satFrames]);
+
+  const currentEchoFrame = echoFrames[frameIndex] || echoMeta?.nationwide || null;
+
+  // Map satellite frame from timeline: when echo drives timeline, find closest sat frame by tm
+  const currentSatFrame = useMemo(() => {
+    if (!satFrames.length) return satMeta?.latest || null;
+    // Satellite drives timeline directly
+    if (activeFrames === satFrames) return satFrames[frameIndex] || satFrames[satFrames.length - 1];
+    // Echo drives timeline — find closest satellite frame by timestamp
+    const activeTm = activeFrames[frameIndex]?.tm;
+    if (!activeTm) return satFrames[satFrames.length - 1];
+    let best = satFrames[0];
+    for (const sf of satFrames) {
+      if (sf.tm <= activeTm) best = sf;
+      else break;
+    }
+    return best;
+  }, [satFrames, satMeta, activeFrames, frameIndex]);
+
+  const maxIndex = Math.max(activeFrames.length - 1, 0);
   const progressRatio = maxIndex > 0 ? (frameIndex / maxIndex) : 0;
   const loopStartPct = maxIndex > 0 ? (loopStart / maxIndex) * 100 : 0;
   const loopEndPct = maxIndex > 0 ? (loopEnd / maxIndex) * 100 : 100;
@@ -949,14 +1007,14 @@ export default function InteractiveMap({
   const canIncrementSpeed = playbackMs < MAX_FRAME_MS;
   const loopActive = loopStart !== 0 || loopEnd !== maxIndex;
 
-  // Clamp loop bounds when echoFrames change
+  // Clamp loop bounds when active frames change
   useEffect(() => {
     setLoopStart(0);
     setLoopEnd(maxIndex);
   }, [maxIndex]);
 
   useEffect(() => {
-    if (!echoFrames.length) {
+    if (!activeFrames.length) {
       setFrameIndex(0);
       return;
     }
@@ -970,11 +1028,11 @@ export default function InteractiveMap({
       return;
     }
 
-    setFrameIndex(echoFrames.length - 1);
-  }, [echoFrames, isPlaying]);
+    setFrameIndex(activeFrames.length - 1);
+  }, [activeFrames, isPlaying]);
 
   useEffect(() => {
-    if (!isPlaying || echoFrames.length <= 1) return undefined;
+    if (!isPlaying || activeFrames.length <= 1) return undefined;
     const effectiveStart = loopActive ? loopStart : 0;
     const effectiveEnd = loopActive ? loopEnd : maxIndex;
     const timer = setInterval(() => {
@@ -985,7 +1043,7 @@ export default function InteractiveMap({
       });
     }, playbackMs);
     return () => clearInterval(timer);
-  }, [echoFrames.length, isPlaying, playbackMs, loopStart, loopEnd, loopActive, maxIndex]);
+  }, [activeFrames.length, isPlaying, playbackMs, loopStart, loopEnd, loopActive, maxIndex]);
 
   const resolveLoopIndex = useCallback((clientX) => {
     const track = loopTrackRef.current;
@@ -1060,17 +1118,29 @@ export default function InteractiveMap({
   }
 
   const echoInfo = useMemo(() => {
-    if (!currentFrame?.path || !currentFrame?.bounds) return null;
-    const isVersionedFrame = /echo_korea_\d{12}\.png$/.test(currentFrame.path);
+    if (!currentEchoFrame?.path || !currentEchoFrame?.bounds) return null;
+    const isVersionedFrame = /echo_korea_\d{12}\.png$/.test(currentEchoFrame.path);
     return {
       url: isVersionedFrame
-        ? currentFrame.path
-        : currentFrame.path + "?t=" + (currentFrame.tm || echoMeta?.tm || Date.now()),
-      bounds: currentFrame.bounds,
-      echoCount: currentFrame.echoCount || 0,
-      tm: currentFrame.tm || echoMeta?.tm || null,
+        ? currentEchoFrame.path
+        : currentEchoFrame.path + "?t=" + (currentEchoFrame.tm || echoMeta?.tm || Date.now()),
+      bounds: currentEchoFrame.bounds,
+      echoCount: currentEchoFrame.echoCount || 0,
+      tm: currentEchoFrame.tm || echoMeta?.tm || null,
     };
-  }, [currentFrame, echoMeta]);
+  }, [currentEchoFrame, echoMeta]);
+
+  const satInfo = useMemo(() => {
+    if (!currentSatFrame?.path || !currentSatFrame?.bounds) return null;
+    const isVersioned = /sat_korea_\d{12}\.png$/.test(currentSatFrame.path);
+    return {
+      url: isVersioned
+        ? currentSatFrame.path
+        : currentSatFrame.path + "?t=" + (currentSatFrame.tm || satMeta?.tm || Date.now()),
+      bounds: currentSatFrame.bounds,
+      tm: currentSatFrame.tm || satMeta?.tm || null,
+    };
+  }, [currentSatFrame, satMeta]);
 
   const radarCoverageBoundary = useMemo(() => {
     if (!RADAR_SITES.length) return null;
@@ -1150,6 +1220,15 @@ export default function InteractiveMap({
             disabled={!echoInfo}
             >
               강수에코
+            </button>
+            <button
+              type="button"
+              className={`range-btn satellite-toggle ${showSatellite ? "active" : ""}`}
+              onClick={() => setShowSatellite((v) => !v)}
+              title={satInfo ? `안개영상 (${satInfo.tm || ""})` : "안개영상을 사용할 수 없습니다"}
+              disabled={!satInfo}
+            >
+              안개
             </button>
           <button
             type="button"
@@ -1285,7 +1364,7 @@ export default function InteractiveMap({
               />
               <ZoomBoundaryController onBoundaryChange={handleBoundaryChange} />
 
-            {!showEcho && (
+            {!showEcho && !showSatellite && (
               <Pane name="boundary-fill-pane" style={{ zIndex: 350 }}>
                 {geoData && (
                   <GeoJSON
@@ -1294,6 +1373,16 @@ export default function InteractiveMap({
                     style={() => boundaryStyle}
                   />
                 )}
+              </Pane>
+            )}
+
+            {showSatellite && satInfo && (
+              <Pane name="satellite-pane" style={{ zIndex: 390 }}>
+                <ImageOverlay
+                  url={satInfo.url}
+                  bounds={satInfo.bounds}
+                  opacity={1}
+                />
               </Pane>
             )}
 
@@ -1690,7 +1779,7 @@ export default function InteractiveMap({
                   type="button"
                   className="radar-icon-btn radar-icon-inline"
                   onClick={() => setIsPlaying((prev) => !prev)}
-                  disabled={echoFrames.length <= 1}
+                  disabled={activeFrames.length <= 1}
                   aria-label={isPlaying ? "재생 일시정지" : "재생"}
                   title={isPlaying ? "일시정지" : "재생"}
                 >
@@ -1705,12 +1794,12 @@ export default function InteractiveMap({
                     step={1}
                     value={Math.min(frameIndex, maxIndex)}
                     onChange={(event) => setFrameIndex(Number(event.target.value))}
-                    disabled={echoFrames.length === 0}
+                    disabled={activeFrames.length === 0}
                     style={loopActive ? {
                       "--loop-start-pct": `${loopStartPct}%`,
                       "--loop-end-pct": `${loopEndPct}%`,
                     } : undefined}
-                    aria-label="레이더 타임라인"
+                    aria-label="타임라인"
                   />
                   {maxIndex > 1 && (
                     <div className="radar-loop-overlay" aria-hidden="true">
@@ -1718,7 +1807,7 @@ export default function InteractiveMap({
                         className={`radar-loop-handle radar-loop-handle--start${loopActive ? " active" : ""}`}
                         style={{ left: `${loopStartPct}%` }}
                         onPointerDown={(e) => handleLoopPointerDown("start", e)}
-                        title={`반복 시작: ${formatTmLabel(echoFrames[loopStart]?.tm)}`}
+                        title={`반복 시작: ${formatTmLabel(activeFrames[loopStart]?.tm)}`}
                       >
                         ▼
                       </div>
@@ -1726,7 +1815,7 @@ export default function InteractiveMap({
                         className={`radar-loop-handle radar-loop-handle--end${loopActive ? " active" : ""}`}
                         style={{ left: `${loopEndPct}%` }}
                         onPointerDown={(e) => handleLoopPointerDown("end", e)}
-                        title={`반복 종료: ${formatTmLabel(echoFrames[loopEnd]?.tm)}`}
+                        title={`반복 종료: ${formatTmLabel(activeFrames[loopEnd]?.tm)}`}
                       >
                         ▼
                       </div>
@@ -1738,7 +1827,7 @@ export default function InteractiveMap({
                     className="radar-current-time"
                     style={{ "--radar-progress": progressRatio }}
                   >
-                    {echoFrames.length > 0 ? formatTmLabel(currentFrame?.tm) : ""}
+                    {activeFrames.length > 0 ? formatTmLabel(activeFrames[frameIndex]?.tm || currentSatFrame?.tm) : ""}
                   </span>
                 </div>
               </div>

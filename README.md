@@ -2,7 +2,7 @@
 
 KMA 항공기상 수집기 + 대시보드 프로젝트입니다.
 
-이 프로젝트는 KMA 항공/기상 피드(METAR, TAF, AMOS 강수, 특보, 낙뢰, 레이더, 레이더 에코, 저고도 중요기상예보 SIGWX_LOW)와 OpenSky ADS-B 항공기 위치를 주기적으로 수집하고, 정규화된 결과를 `backend/data/`에 저장한 뒤 React 대시보드로 제공합니다.
+이 프로젝트는 KMA 항공/기상 피드(METAR, TAF, AMOS 강수, 특보, 낙뢰, 레이더, 레이더 에코, 저고도 중요기상예보 SIGWX_LOW, GK2A 안개 위성영상)와 OpenSky ADS-B 항공기 위치를 주기적으로 수집하고, 정규화된 결과를 `backend/data/`에 저장한 뒤 React 대시보드로 제공합니다.
 
 ## 프로젝트가 하는 일
 
@@ -12,6 +12,7 @@ KMA 항공기상 수집기 + 대시보드 프로젝트입니다.
 - 단일 Node 서버에서 API와 정적 데이터를 함께 제공합니다.
 - METAR/TAF/특보/낙뢰/레이더 에코/SIGWX_LOW를 단일 인터랙티브 지도 패널과 함께 렌더링합니다.
 - ADS-B `Traffic` 레이어로 한국 주변 상공 항공기 현재 위치를 지도에 표시합니다.
+- GK2A `안개` 레이어로 IR105 배경 + FOG 산출물을 합성한 위성영상을 지도에 표시합니다.
 - `/test` 경로에서는 `TST1` 테스트 공항을 선택할 수 있고, 메인 `/`에서는 `TST1`을 숨깁니다.
 
 ## 기술 스택
@@ -38,7 +39,9 @@ KMA APIs
   ├─ typ01/url/lgt_pnt.php (낙뢰)
   ├─ typ01/url/amo_sigwx.php (저고도 SIGWX)
   ├─ typ04/url/rdr_cmp_file.php (레이더 바이너리 / 에코 생성용)
-  └─ typ01/url/amos.php (AMOS 일강수량)
+  ├─ typ01/url/amos.php (AMOS 일강수량)
+  ├─ typ05/api/GK2A/LE1B/{channel}/{region}/data (IR105 위성영상)
+  └─ typ05/api/GK2A/LE2/{product}/{region}/data (FOG 안개 산출물)
 
 OpenSky Network
   └─ states/all (ADS-B 현재 항공기 위치)
@@ -74,7 +77,8 @@ frontend/src (React 대시보드)
 │   │   ├── warning/
 │   │   ├── lightning/
 │   │   ├── adsb/
-│   │   └── radar/                    # 레이더 이미지 + echo png/meta
+│   │   ├── radar/                    # 레이더 이미지 + echo png/meta
+│   │   └── satellite/                # GK2A 위성 png/meta
 │   ├── src/
 │   │   ├── processors/
 │   │   │   ├── metar-processor.js
@@ -135,6 +139,7 @@ frontend/src (React 대시보드)
 - 레이더 이미지/에코 에셋은 `backend/data/radar/`에 저장되며 `/data/radar/*`로 제공됩니다.
 - ADS-B 현재 위치 스냅샷은 `backend/data/adsb/latest.json`에 저장되며 `/api/adsb`로 제공됩니다.
 - SIGWX_LOW 스냅샷은 `backend/data/sigwx_low/latest.json`에 저장되며 `/api/sigwx-low`로 제공됩니다.
+- GK2A 위성 스냅샷은 `backend/data/satellite/sat_meta.json`과 `sat_korea_<tm>.png`에 저장되며 `/data/satellite/*`로 제공됩니다. API 호출용 `tm`은 UTC, 저장/표시용 `tm`은 KST입니다.
 - 지도 경계는 `frontend/public/geo/korea_boundaries.v1.topojson`(시도/시군구 통합)과 `frontend/public/geo/korea_neighbors_masked.v1.geojson`을 사용합니다.
 
 예시:
@@ -148,6 +153,8 @@ frontend/src (React 대시보드)
 - `backend/data/sigwx_low/latest.json`
 - `backend/data/radar/echo_meta.json`
 - `backend/data/radar/echo_korea_<tm>.png`
+- `backend/data/satellite/sat_meta.json`
+- `backend/data/satellite/sat_korea_<tm>.png`
 - `frontend/public/geo/korea_boundaries.v1.topojson`
 
 ## API 표면
@@ -192,6 +199,8 @@ API_AUTH_KEY=your_kma_key
 # AMOS_API_URL=https://apihub.kma.go.kr/api/typ01/url/amos.php
 # RADAR_API_URL=https://apihub.kma.go.kr/api/typ04/url/rdr_cmp_file.php
 # RADAR_CMP_TYPE=hsr
+# SATELLITE_API_URL=https://apihub.kma.go.kr/api/typ05/api/GK2A/LE1B
+# SATELLITE_FOG_API_URL=https://apihub.kma.go.kr/api/typ05/api/GK2A/LE2
 # ADSB_API_URL=https://opensky-network.org/api/states/all
 # ADSB_LAMIN=33
 # ADSB_LAMAX=39
@@ -270,6 +279,7 @@ node backend/test/run-once.js sigwx-low
 node backend/test/run-once.js lightning
 node backend/test/run-once.js radar-echo
 node backend/test/run-once.js adsb
+node backend/test/run-once.js satellite
 ```
 
 TLS 인증서 체인 문제로 외부 API 호출이 실패하는 환경에서는 임시로 다음처럼 실행할 수 있습니다.
@@ -292,8 +302,11 @@ $env:NODE_TLS_REJECT_UNAUTHORIZED="0"; node backend/test/run-once.js adsb
 - 경계 데이터(`.v1.topojson`/`.v1.geojson`)는 브라우저 HTTP 캐시 + 프론트 메모리 캐시를 함께 사용해 전환 시 재요청을 최소화합니다.
 - 레이더 루프는 첫 진입 시 최신 프레임에서 일시정지 상태로 시작합니다.
 - 전국 레이더 에코는 `HSR` 바이너리를 사용하며, 반사도(`dBZ`)를 강수강도(`mm/h`)로 치환한 뒤 전체 레이더 도메인 기준으로 재투영한 PNG를 오버레이합니다.
+- GK2A `안개` 레이어는 IR105 LE1B와 FOG LE2를 합성해 생성합니다. IR 배경은 고정 brightness-temperature stretch(`190K..310K`)를 우선 사용하고, 안개 오버레이 색은 KMA 범례(`0 Fog -> 6 Lower Cloud`)에 맞춰 보간합니다.
 - Korea 모드에서는 레이더 사이트 반경 메타데이터를 union한 커버리지 경계를 점선으로 표시하고, 해당 경계 바깥 영역만 약하게 어둡게 표시합니다.
 - 레이더 오버레이의 `0.1 mm/h` 미만 영역은 투명 처리되어 다크 모드에서 밝은 테두리가 보이지 않도록 조정되어 있습니다.
+- 위성 레이어가 켜져 있을 때는 해안선/행정경계선이 노란색으로 바뀌고, 투명도 없이(`opacity=1`) 표시됩니다.
+- 레이더 에코와 위성 레이어를 둘 다 켜면 공통 타임라인을 사용하며, 에코를 껐다 켜도 버튼이 비활성화되지 않도록 분리된 프레임 상태를 사용합니다.
 - `Traffic` 레이어는 기본적으로 꺼져 있습니다.
 - `SIGWX_LOW`는 지도 우상단 토글로 켜고 끌 수 있으며, 전국 모드에서는 인천 FIR 경계와 함께 표시됩니다.
 - `SIGWX_LOW` 아이템은 영역(`item_type 4`)과 배지/텍스트(`item_type 7/10/12`)를 그룹화해 같은 현상으로 취급합니다.
