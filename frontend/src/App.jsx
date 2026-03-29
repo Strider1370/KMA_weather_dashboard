@@ -122,7 +122,7 @@ export default function App() {
   const prevDataRef = useRef(null);
   const pollingRef = useRef(null);
   const pollingInFlightRef = useRef(false);
-  const snapshotHashRef = useRef({ metar: null, taf: null, warning: null, sigmet: null, airmet: null, amos: null, lightning: null, adsb: null, echo: null });
+  const snapshotHashRef = useRef({ metar: null, taf: null, warning: null, sigmet: null, airmet: null, sigwxLow: null, amos: null, lightning: null, adsb: null, echo: null });
 
   // 디스패처 콜백 등록
   useEffect(() => {
@@ -163,6 +163,7 @@ export default function App() {
         warning: result.warning?.content_hash || null,
         sigmet: result.sigmet?.content_hash || null,
         airmet: result.airmet?.content_hash || null,
+        sigwxLow: result.sigwxLow?.content_hash || null,
         amos: result.amos?.content_hash || null,
         lightning: result.lightning?.content_hash || null,
         adsb: result.adsb?.content_hash || null,
@@ -194,6 +195,7 @@ export default function App() {
         warning: snapshot.warning?.hash == null || snapshot.warning.hash !== saved.warning,
         sigmet: snapshot.sigmet?.hash == null || snapshot.sigmet.hash !== saved.sigmet,
         airmet: snapshot.airmet?.hash == null || snapshot.airmet.hash !== saved.airmet,
+        sigwxLow: snapshot.sigwx_low?.hash == null || snapshot.sigwx_low.hash !== saved.sigwxLow,
         amos: snapshot.amos?.hash == null || snapshot.amos.hash !== saved.amos,
         lightning: snapshot.lightning?.hash == null || snapshot.lightning.hash !== saved.lightning,
         adsb: snapshot.adsb?.hash == null || snapshot.adsb.hash !== saved.adsb,
@@ -222,6 +224,9 @@ export default function App() {
         airmet: changes.airmet && changedData.airmet?.content_hash != null
           ? changedData.airmet.content_hash
           : (snapshot.airmet?.hash ?? saved.airmet),
+        sigwxLow: changes.sigwxLow && changedData.sigwxLow?.content_hash != null
+          ? changedData.sigwxLow.content_hash
+          : (snapshot.sigwx_low?.hash ?? saved.sigwxLow),
         amos: changes.amos && changedData.amos?.content_hash != null
           ? changedData.amos.content_hash
           : (snapshot.amos?.hash ?? saved.amos),
@@ -461,6 +466,7 @@ export default function App() {
             <div className="map-panel-title">기상 레이더</div>
             <InteractiveMap
               lightningData={data.lightning}
+              sigwxLowData={data.sigwxLow}
               sigmetData={data.sigmet}
               airmetData={data.airmet}
               adsbData={data.adsb}

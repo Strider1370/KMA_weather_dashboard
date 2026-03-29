@@ -309,6 +309,10 @@ const server = http.createServer(async (req, res) => {
       return sendJson(req, res, 200, readLatest("airmet"));
     }
 
+    if (req.url === "/api/sigwx-low") {
+      return sendJson(req, res, 200, readLatest("sigwx_low"));
+    }
+
     if (req.url === "/api/amos") {
       return sendJson(req, res, 200, mergeTst1(readLatest("amos"), "amos"));
     }
@@ -353,6 +357,7 @@ const server = http.createServer(async (req, res) => {
         warning: { hash: readSnapshotHash("warning") },
         sigmet: { hash: readSnapshotHash("sigmet") },
         airmet: { hash: readSnapshotHash("airmet") },
+        sigwx_low: { hash: readSnapshotHash("sigwx_low") },
         amos: { hash: readSnapshotHash("amos") },
         lightning: { hash: readSnapshotHash("lightning") },
         adsb: { hash: readSnapshotHash("adsb") },

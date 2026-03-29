@@ -23,6 +23,7 @@ module.exports = {
     base_url: process.env.API_BASE_URL || "https://apihub.kma.go.kr/api/typ02/openApi",
     lightning_url: process.env.LIGHTNING_API_URL || "https://apihub.kma.go.kr/api/typ01/url/lgt_pnt.php",
     amos_url: process.env.AMOS_API_URL || "https://apihub.kma.go.kr/api/typ01/url/amos.php",
+    sigwx_low_url: process.env.SIGWX_LOW_API_URL || "https://apihub.kma.go.kr/api/typ01/url/amo_sigwx.php",
     radar_url: process.env.RADAR_API_URL || "https://apihub.kma.go.kr/api/typ04/url/rdr_cmp_file.php",
     endpoints: {
       metar: "/AmmIwxxmService/getMetar",
@@ -81,6 +82,7 @@ module.exports = {
     warning_interval: "*/5 * * * *",
     sigmet_interval: "*/5 * * * *",
     airmet_interval: "*/5 * * * *",
+    sigwx_low_interval: "5 5,11,17,23 * * *",
     amos_interval: "*/10 * * * *",
     lightning_interval: "*/5 * * * *",
     radar_echo_interval: "*/5 * * * *",

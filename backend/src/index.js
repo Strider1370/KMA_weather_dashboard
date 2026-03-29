@@ -7,12 +7,13 @@ const tafProcessor = require("./processors/taf-processor");
 const warningProcessor = require("./processors/warning-processor");
 const sigmetProcessor = require("./processors/sigmet-processor");
 const airmetProcessor = require("./processors/airmet-processor");
+const sigwxLowProcessor = require("./processors/sigwx-low-processor");
 const amosProcessor = require("./processors/amos-processor");
 const lightningProcessor = require("./processors/lightning-processor");
 const radarEchoProcessor = require("./processors/radar-echo-processor");
 const adsbProcessor = require("./processors/adsb-processor");
 
-const locks = { metar: false, taf: false, warning: false, sigmet: false, airmet: false, amos: false, lightning: false, radar_echo: false, adsb: false };
+const locks = { metar: false, taf: false, warning: false, sigmet: false, airmet: false, sigwx_low: false, amos: false, lightning: false, radar_echo: false, adsb: false };
 
 async function runWithLock(type, job) {
   if (locks[type]) {
@@ -45,6 +46,7 @@ async function main() {
   cron.schedule(config.schedule.warning_interval, () => runWithLock("warning", warningProcessor.process));
   cron.schedule(config.schedule.sigmet_interval, () => runWithLock("sigmet", sigmetProcessor.process));
   cron.schedule(config.schedule.airmet_interval, () => runWithLock("airmet", airmetProcessor.process));
+  cron.schedule(config.schedule.sigwx_low_interval, () => runWithLock("sigwx_low", sigwxLowProcessor.process));
   cron.schedule(config.schedule.amos_interval, () => runWithLock("amos", amosProcessor.process));
   cron.schedule(config.schedule.lightning_interval, () => runWithLock("lightning", lightningProcessor.process));
   cron.schedule(config.schedule.radar_echo_interval, () => runWithLock("radar_echo", radarEchoProcessor.process));
@@ -58,6 +60,7 @@ async function main() {
     runWithLock("warning", warningProcessor.process),
     runWithLock("sigmet", sigmetProcessor.process),
     runWithLock("airmet", airmetProcessor.process),
+    runWithLock("sigwx_low", sigwxLowProcessor.process),
     runWithLock("amos", amosProcessor.process),
     runWithLock("lightning", lightningProcessor.process),
     runWithLock("radar_echo", radarEchoProcessor.process),

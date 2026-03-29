@@ -1,5 +1,5 @@
-import { useState, useEffect, useMemo, useRef, useCallback, useReducer } from "react";
-import { MapContainer, GeoJSON, CircleMarker, Circle, Marker, Pane, ImageOverlay, Polygon, Tooltip, useMap } from "react-leaflet";
+﻿import { useState, useEffect, useMemo, useRef, useCallback, useReducer } from "react";
+import { MapContainer, GeoJSON, CircleMarker, Circle, Marker, Pane, ImageOverlay, Polygon, Polyline, Tooltip, useMap } from "react-leaflet";
 import L from "leaflet";
 import { feature as topoFeature } from "topojson-client";
 import {
@@ -12,6 +12,18 @@ import {
   union as turfUnion,
 } from "@turf/turf";
 import { formatDateTimeRange } from "../utils/helpers";
+import {
+  sigwxCenter,
+  sigwxLabel,
+  sigwxNeedsLabelMarker,
+  sigwxNeedsPath,
+  buildSigwxGroups,
+  sigwxAltitudeLabel,
+  sigwxAltitudeParts,
+  sigwxPhenomenonLabel,
+  sigwxStyle,
+  smoothSigwxLatLngs,
+} from "../utils/sigwx";
 import "leaflet/dist/leaflet.css";
 
 const ZONE_RADII = [
@@ -76,17 +88,17 @@ const NATIONWIDE_ZOOM = 6;
 const BOUNDARY_ZOOM_THRESHOLD = 9;
 
 const RADAR_SITES = [
-  { name: "백령도", coords: [124.629309, 37.966937], radiusKm: 240 },
-  { name: "광덕산", coords: [127.433582, 38.117112], radiusKm: 240 },
-  { name: "강릉", coords: [128.865815, 37.817706], radiusKm: 280 },
-  { name: "관악산", coords: [126.945743, 37.455594], radiusKm: 240 },
-  { name: "오성산", coords: [126.784179, 36.013268], radiusKm: 240 },
-  { name: "면봉산", coords: [128.997306, 36.179395], radiusKm: 285 },
-  { name: "진도", coords: [126.323801, 34.47255], radiusKm: 240 },
-  { name: "구덕산", coords: [128.999739, 35.118713], radiusKm: 240 },
-  { name: "성산", coords: [126.880259, 33.386949], radiusKm: 240 },
-  { name: "고산", coords: [126.162982, 33.294199], radiusKm: 240 },
-  { name: "영종도(인천공항)", coords: [126.363055, 37.465224], radiusKm: 120 },
+  { name: "Baengnyeongdo", coords: [124.629309, 37.966937], radiusKm: 240 },
+  { name: "Gwandeksan", coords: [127.433582, 38.117112], radiusKm: 240 },
+  { name: "Gangneung", coords: [128.865815, 37.817706], radiusKm: 280 },
+  { name: "Gwanaksan", coords: [126.945743, 37.455594], radiusKm: 240 },
+  { name: "Seosan", coords: [126.784179, 36.013268], radiusKm: 240 },
+  { name: "Myeonbongsan", coords: [128.997306, 36.179395], radiusKm: 285 },
+  { name: "Jindo", coords: [126.323801, 34.47255], radiusKm: 240 },
+  { name: "Gudeoksan", coords: [128.999739, 35.118713], radiusKm: 240 },
+  { name: "Seongsan", coords: [126.880259, 33.386949], radiusKm: 240 },
+  { name: "Gosan", coords: [126.162982, 33.294199], radiusKm: 240 },
+  { name: "Yeongjongdo", coords: [126.363055, 37.465224], radiusKm: 120 },
 ];
 
 const WORLD_OUTER_RING = [
@@ -97,7 +109,7 @@ const WORLD_OUTER_RING = [
   [85, -180],
 ];
 
-// ── Module-level boundary cache (survives re-renders, zero re-fetch) ──
+// ?? Module-level boundary cache (survives re-renders, zero re-fetch) ??
 const _boundaryCache = {
   topology: null,       // raw TopoJSON object
   sido: null,           // topoFeature result for sido
@@ -282,20 +294,20 @@ function formatTmLabel(tm) {
 }
 
 function formatLightningSummary(summary, isNationwide) {
-  if (summary.total === 0) return "No recent strikes";
+  if (summary.total === 0) return "최근 낙뢰 없음";
   if (!isNationwide && summary.nearest != null) {
-    return `${summary.total} recent strikes · nearest ${summary.nearest.toFixed(1)} km`;
+    return `최근 낙뢰 ${summary.total}회 · 최근접 ${summary.nearest.toFixed(1)}km`;
   }
-  return `${summary.total} recent strikes`;
+  return `최근 낙뢰 ${summary.total}회`;
 }
 
 function advisoryPhenomenonIcon(code) {
   if (!code) return "!";
-  if (code.includes("ICE")) return "❄";
-  if (code.includes("TURB") || code.includes("MTW") || code.includes("LLWS")) return "≋";
-  if (code.includes("TS") || code.includes("CB")) return "⚡";
-  if (code.includes("VA")) return "▲";
-  if (code.includes("IFR") || code.includes("OBSC")) return "◌";
+  if (code.includes("ICE")) return "ICE";
+  if (code.includes("TURB") || code.includes("MTW") || code.includes("LLWS")) return "TURB";
+  if (code.includes("TS") || code.includes("CB")) return "TS";
+  if (code.includes("VA")) return "ASH";
+  if (code.includes("IFR") || code.includes("OBSC")) return "VIS";
   return "!";
 }
 
@@ -347,7 +359,7 @@ function advisoryLabel(item) {
 function advisoryAltitudeLabel(item) {
   const lower = item?.altitude?.lower_fl;
   const upper = item?.altitude?.upper_fl;
-  if (lower == null && upper == null) return "고도 미상";
+  if (lower == null && upper == null) return "怨좊룄 誘몄긽";
   if (lower != null && upper != null) return `FL${String(lower).padStart(3, "0")} - FL${String(upper).padStart(3, "0")}`;
   if (lower != null) return `ABV FL${String(lower).padStart(3, "0")}`;
   return `BLW FL${String(upper).padStart(3, "0")}`;
@@ -357,7 +369,7 @@ function advisoryShowsAltitude(item) {
   const code = String(item?.phenomenon_code || "").toUpperCase();
   const label = String(item?.phenomenon_label || "").toUpperCase();
   if (code.includes("SFC_VIS") || code.includes("VIS")) return false;
-  if (label.includes("SURFACE VIS") || label.includes("SFC VIS") || label.includes("지상 시정")) return false;
+  if (label.includes("SURFACE VIS") || label.includes("SFC VIS") || label.includes("吏???쒖젙")) return false;
   return true;
 }
 
@@ -377,7 +389,7 @@ function advisoryStatusLabel(item) {
   const bits = [];
   if (item?.time_indicator) bits.push(item.time_indicator === "OBSERVATION" ? "Observed" : "Forecast");
   if (item?.intensity_change) bits.push(item.intensity_change.replaceAll("_", " "));
-  return bits.join(" · ") || "Active";
+  return bits.join(" 쨌 ") || "Active";
 }
 
 function geometryToLeafletPositions(geometry) {
@@ -457,8 +469,50 @@ function createAdvisoryIcon(item, kind) {
   });
 }
 
+function escapeHtml(value) {
+  return String(value || "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+function createSigwxBadgeIcon(item) {
+  const label = sigwxPhenomenonLabel(item);
+  const altitude = sigwxAltitudeLabel(item);
+  const altitudeParts = sigwxAltitudeParts(item);
+  const altitudeHtml = altitudeParts
+    ? `<span class="leaflet-advisory-icon-alt-stack"><span>${escapeHtml(altitudeParts.upper)}</span><span class="leaflet-advisory-icon-alt-divider"></span><span>${escapeHtml(altitudeParts.lower)}</span></span>`
+    : altitude && altitude !== "-"
+      ? `<span class="leaflet-advisory-icon-alt-single">${escapeHtml(altitude)}</span>`
+      : "";
+  const maxLineLength = Math.max(label.length, altitudeParts ? Math.max(altitudeParts.upper.length, altitudeParts.lower.length) : String(altitude || "").length);
+  const width = Math.max(72, Math.min(118, 20 + (maxLineLength * 7)));
+  const height = altitudeHtml ? 42 : 24;
+  return L.divIcon({
+    className: "leaflet-advisory-icon leaflet-advisory-icon--sigwx",
+    html: `<span class="leaflet-advisory-icon-badge leaflet-advisory-icon-badge--sigwx" data-icon-name="${escapeHtml(item.icon_name || "")}"><span class="leaflet-advisory-icon-label">${escapeHtml(label)}</span>${altitudeHtml}</span>`,
+    iconSize: [width, height],
+    iconAnchor: [Math.round(width / 2), Math.round(height / 2)],
+  });
+}
+
+function renderSigwxAltitude(item) {
+  const parts = sigwxAltitudeParts(item);
+  if (!parts) return <div>{sigwxAltitudeLabel(item)}</div>;
+  return (
+    <div className="sigwx-altitude-stack">
+      <span>{parts.upper}</span>
+      <span className="sigwx-altitude-stack__divider" aria-hidden="true" />
+      <span>{parts.lower}</span>
+    </div>
+  );
+}
+
 export default function InteractiveMap({
   lightningData,
+  sigwxLowData = null,
   sigmetData = null,
   airmetData = null,
   adsbData = null,
@@ -478,12 +532,13 @@ export default function InteractiveMap({
   const [, forceRender] = useReducer((x) => x + 1, 0);
   const [showEcho, setShowEcho] = useState(true);
   const [showLightning, setShowLightning] = useState(true);
+  const [showSigwxLow, setShowSigwxLow] = useState(false);
   const [showSigmet, setShowSigmet] = useState(false);
   const [showAirmet, setShowAirmet] = useState(false);
   const [showTraffic, setShowTraffic] = useState(false);
   const [hoveredAdvisoryId, setHoveredAdvisoryId] = useState(null);
   const [openAdvisoryPanel, setOpenAdvisoryPanel] = useState(null);
-  const [hiddenAdvisoryKeys, setHiddenAdvisoryKeys] = useState({ sigmet: [], airmet: [] });
+  const [hiddenAdvisoryKeys, setHiddenAdvisoryKeys] = useState({ sigwxLow: [], sigmet: [], airmet: [] });
   const [frameIndex, setFrameIndex] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
   const [playbackMs, setPlaybackMs] = useState(DEFAULT_FRAME_MS);
@@ -502,7 +557,8 @@ export default function InteractiveMap({
     loadFirDraft().then(() => forceRender());
   }, []);
 
-  // Derive geoData directly from cache — no async, no stale closures
+
+  // Derive geoData directly from cache ??no async, no stale closures
   const geoData = _boundaryCache[boundaryLevel] || null;
   const neighborGeoData = _boundaryCache.neighbors || null;
   const firDraftGeoData = _boundaryCache.firDraft || null;
@@ -577,13 +633,13 @@ export default function InteractiveMap({
       : "0 0 6px rgba(31,122,224,0.95)";
     return L.divIcon({
       className: "leaflet-airport-icon",
-      html: `<span style="display:inline-block;transform:rotate(${rotation}deg);font-size:20px;line-height:1;color:${iconColor};text-shadow:${iconShadow}">✈</span>`,
+      html: `<span style="display:inline-block;transform:rotate(${rotation}deg);font-size:20px;line-height:1;color:${iconColor};text-shadow:${iconShadow}">&#9992;</span>`,
       iconSize: [24, 24],
       iconAnchor: [12, 12],
     });
   }, [effectiveHdg, mapTheme]);
 
-  // All strikes for map rendering — always nationwide regardless of mode
+  // All strikes for map rendering ??always nationwide regardless of mode
   const visibleStrikes = useMemo(() => {
     const cutoff = Date.now() - timeRangeMin * 60 * 1000;
     const nationwideStrikes = lightningData?.nationwide?.strikes;
@@ -645,6 +701,29 @@ export default function InteractiveMap({
     ) <= AIRCRAFT_AIRPORT_RANGE_KM);
   }, [aircraft, arp, isNationwide]);
 
+  const sigwxLowItems = useMemo(() => (
+    (sigwxLowData?.items || [])
+      .filter((item) => item?.lat_lngs?.length > 0)
+      .map((item, index) => ({
+        ...item,
+        mapKey: `sigwx-low-${index}`,
+        smoothedLatLngs: smoothSigwxLatLngs(item.lat_lngs, item.curve_tension, item.is_close),
+      }))
+  ), [sigwxLowData]);
+  const sigwxLowGroups = useMemo(() => buildSigwxGroups(sigwxLowItems), [sigwxLowItems]);
+  const sigwxLowParentMap = useMemo(() => {
+    const next = new Map();
+    for (const group of sigwxLowGroups) {
+      next.set(group.mapKey, group.mapKey);
+      for (const child of group.childItems || []) {
+        next.set(child.mapKey, group.mapKey);
+      }
+    }
+    return next;
+  }, [sigwxLowGroups]);
+  const resolveSigwxHoverKey = useCallback((item) => (
+    sigwxLowParentMap.get(item?.mapKey) || item?.parentMapKey || item?.mapKey || null
+  ), [sigwxLowParentMap]);
   const sigmetItems = useMemo(() => (
     (sigmetData?.items || [])
       .filter((item) => item?.geometry)
@@ -655,16 +734,22 @@ export default function InteractiveMap({
       .filter((item) => item?.geometry)
       .map((item, index) => ({ ...item, mapKey: advisoryItemKey("airmet", item, index) }))
   ), [airmetData]);
-  const showFirDraft = isNationwide && (showSigmet || showAirmet) && firDraftGeoData;
+  const showFirDraft = isNationwide && (showSigwxLow || showSigmet || showAirmet) && firDraftGeoData;
   const advisoryBadgeItems = useMemo(() => ([
+    showSigwxLow ? { key: "sigwxLow", badgeClass: "sigwx-low", label: "SIGWX_LOW", count: sigwxLowGroups.length } : null,
     showSigmet ? { key: "sigmet", label: "SIGMET", count: sigmetItems.length } : null,
     showAirmet ? { key: "airmet", label: "AIRMET", count: airmetItems.length } : null
-  ].filter((item) => item && item.count > 0)), [showSigmet, showAirmet, sigmetItems.length, airmetItems.length]);
+  ].filter((item) => item && item.count > 0)), [showSigwxLow, showSigmet, showAirmet, sigwxLowGroups.length, sigmetItems.length, airmetItems.length]);
   const advisoryPanelItems = useMemo(() => {
+    if (openAdvisoryPanel === "sigwxLow") return sigwxLowGroups;
     if (openAdvisoryPanel === "sigmet") return sigmetItems;
     if (openAdvisoryPanel === "airmet") return airmetItems;
     return [];
-  }, [openAdvisoryPanel, sigmetItems, airmetItems]);
+  }, [openAdvisoryPanel, sigwxLowGroups, sigmetItems, airmetItems]);
+  const visibleSigwxLowItems = useMemo(() => {
+    const hidden = new Set(hiddenAdvisoryKeys.sigwxLow);
+    return sigwxLowItems.filter((item) => !hidden.has(sigwxLowParentMap.get(item.mapKey) || item.mapKey));
+  }, [hiddenAdvisoryKeys.sigwxLow, sigwxLowItems, sigwxLowParentMap]);
   const visibleSigmetItems = useMemo(() => {
     const hidden = new Set(hiddenAdvisoryKeys.sigmet);
     return sigmetItems.filter((item) => !hidden.has(item.mapKey));
@@ -675,22 +760,25 @@ export default function InteractiveMap({
   }, [hiddenAdvisoryKeys.airmet, airmetItems]);
 
   useEffect(() => {
+    if (openAdvisoryPanel === "sigwxLow" && !showSigwxLow) setOpenAdvisoryPanel(null);
     if (openAdvisoryPanel === "sigmet" && !showSigmet) setOpenAdvisoryPanel(null);
     if (openAdvisoryPanel === "airmet" && !showAirmet) setOpenAdvisoryPanel(null);
-  }, [openAdvisoryPanel, showSigmet, showAirmet]);
+  }, [openAdvisoryPanel, showSigwxLow, showSigmet, showAirmet]);
 
   useEffect(() => {
     setHiddenAdvisoryKeys((prev) => {
+      const sigwxLowKeySet = new Set(sigwxLowGroups.map((item) => item.mapKey));
       const sigmetKeySet = new Set(sigmetItems.map((item) => item.mapKey));
       const airmetKeySet = new Set(airmetItems.map((item) => item.mapKey));
+      const nextSigwxLow = prev.sigwxLow.filter((key) => sigwxLowKeySet.has(key));
       const nextSigmet = prev.sigmet.filter((key) => sigmetKeySet.has(key));
       const nextAirmet = prev.airmet.filter((key) => airmetKeySet.has(key));
-      if (nextSigmet.length === prev.sigmet.length && nextAirmet.length === prev.airmet.length) {
+      if (nextSigwxLow.length === prev.sigwxLow.length && nextSigmet.length === prev.sigmet.length && nextAirmet.length === prev.airmet.length) {
         return prev;
       }
-      return { sigmet: nextSigmet, airmet: nextAirmet };
+      return { sigwxLow: nextSigwxLow, sigmet: nextSigmet, airmet: nextAirmet };
     });
-  }, [sigmetItems, airmetItems]);
+  }, [sigwxLowGroups, sigmetItems, airmetItems]);
 
   function toggleAdvisoryVisibility(kind, mapKey) {
     setHiddenAdvisoryKeys((prev) => {
@@ -994,7 +1082,7 @@ export default function InteractiveMap({
   return (
     <aside className={`panel lightning-panel interactive-map-panel ${isNationwide ? "interactive-map-panel--korea" : "interactive-map-panel--airport"}`}>
       <div className="lightning-head">
-        <div className="panel-switch map-scope-switch" role="tablist" aria-label="Map scope">
+        <div className="panel-switch map-scope-switch" role="tablist" aria-label="지도 범위">
           <button
             type="button"
             className={`panel-switch-btn ${isNationwide ? "active" : ""}`}
@@ -1028,10 +1116,17 @@ export default function InteractiveMap({
               type="button"
               className={`range-btn echo-toggle ${showEcho ? "active" : ""}`}
             onClick={() => setShowEcho((v) => !v)}
-            title={echoInfo ? `Radar echo (${echoInfo.echoCount} px)` : isNationwide ? "Nationwide radar overlay unavailable" : "Radar echo unavailable"}
+            title={echoInfo ? `강수에코 (${echoInfo.echoCount} px)` : isNationwide ? "전국 강수에코 오버레이를 사용할 수 없습니다" : "강수에코를 사용할 수 없습니다"}
             disabled={!echoInfo}
             >
               강수에코
+            </button>
+            <button
+              type="button"
+              className={`range-btn sigwx-toggle ${showSigwxLow ? "active" : ""}`}
+              onClick={() => setShowSigwxLow((value) => !value)}
+            >
+              SIGWX_LOW
             </button>
             <button
               type="button"
@@ -1058,12 +1153,12 @@ export default function InteractiveMap({
       </div>
 
       {!isNationwide && !arp ? (
-        <p className="sub">Lightning data unavailable for this airport.</p>
+        <p className="sub">이 공항의 낙뢰 데이터를 사용할 수 없습니다.</p>
       ) : (
         <>
           <div className={`interactive-map-shell interactive-map-shell--${mapTheme} ${isNationwide ? "interactive-map-shell--korea" : "interactive-map-shell--airport"}`}>
             {(showLightning || advisoryBadgeItems.length > 0 || (showTraffic && adsbData)) && (
-              <div className="interactive-map-legend" aria-label="Active map badges">
+              <div className="interactive-map-legend" aria-label="활성 지도 배지">
                 {showLightning && !isNationwide ? (
                   <>
                     <span className="zone-tag alert">8km {summary.byZone.alert}</span>
@@ -1078,7 +1173,7 @@ export default function InteractiveMap({
                   <button
                     key={item.key}
                     type="button"
-                    className={`advisory-count-badge advisory-count-badge--${item.key} ${openAdvisoryPanel === item.key ? "active" : ""}`}
+                    className={`advisory-count-badge advisory-count-badge--${item.badgeClass || item.key} ${openAdvisoryPanel === item.key ? "active" : ""}`}
                     onClick={() => setOpenAdvisoryPanel((prev) => (prev === item.key ? null : item.key))}
                   >
                     {item.label} {item.count}
@@ -1087,26 +1182,27 @@ export default function InteractiveMap({
               </div>
             )}
             {openAdvisoryPanel && advisoryPanelItems.length > 0 && (
-              <div className={`advisory-detail-panel advisory-detail-panel--${openAdvisoryPanel}`} aria-label={`${openAdvisoryPanel} details`}>
+              <div className={`advisory-detail-panel advisory-detail-panel--${openAdvisoryPanel}`} aria-label={`${openAdvisoryPanel} 상세 정보`}>
                 <div className="advisory-detail-list">
                   {advisoryPanelItems.map((item) => {
                     const kind = openAdvisoryPanel;
                     const isVisible = !hiddenAdvisoryKeys[kind]?.includes(item.mapKey);
-                    const showAltitude = advisoryShowsAltitude(item);
+                    const isSigwx = kind === "sigwxLow";
+                    const showAltitude = !isSigwx && advisoryShowsAltitude(item);
                     return (
                     <article key={`${openAdvisoryPanel}-${item.mapKey}`} className="advisory-detail-item">
-                      <div className="advisory-detail-icon" aria-hidden="true">{advisoryPhenomenonIcon(item.phenomenon_code)}</div>
+                      <div className="advisory-detail-icon" aria-hidden="true">{isSigwx ? "WX" : advisoryPhenomenonIcon(item.phenomenon_code)}</div>
                       <div className="advisory-detail-main">
-                        <div className="advisory-detail-title">{advisoryLabel(item)}</div>
-                        <div className="advisory-detail-time">{advisoryValidLabel(item, tz)}</div>
+                        <div className="advisory-detail-title">{isSigwx ? (item.groupLabel || sigwxLabel(item)) : advisoryLabel(item)}</div>
+                        <div className="advisory-detail-time">{isSigwx ? item.contour_name : advisoryValidLabel(item, tz)}</div>
                         {showAltitude ? <div className="advisory-detail-altitude">{advisoryAltitudeLabel(item)}</div> : null}
                       </div>
-                      <label className="advisory-detail-toggle" title="지도 표시">
+                      <label className="advisory-detail-toggle" title="표시 여부">
                         <input
                           type="checkbox"
                           checked={isVisible}
                           onChange={() => toggleAdvisoryVisibility(kind, item.mapKey)}
-                          aria-label={`${advisoryLabel(item)} 지도 표시`}
+                          aria-label={`${isSigwx ? sigwxLabel(item) : advisoryLabel(item)} 표시 여부`}
                         />
                       </label>
                     </article>
@@ -1271,6 +1367,43 @@ export default function InteractiveMap({
             </Pane>
 
             <Pane name="advisory-pane" style={{ zIndex: 520 }}>
+              {showSigwxLow && visibleSigwxLowItems.map((item) => {
+                if (!sigwxNeedsPath(item)) return null;
+                const hoverKey = resolveSigwxHoverKey(item);
+                const hovered = hoveredAdvisoryId === hoverKey;
+                const positions = item.smoothedLatLngs?.length ? item.smoothedLatLngs : item.lat_lngs;
+                const pathProps = {
+                  pathOptions: sigwxStyle(item, hovered),
+                  eventHandlers: {
+                    mouseover: () => setHoveredAdvisoryId(hoverKey),
+                    mouseout: () => setHoveredAdvisoryId((prev) => (prev === hoverKey ? null : prev)),
+                  },
+                };
+
+                if (item.is_close && item.lat_lngs.length >= 3) {
+                  return (
+                    <Polygon key={`sigwx-${item.mapKey}`} positions={positions} {...pathProps}>
+                      <Tooltip sticky opacity={0.96} className="advisory-tooltip">
+                        <div className="advisory-tooltip-body">
+                          <strong>{sigwxPhenomenonLabel(item)}</strong>
+                          {renderSigwxAltitude(item)}
+                        </div>
+                      </Tooltip>
+                    </Polygon>
+                  );
+                }
+
+                return (
+                  <Polyline key={`sigwx-${item.mapKey}`} positions={positions} {...pathProps}>
+                    <Tooltip sticky opacity={0.96} className="advisory-tooltip">
+                      <div className="advisory-tooltip-body">
+                        <strong>{sigwxPhenomenonLabel(item)}</strong>
+                        {renderSigwxAltitude(item)}
+                      </div>
+                    </Tooltip>
+                  </Polyline>
+                );
+              })}
               {showSigmet && visibleSigmetItems.map((item) => {
                 const positions = geometryToLeafletPositions(item.geometry);
                 if (!positions) return null;
@@ -1324,6 +1457,30 @@ export default function InteractiveMap({
             </Pane>
 
             <Pane name="advisory-icon-pane" style={{ zIndex: 530 }}>
+              {showSigwxLow && visibleSigwxLowItems.map((item) => {
+                if (!sigwxNeedsLabelMarker(item)) return null;
+                const centerPoint = sigwxCenter(item);
+                if (!centerPoint) return null;
+                const hoverKey = resolveSigwxHoverKey(item);
+                return (
+                  <Marker
+                    key={`sigwx-icon-${item.mapKey}`}
+                    position={centerPoint}
+                    icon={createSigwxBadgeIcon(item)}
+                    eventHandlers={{
+                      mouseover: () => setHoveredAdvisoryId(hoverKey),
+                      mouseout: () => setHoveredAdvisoryId((prev) => (prev === hoverKey ? null : prev)),
+                    }}
+                  >
+                    <Tooltip direction="top" offset={[0, -10]} opacity={0.96} className="advisory-tooltip">
+                      <div className="advisory-tooltip-body">
+                        <strong>{sigwxPhenomenonLabel(item)}</strong>
+                        {renderSigwxAltitude(item)}
+                      </div>
+                    </Tooltip>
+                  </Marker>
+                );
+              })}
               {showSigmet && visibleSigmetItems.map((item) => {
                 const centerPoint = advisoryCenter(item);
                 if (!centerPoint) return null;
@@ -1441,7 +1598,8 @@ export default function InteractiveMap({
                     className="radar-speed-step"
                     onClick={() => changePlaybackSpeed(-FRAME_MS_STEP)}
                     disabled={!canDecrementSpeed}
-                    aria-label="재생시간 감소"
+                    aria-label="재생시간 줄이기"
+                    title="재생시간 줄이기"
                   >
                     -
                   </button>
@@ -1451,7 +1609,8 @@ export default function InteractiveMap({
                     className="radar-speed-step"
                     onClick={() => changePlaybackSpeed(FRAME_MS_STEP)}
                     disabled={!canIncrementSpeed}
-                    aria-label="재생시간 증가"
+                    aria-label="재생시간 늘리기"
+                    title="재생시간 늘리기"
                   >
                     +
                   </button>
@@ -1468,10 +1627,10 @@ export default function InteractiveMap({
                   className="radar-icon-btn radar-icon-inline"
                   onClick={() => setIsPlaying((prev) => !prev)}
                   disabled={echoFrames.length <= 1}
-                  aria-label={isPlaying ? "Pause radar playback" : "Play radar playback"}
+                  aria-label={isPlaying ? "재생 일시정지" : "재생"}
                   title={isPlaying ? "일시정지" : "재생"}
                 >
-                  {isPlaying ? "❚❚" : "▶"}
+                  {isPlaying ? "⏸" : "▶"}
                 </button>
                 <div className="radar-seek-track" ref={loopTrackRef}>
                   <input
@@ -1487,7 +1646,7 @@ export default function InteractiveMap({
                       "--loop-start-pct": `${loopStartPct}%`,
                       "--loop-end-pct": `${loopEndPct}%`,
                     } : undefined}
-                    aria-label="Radar timeline"
+                    aria-label="레이더 타임라인"
                   />
                   {maxIndex > 1 && (
                     <div className="radar-loop-overlay" aria-hidden="true">
@@ -1495,7 +1654,7 @@ export default function InteractiveMap({
                         className={`radar-loop-handle radar-loop-handle--start${loopActive ? " active" : ""}`}
                         style={{ left: `${loopStartPct}%` }}
                         onPointerDown={(e) => handleLoopPointerDown("start", e)}
-                        title={`구간 시작: ${formatTmLabel(echoFrames[loopStart]?.tm)}`}
+                        title={`반복 시작: ${formatTmLabel(echoFrames[loopStart]?.tm)}`}
                       >
                         ▼
                       </div>
@@ -1503,7 +1662,7 @@ export default function InteractiveMap({
                         className={`radar-loop-handle radar-loop-handle--end${loopActive ? " active" : ""}`}
                         style={{ left: `${loopEndPct}%` }}
                         onPointerDown={(e) => handleLoopPointerDown("end", e)}
-                        title={`구간 종료: ${formatTmLabel(echoFrames[loopEnd]?.tm)}`}
+                        title={`반복 종료: ${formatTmLabel(echoFrames[loopEnd]?.tm)}`}
                       >
                         ▼
                       </div>

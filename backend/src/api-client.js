@@ -41,6 +41,14 @@ function buildUrl(type, icao = null) {
   return `${config.api.base_url}${endpoint}?${params.toString()}`;
 }
 
+function buildSigwxLowUrl(tmfc) {
+  const params = new URLSearchParams({
+    tmfc,
+    authKey: config.api.auth_key,
+  });
+  return `${config.api.sigwx_low_url}?${params.toString()}`;
+}
+
 function parseApiHeader(xmlText) {
   const codeMatch = xmlText.match(/<resultCode>([^<]+)<\/resultCode>/i);
   const msgMatch = xmlText.match(/<resultMsg>([^<]+)<\/resultMsg>/i);
@@ -51,6 +59,7 @@ function parseApiHeader(xmlText) {
 }
 
 function isSuccessByType(type, resultCode, resultMsg) {
+  if (type === "sigwx_low") return true;
   if (resultCode == null) return false;
   if (resultCode === "00") return true;
   if (type === "warning" && resultCode === "03" && /NO_DATA/i.test(resultMsg || "")) {
@@ -59,12 +68,27 @@ function isSuccessByType(type, resultCode, resultMsg) {
   return false;
 }
 
-async function fetchApi(type, icao = null) {
+async function fetchApi(type, icao = null, options = {}) {
   const url = buildUrl(type, icao);
+  return fetchTextWithRetries(url, type, options);
+}
+
+async function fetchSigwxLow(tmfc, options = {}) {
+  const url = buildSigwxLowUrl(tmfc);
+  return fetchTextWithRetries(url, "sigwx_low", options);
+}
+
+async function fetchTextWithRetries(url, type, options = {}) {
   const configuredRetries = Number(config.api.max_retries);
+  const requestedRetries = Number(options.maxRetries);
   const maxRetries = Math.min(
     3,
-    Math.max(1, Number.isFinite(configuredRetries) ? configuredRetries : 1)
+    Math.max(
+      1,
+      Number.isFinite(requestedRetries)
+        ? requestedRetries
+        : (Number.isFinite(configuredRetries) ? configuredRetries : 1)
+    )
   );
 
   for (let attempt = 1; attempt <= maxRetries; attempt += 1) {
@@ -84,6 +108,9 @@ async function fetchApi(type, icao = null) {
       }
 
       const { resultCode, resultMsg } = parseApiHeader(body);
+      if (type === "sigwx_low" && !/<odmap_ml[\s>]/i.test(body)) {
+        throw new Error("SIGWX LOW payload missing odmap_ml");
+      }
       if (!isSuccessByType(type, resultCode, resultMsg)) {
         const error = new Error(`API ${resultCode}: ${resultMsg || "UNKNOWN_ERROR"}`);
         if (/유효한 인증키/i.test(resultMsg || "")) {
@@ -108,5 +135,7 @@ async function fetchApi(type, icao = null) {
 
 module.exports = {
   fetch: fetchApi,
-  buildUrl
+  fetchSigwxLow,
+  buildUrl,
+  buildSigwxLowUrl,
 };

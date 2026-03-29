@@ -3,7 +3,7 @@ const fs = require("fs");
 const path = require("path");
 const config = require("./config");
 
-const TYPES = ["metar", "taf", "warning", "lightning", "sigmet", "airmet", "amos"];
+const TYPES = ["metar", "taf", "warning", "lightning", "sigmet", "airmet", "sigwx_low", "amos", "adsb"];
 const FILE_PREFIX = {
   metar: "METAR",
   taf: "TAF",
@@ -11,6 +11,7 @@ const FILE_PREFIX = {
   lightning: "LIGHTNING",
   sigmet: "SIGMET",
   airmet: "AIRMET",
+  sigwx_low: "SIGWX_LOW",
   amos: "AMOS"
 };
 
@@ -21,6 +22,7 @@ const cache = {
   lightning: { hash: null, prev_data: null },
   sigmet: { hash: null, prev_data: null },
   airmet: { hash: null, prev_data: null },
+  sigwx_low: { hash: null, prev_data: null },
   amos: { hash: null, prev_data: null },
   adsb: { hash: null, prev_data: null },
 };
