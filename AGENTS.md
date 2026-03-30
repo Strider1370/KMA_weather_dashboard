@@ -56,7 +56,6 @@ Use repo root unless noted.
   - `node backend/test/run-once.js warning`
   - `node backend/test/run-once.js sigwx-low`
   - `node backend/test/run-once.js lightning`
-  - `node backend/test/run-once.js lightning-backfill`
   - `node backend/test/run-once.js radar-echo`
   - `node backend/test/run-once.js adsb`
   - `node backend/test/run-once.js satellite`
@@ -184,7 +183,7 @@ Derived from `.editorconfig` + existing source files.
 - InteractiveMap boundary detail is auto-switched by zoom (`zoom >= 9`: sigungu, `zoom < 9`: sido); there is no user setting toggle anymore.
 - InteractiveMap renders nationwide lightning strikes in both Airport/Korea modes; Airport mode zone counters (8/16/32km) must remain based on selected-airport strikes.
 - Lightning collection now uses a single nationwide fetch (`range_km: 800`, `itv_minutes: 5`), keeps a rolling 4-hour strike history in `backend/data/lightning/latest.json`, and filters the displayed strikes to the selected frame time minus 60 minutes.
-- `node backend/test/run-once.js lightning-backfill` is a development-only helper that backfills the last 4 hours of lightning windows into the current rolling payload.
+- `node backend/test/run-once.js lightning` now uses the development-oriented 4-hour lightning backfill path; the scheduler still uses the normal incremental collector path.
 - InteractiveMap `Traffic` layer is toggleable again and supports settings-driven callsign substring filtering plus altitude-band filtering (`baro_altitude` first, `geo_altitude` fallback, compare in feet after converting from meters). Altitude bands default to all 5 bands selected; an empty band selection hides all traffic (does not show all). Callsign filter empty = show all; any input = substring match only. Selections are persisted in `localStorage` keys `traffic_altitude_bands` and `traffic_callsign_filter`.
 - InteractiveMap satellite overlay shares the radar timeline when both layers are enabled, uses full opacity, and switches coastline/administrative boundary strokes to yellow while satellite is visible.
 - InteractiveMap `SIGWX_LOW` uses grouped rendering: contour items (`item_type 4`) are treated as primary regions, while label/icon items (`item_type 7/10/12`) are attached to the nearest matching region using contour/type context plus geometric matching.

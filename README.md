@@ -277,7 +277,6 @@ node backend/test/run-once.js amos
 node backend/test/run-once.js warning
 node backend/test/run-once.js sigwx-low
 node backend/test/run-once.js lightning
-node backend/test/run-once.js lightning-backfill
 node backend/test/run-once.js radar-echo
 node backend/test/run-once.js adsb
 node backend/test/run-once.js satellite
