@@ -1,5 +1,7 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { safe, warningMeta, getDisplayDate } from "../utils/helpers";
+
+const EMPTY_LIST = [];
 
 const WARNING_NAME_KO = {
   WIND_SHEAR: "급변풍",
@@ -27,7 +29,9 @@ function formatValidTime(value, tz = "UTC") {
 
 export default function WarningList({ warningData, icao, warningTypes, tz = "UTC" }) {
   const block = warningData?.airports?.[icao];
-  const list = block?.warnings || [];
+  const list = useMemo(() => (
+    Array.isArray(block?.warnings) ? block.warnings : EMPTY_LIST
+  ), [block?.warnings]);
   const viewportRef = useRef(null);
   const measureRef = useRef(null);
   const [pages, setPages] = useState([]);
@@ -38,10 +42,10 @@ export default function WarningList({ warningData, icao, warningTypes, tz = "UTC
 
   useEffect(() => {
     if (list.length === 0) {
-      setPages([]);
-      setPageIndex(0);
-      setNextPageIndex(0);
-      setIsAnimating(false);
+      setPages((prev) => (prev.length === 0 ? prev : []));
+      setPageIndex((prev) => (prev === 0 ? prev : 0));
+      setNextPageIndex((prev) => (prev === 0 ? prev : 0));
+      setIsAnimating((prev) => (prev ? false : prev));
       return undefined;
     }
 

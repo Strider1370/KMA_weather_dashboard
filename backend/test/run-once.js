@@ -14,10 +14,10 @@ const satelliteProcessor = require("../src/processors/satellite-processor");
 
 async function main() {
   const target = (process.argv[2] || "all").toLowerCase();
-  const allowed = new Set(["metar", "taf", "warning", "sigmet", "airmet", "sigwx-low", "amos", "lightning", "radar-echo", "adsb", "satellite", "all"]);
+  const allowed = new Set(["metar", "taf", "warning", "sigmet", "airmet", "sigwx-low", "amos", "lightning", "lightning-backfill", "radar-echo", "adsb", "satellite", "all"]);
 
   if (!allowed.has(target)) {
-    console.error("Usage: node backend/test/run-once.js [metar|taf|warning|sigmet|airmet|sigwx-low|amos|lightning|radar-echo|adsb|satellite|all]");
+    console.error("Usage: node backend/test/run-once.js [metar|taf|warning|sigmet|airmet|sigwx-low|amos|lightning|lightning-backfill|radar-echo|adsb|satellite|all]");
     process.exit(1);
   }
 
@@ -64,6 +64,10 @@ async function main() {
 
   if (target === "lightning" || target === "all") {
     await execute("lightning", () => lightningProcessor.process());
+  }
+
+  if (target === "lightning-backfill") {
+    await execute("lightning-backfill", () => lightningProcessor.processBackfill());
   }
 
   if (target === "radar-echo" || target === "all") {

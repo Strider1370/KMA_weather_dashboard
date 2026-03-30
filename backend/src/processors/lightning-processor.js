@@ -3,9 +3,11 @@ const config = require("../config");
 const store = require("../store");
 const lightningParser = require("../parsers/lightning-parser");
 
-function getCurrentKstTm() {
-  const now = new Date();
-  const kst = new Date(now.getTime() + 9 * 60 * 60 * 1000);
+const LIGHTNING_HISTORY_WINDOW_MINUTES = 240;
+const LIGHTNING_BACKFILL_STEP_MINUTES = 5;
+
+function formatKstTm(date) {
+  const kst = new Date(date.getTime() + 9 * 60 * 60 * 1000);
   const y = kst.getUTCFullYear();
   const m = String(kst.getUTCMonth() + 1).padStart(2, "0");
   const d = String(kst.getUTCDate()).padStart(2, "0");
@@ -14,17 +16,47 @@ function getCurrentKstTm() {
   return `${y}${m}${d}${h}${min}`;
 }
 
-function buildLightningUrl(airport, tm) {
-  const params = new URLSearchParams({
-    tm,
-    itv: String(config.lightning.itv_minutes),
-    lon: String(airport.lon),
-    lat: String(airport.lat),
-    range: String(config.lightning.range_km),
-    gc: "T",
-    authKey: config.api.auth_key
-  });
-  return `${config.api.lightning_url}?${params.toString()}`;
+function getCurrentKstTm() {
+  return formatKstTm(new Date());
+}
+
+function getAlignedKstTm(stepMinutes = config.lightning.itv_minutes) {
+  const now = new Date();
+  const kst = new Date(now.getTime() + 9 * 60 * 60 * 1000);
+  kst.setUTCSeconds(0, 0);
+  const minute = kst.getUTCMinutes();
+  kst.setUTCMinutes(minute - (minute % stepMinutes));
+  return formatKstTm(new Date(kst.getTime() - 9 * 60 * 60 * 1000));
+}
+
+function kstTmToUtcDate(tm) {
+  const raw = String(tm || "");
+  if (!/^\d{12}$/.test(raw)) {
+    throw new Error(`Invalid KST tm: ${tm}`);
+  }
+  return new Date(Date.UTC(
+    Number(raw.slice(0, 4)),
+    Number(raw.slice(4, 6)) - 1,
+    Number(raw.slice(6, 8)),
+    Number(raw.slice(8, 10)) - 9,
+    Number(raw.slice(10, 12)),
+    0,
+    0
+  ));
+}
+
+function shiftKstTm(tm, deltaMinutes) {
+  const shifted = new Date(kstTmToUtcDate(tm).getTime() + deltaMinutes * 60 * 1000);
+  return formatKstTm(shifted);
+}
+
+function buildBackfillTms(baseTm, windowMinutes = LIGHTNING_HISTORY_WINDOW_MINUTES, stepMinutes = config.lightning.itv_minutes) {
+  const steps = Math.ceil(windowMinutes / stepMinutes);
+  const tms = [];
+  for (let index = steps - 1; index >= 0; index -= 1) {
+    tms.push(shiftKstTm(baseTm, -index * stepMinutes));
+  }
+  return tms;
 }
 
 function buildNationwideLightningUrl(tm) {
@@ -36,7 +68,7 @@ function buildNationwideLightningUrl(tm) {
     lat: String(nationwide.lat),
     range: String(nationwide.range_km),
     gc: "T",
-    authKey: config.api.auth_key
+    authKey: config.api.auth_key,
   });
   return `${config.api.lightning_url}?${params.toString()}`;
 }
@@ -53,6 +85,35 @@ async function fetchWithTimeout(url, timeoutMs = config.api.timeout_ms) {
   } finally {
     clearTimeout(timer);
   }
+}
+
+function buildStrikeKey(strike) {
+  return [
+    strike.time || "",
+    strike.lon ?? "",
+    strike.lat ?? "",
+    strike.type || "",
+    strike.intensity ?? "",
+  ].join("|");
+}
+
+function mergeRecentStrikes(previousStrikes, incomingStrikes, nowMs) {
+  const cutoffMs = nowMs - (LIGHTNING_HISTORY_WINDOW_MINUTES * 60 * 1000);
+  const merged = new Map();
+
+  for (const strike of previousStrikes || []) {
+    const timeMs = new Date(strike.time).getTime();
+    if (!Number.isFinite(timeMs) || timeMs < cutoffMs) continue;
+    merged.set(buildStrikeKey(strike), strike);
+  }
+
+  for (const strike of incomingStrikes || []) {
+    const timeMs = new Date(strike.time).getTime();
+    if (!Number.isFinite(timeMs) || timeMs < cutoffMs) continue;
+    merged.set(buildStrikeKey(strike), strike);
+  }
+
+  return Array.from(merged.values()).sort((a, b) => new Date(b.time).getTime() - new Date(a.time).getTime());
 }
 
 function summarize(strikes) {
@@ -78,23 +139,31 @@ function summarize(strikes) {
     by_zone: byZone,
     by_type: byType,
     max_intensity: maxIntensity,
-    latest_time: latestTime
+    latest_time: latestTime,
   };
 }
 
-function emptyAirportPayload(airport) {
-  return {
-    airport_name: airport.name,
-    arp: { lat: airport.lat, lon: airport.lon },
-    summary: {
-      total_count: 0,
-      by_zone: { alert: 0, danger: 0, caution: 0 },
-      by_type: { ground: 0, cloud: 0 },
-      max_intensity: null,
-      latest_time: null
-    },
-    strikes: []
-  };
+function classifyForAirport(strikes, airport, zones) {
+  return strikes
+    .map((strike) => lightningParser.classifyStrike(strike, airport, zones))
+    .filter((strike) => strike.zone !== "outside")
+    .sort((a, b) => new Date(b.time).getTime() - new Date(a.time).getTime());
+}
+
+function buildAirportPayloads(strikes) {
+  const airports = {};
+
+  for (const airport of config.airports) {
+    const airportStrikes = classifyForAirport(strikes, airport, config.lightning.zones);
+    airports[airport.icao] = {
+      airport_name: airport.name,
+      arp: { lat: airport.lat, lon: airport.lon },
+      summary: summarize(airportStrikes),
+      strikes: airportStrikes,
+    };
+  }
+
+  return airports;
 }
 
 function emptyNationwidePayload() {
@@ -104,101 +173,135 @@ function emptyNationwidePayload() {
       by_zone: { alert: 0, danger: 0, caution: 0 },
       by_type: { ground: 0, cloud: 0 },
       max_intensity: null,
-      latest_time: null
+      latest_time: null,
     },
-    strikes: []
+    strikes: [],
   };
 }
 
-async function process() {
-  const tm = getCurrentKstTm();
-  const result = {
+function buildLightningResult(tm, strikes, extraQuery = {}) {
+  const airports = buildAirportPayloads(strikes);
+  return {
     type: "lightning",
     fetched_at: new Date().toISOString(),
     query: {
       tm,
       itv_minutes: config.lightning.itv_minutes,
-      range_km: config.lightning.range_km,
-      nationwide_range_km: config.lightning.nationwide?.range_km || null
+      nationwide_range_km: config.lightning.nationwide?.range_km || null,
+      ...extraQuery,
     },
-    airports: {},
-    nationwide: emptyNationwidePayload()
+    history_window_minutes: LIGHTNING_HISTORY_WINDOW_MINUTES,
+    airports,
+    nationwide: {
+      summary: summarize(strikes),
+      strikes,
+    },
   };
+}
 
-  const previous = store.loadLatest(path.join(config.storage.base_path, "lightning"));
-  const failedAirports = [];
-  const airportErrors = {};
-
-  for (const airport of config.airports) {
-    try {
-      const raw = await fetchWithTimeout(buildLightningUrl(airport, tm));
-      const strikes = lightningParser.parse(raw, airport, config.lightning.zones);
-      result.airports[airport.icao] = {
-        airport_name: airport.name,
-        arp: { lat: airport.lat, lon: airport.lon },
-        summary: summarize(strikes),
-        strikes
-      };
-    } catch (error) {
-      failedAirports.push(airport.icao);
-      airportErrors[airport.icao] = error.message || "Unknown error";
-      const prevAirport = previous?.airports?.[airport.icao];
-      if (prevAirport) {
-        result.airports[airport.icao] = {
-          ...prevAirport,
-          _stale: true
-        };
-      } else {
-        result.airports[airport.icao] = emptyAirportPayload(airport);
-      }
-    }
-  }
-
-  try {
-    const rawNationwide = await fetchWithTimeout(buildNationwideLightningUrl(tm));
-    const nationwidePoint = {
-      lat: config.lightning.nationwide?.lat,
-      lon: config.lightning.nationwide?.lon
-    };
-    const nationwideStrikes = lightningParser.parse(
-      rawNationwide,
-      nationwidePoint,
-      config.lightning.zones,
-      {
-        includeOutside: true,
-        forceZone: "nationwide"
-      }
-    );
-    result.nationwide = {
-      summary: summarize(nationwideStrikes),
-      strikes: nationwideStrikes
-    };
-  } catch (error) {
-    const previousNationwide = previous?.nationwide;
-    if (previousNationwide) {
-      result.nationwide = {
-        ...previousNationwide,
-        _stale: true
-      };
-    }
-  }
-
-  const saveResult = store.save("lightning", result);
-  const totalStrikes = Object.values(result.airports).reduce(
-    (acc, airport) => acc + Number(airport?.summary?.total_count || 0),
-    0
-  );
-
+function buildProcessResponse(result, saveResult, airportErrors = {}) {
   return {
     type: "lightning",
     saved: saveResult.saved,
     filePath: saveResult.filePath || null,
-    airports: Object.keys(result.airports).length,
+    airports: Object.keys(result.airports || {}).length,
     nationwideStrikes: Number(result.nationwide?.summary?.total_count || 0),
-    totalStrikes,
-    failedAirports,
-    airportErrors
+    totalStrikes: Number(result.nationwide?.summary?.total_count || 0),
+    failedAirports: [],
+    airportErrors,
   };
 }
 
-module.exports = { process };
+async function fetchNationwideStrikes(tm) {
+  const rawNationwide = await fetchWithTimeout(buildNationwideLightningUrl(tm));
+  const nationwidePoint = {
+    lat: config.lightning.nationwide?.lat,
+    lon: config.lightning.nationwide?.lon,
+  };
+  return lightningParser.parse(
+    rawNationwide,
+    nationwidePoint,
+    config.lightning.zones,
+    { classify: false }
+  );
+}
+
+async function process() {
+  const tm = getCurrentKstTm();
+  const previous = store.loadLatest(path.join(config.storage.base_path, "lightning"));
+  const nowMs = Date.now();
+
+  try {
+    const recentNationwideStrikes = await fetchNationwideStrikes(tm);
+    const mergedNationwideStrikes = mergeRecentStrikes(previous?.nationwide?.strikes || [], recentNationwideStrikes, nowMs);
+    const result = buildLightningResult(tm, mergedNationwideStrikes);
+    const saveResult = store.save("lightning", result);
+    return buildProcessResponse(result, saveResult);
+  } catch (error) {
+    if (previous) {
+      const staleResult = {
+        ...previous,
+        fetched_at: new Date().toISOString(),
+        query: {
+          ...(previous.query || {}),
+          tm,
+          itv_minutes: config.lightning.itv_minutes,
+          nationwide_range_km: config.lightning.nationwide?.range_km || null,
+        },
+        history_window_minutes: LIGHTNING_HISTORY_WINDOW_MINUTES,
+        _stale: true,
+        nationwide: previous.nationwide ? { ...previous.nationwide, _stale: true } : emptyNationwidePayload(),
+        airports: Object.fromEntries(
+          Object.entries(previous.airports || {}).map(([icao, payload]) => [
+            icao,
+            { ...payload, _stale: true },
+          ])
+        ),
+      };
+      const saveResult = store.save("lightning", staleResult);
+      return buildProcessResponse(staleResult, saveResult, { nationwide: error.message || "Unknown error" });
+    }
+
+    throw error;
+  }
+}
+
+async function processBackfill() {
+  const baseTm = getAlignedKstTm(LIGHTNING_BACKFILL_STEP_MINUTES);
+  const tms = buildBackfillTms(baseTm, LIGHTNING_HISTORY_WINDOW_MINUTES, LIGHTNING_BACKFILL_STEP_MINUTES);
+  const merged = new Map();
+  const failedTms = [];
+  const nowMs = Date.now();
+
+  for (const tm of tms) {
+    try {
+      const strikes = await fetchNationwideStrikes(tm);
+      for (const strike of mergeRecentStrikes([], strikes, nowMs)) {
+        merged.set(buildStrikeKey(strike), strike);
+      }
+    } catch (error) {
+      failedTms.push({ tm, error: error.message || "Unknown error" });
+    }
+  }
+
+  if (merged.size === 0 && failedTms.length === tms.length) {
+    throw new Error(`Lightning backfill failed for all windows (${failedTms.length})`);
+  }
+
+  const mergedNationwideStrikes = mergeRecentStrikes([], Array.from(merged.values()), nowMs);
+  const result = buildLightningResult(baseTm, mergedNationwideStrikes, {
+    backfill: true,
+    backfill_from_tm: tms[0] || null,
+    backfill_to_tm: tms[tms.length - 1] || null,
+  });
+  const saveResult = store.save("lightning", result);
+
+  return {
+    ...buildProcessResponse(result, saveResult, failedTms.length ? { backfill: `${failedTms.length} windows failed` } : {}),
+    backfillWindows: tms.length,
+    failedWindows: failedTms.length,
+    failedTms,
+  };
+}
+
+module.exports = { process, processBackfill };

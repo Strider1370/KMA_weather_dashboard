@@ -205,16 +205,27 @@ function preloadFrameImages(frames) {
   return imageRefs;
 }
 
-function getStrikeColor(strikeTimeIso) {
-  const elapsedMin = (Date.now() - new Date(strikeTimeIso).getTime()) / 60000;
-  if (elapsedMin < 5) return { color: "#FF0000", opacity: 1 };
-  if (elapsedMin < 10) return { color: "#FF6600", opacity: 0.85 };
-  if (elapsedMin < 15) return { color: "#FFCC00", opacity: 0.8 };
-  if (elapsedMin < 20) return { color: "#99CC00", opacity: 0.7 };
-  if (elapsedMin < 30) return { color: "#33AA33", opacity: 0.6 };
-  if (elapsedMin < 60) return { color: "#3366FF", opacity: 0.45 };
+function getStrikeColor(strikeTimeIso, referenceTimeMs) {
+  const baseTimeMs = Number.isFinite(referenceTimeMs) ? referenceTimeMs : Date.now();
+  const elapsedMin = (baseTimeMs - new Date(strikeTimeIso).getTime()) / 60000;
+  if (elapsedMin < 0) return { color: "#999999", opacity: 0.2 };
+  if (elapsedMin < 10) return { color: "#ff1f1f", opacity: 1 };
+  if (elapsedMin < 20) return { color: "#ff00ff", opacity: 0.92 };
+  if (elapsedMin < 30) return { color: "#2f55ff", opacity: 0.85 };
+  if (elapsedMin < 40) return { color: "#1dd9e6", opacity: 0.78 };
+  if (elapsedMin < 50) return { color: "#25d90a", opacity: 0.7 };
+  if (elapsedMin <= 60) return { color: "#ffeb00", opacity: 0.62 };
   return { color: "#999999", opacity: 0.25 };
 }
+
+const LIGHTNING_LEGEND_BANDS = [
+  { min: 0, max: 10, color: "#ff1f1f" },
+  { min: 10, max: 20, color: "#ff00ff" },
+  { min: 20, max: 30, color: "#2f55ff" },
+  { min: 30, max: 40, color: "#1dd9e6" },
+  { min: 40, max: 50, color: "#25d90a" },
+  { min: 50, max: 60, color: "#ffeb00" },
+];
 
 function pickRunwayDirection(runwayHdg, windDir) {
   if (windDir == null) return runwayHdg;
@@ -296,6 +307,21 @@ function createAircraftIcon(track = 0, mapTheme = "dark") {
   });
 }
 
+function createLightningIcon(color, opacity = 1, blink = false) {
+  const safeOpacity = Number.isFinite(opacity) ? Math.max(0.2, Math.min(1, opacity)) : 1;
+  return L.divIcon({
+    className: "leaflet-lightning-icon",
+    html: `
+      <span class="leaflet-lightning-glyph${blink ? " leaflet-lightning-glyph--blink" : ""}" style="opacity:${safeOpacity};">
+        <span class="leaflet-lightning-stroke leaflet-lightning-stroke--h" style="background:${color};"></span>
+        <span class="leaflet-lightning-stroke leaflet-lightning-stroke--v" style="background:${color};"></span>
+      </span>
+    `,
+    iconSize: [22, 22],
+    iconAnchor: [11, 11],
+  });
+}
+
 function formatFlightLevel(aircraft) {
   const altitudeMeters = aircraft.geo_altitude ?? aircraft.baro_altitude;
   if (typeof altitudeMeters !== "number" || !Number.isFinite(altitudeMeters)) return "FL---";
@@ -311,6 +337,30 @@ function formatHeading(track) {
 function formatTmLabel(tm) {
   if (!tm || !/^\d{12}$/.test(tm)) return "-";
   return `${tm.slice(8, 10)}:${tm.slice(10, 12)}`;
+}
+
+function formatReferenceTimeLabel(timeMs) {
+  if (!Number.isFinite(timeMs)) return "--:--";
+  const kst = new Date(timeMs + 9 * 60 * 60 * 1000);
+  const hours = String(kst.getUTCHours()).padStart(2, "0");
+  const minutes = String(kst.getUTCMinutes()).padStart(2, "0");
+  return `${hours}:${minutes}`;
+}
+
+function parseFrameTmToMs(tm) {
+  if (!tm || !/^\d{12}$/.test(String(tm))) return null;
+  const raw = String(tm);
+  const date = new Date(Date.UTC(
+    Number(raw.slice(0, 4)),
+    Number(raw.slice(4, 6)) - 1,
+    Number(raw.slice(6, 8)),
+    Number(raw.slice(8, 10)) - 9,
+    Number(raw.slice(10, 12)),
+    0,
+    0
+  ));
+  const ms = date.getTime();
+  return Number.isFinite(ms) ? ms : null;
 }
 
 function formatLightningSummary(summary, isNationwide) {
@@ -581,6 +631,7 @@ export default function InteractiveMap({
   const [showEcho, setShowEcho] = useState(true);
   const [showSatellite, setShowSatellite] = useState(false);
   const [showLightning, setShowLightning] = useState(false);
+  const [blinkLightning, setBlinkLightning] = useState(false);
   const [showSigwxLow, setShowSigwxLow] = useState(false);
   const [showSigmet, setShowSigmet] = useState(false);
   const [showAirmet, setShowAirmet] = useState(false);
@@ -598,7 +649,7 @@ export default function InteractiveMap({
   const loopTrackRef = useRef(null);
   const draggingRef = useRef(null); // "start" | "end" | null
   const isNationwide = mapScope === "nationwide";
-  const timeRangeMin = 30;
+  const timeRangeMin = 60;
 
   // Load boundaries + neighbors once; forceRender when ready
   useEffect(() => {
@@ -697,21 +748,6 @@ export default function InteractiveMap({
       iconAnchor: [12, 12],
     });
   }, [effectiveHdg, mapTheme]);
-
-  // All strikes for map rendering ??always nationwide regardless of mode
-  const visibleStrikes = useMemo(() => {
-    const cutoff = Date.now() - timeRangeMin * 60 * 1000;
-    const nationwideStrikes = lightningData?.nationwide?.strikes;
-    const source = Array.isArray(nationwideStrikes)
-      ? nationwideStrikes
-      : Object.entries(lightningData?.airports || {}).flatMap(([icao, data]) =>
-          (data?.strikes || []).map((strike) => ({ ...strike, airport: icao }))
-        );
-    return source.filter((s) => {
-      const t = new Date(s.time).getTime();
-      return Number.isFinite(t) && t >= cutoff;
-    });
-  }, [lightningData, timeRangeMin]);
 
   const aircraft = useMemo(() => {
     const normalizedFilters = String(trafficCallsignFilter || "")
@@ -853,30 +889,6 @@ export default function InteractiveMap({
       };
     });
   }
-
-  // Zone counts from per-airport data in airport mode; total always from nationwide
-  const summary = useMemo(() => {
-    const byZone = { alert: 0, danger: 0, caution: 0 };
-    let latest = null;
-    let nearest = null;
-
-    if (!isNationwide) {
-      const cutoff = Date.now() - timeRangeMin * 60 * 1000;
-      const airportStrikes = (strikes || []).filter((s) => {
-        const t = new Date(s.time).getTime();
-        return Number.isFinite(t) && t >= cutoff;
-      });
-      for (const strike of airportStrikes) {
-        if (byZone[strike.zone] != null) byZone[strike.zone] += 1;
-        if (!latest || strike.time > latest) latest = strike.time;
-        if (strike.distance_km != null) {
-          nearest = nearest == null ? strike.distance_km : Math.min(nearest, strike.distance_km);
-        }
-      }
-    }
-
-    return { byZone, total: visibleStrikes.length, nearest, latest };
-  }, [isNationwide, strikes, visibleStrikes, timeRangeMin]);
 
   const boundaryStyle = useMemo(() => (
     mapTheme === "light"
@@ -1161,6 +1173,66 @@ export default function InteractiveMap({
   }, [satInfo]);
 
   const displaySatInfo = satInfo || lastGoodSatInfoRef.current;
+  const lightningReferenceTimeMs = useMemo(() => {
+    const activeFrameTm = activeFrames[frameIndex]?.tm || null;
+    const activeFrameTimeMs = parseFrameTmToMs(activeFrameTm);
+    if (Number.isFinite(activeFrameTimeMs)) return activeFrameTimeMs;
+
+    const echoTm = currentEchoFrame?.tm || echoMeta?.tm || null;
+    const echoTimeMs = parseFrameTmToMs(echoTm);
+    if (Number.isFinite(echoTimeMs)) return echoTimeMs;
+
+    const satTm = currentSatFrame?.tm || satMeta?.tm || null;
+    const satTimeMs = parseFrameTmToMs(satTm);
+    if (Number.isFinite(satTimeMs)) return satTimeMs;
+
+    return Date.now();
+  }, [activeFrames, frameIndex, currentEchoFrame, echoMeta, currentSatFrame, satMeta]);
+
+  const visibleStrikes = useMemo(() => {
+    const cutoff = lightningReferenceTimeMs - timeRangeMin * 60 * 1000;
+    const nationwideStrikes = lightningData?.nationwide?.strikes;
+    const source = Array.isArray(nationwideStrikes)
+      ? nationwideStrikes
+      : Object.entries(lightningData?.airports || {}).flatMap(([icao, data]) =>
+          (data?.strikes || []).map((strike) => ({ ...strike, airport: icao }))
+        );
+    return source.filter((s) => {
+      const t = new Date(s.time).getTime();
+      return Number.isFinite(t) && t >= cutoff && t <= lightningReferenceTimeMs;
+    });
+  }, [lightningData, lightningReferenceTimeMs, timeRangeMin]);
+
+  const lightningLegendEntries = useMemo(() => (
+    LIGHTNING_LEGEND_BANDS.map((band) => ({
+      ...band,
+      label: formatReferenceTimeLabel(lightningReferenceTimeMs - band.max * 60 * 1000),
+    }))
+  ), [lightningReferenceTimeMs]);
+
+  // Zone counts from per-airport data in airport mode; total always from nationwide
+  const summary = useMemo(() => {
+    const byZone = { alert: 0, danger: 0, caution: 0 };
+    let latest = null;
+    let nearest = null;
+
+    if (!isNationwide) {
+      const cutoff = lightningReferenceTimeMs - timeRangeMin * 60 * 1000;
+      const airportStrikes = (strikes || []).filter((s) => {
+        const t = new Date(s.time).getTime();
+        return Number.isFinite(t) && t >= cutoff && t <= lightningReferenceTimeMs;
+      });
+      for (const strike of airportStrikes) {
+        if (byZone[strike.zone] != null) byZone[strike.zone] += 1;
+        if (!latest || strike.time > latest) latest = strike.time;
+        if (strike.distance_km != null) {
+          nearest = nearest == null ? strike.distance_km : Math.min(nearest, strike.distance_km);
+        }
+      }
+    }
+
+    return { byZone, total: visibleStrikes.length, nearest, latest };
+  }, [isNationwide, strikes, visibleStrikes, timeRangeMin, lightningReferenceTimeMs]);
 
   const radarCoverageBoundary = useMemo(() => {
     if (!RADAR_SITES.length) return null;
@@ -1257,6 +1329,15 @@ export default function InteractiveMap({
           >
             낙뢰
           </button>
+          {showLightning && (
+            <button
+              type="button"
+              className={`range-btn lightning-blink-toggle ${blinkLightning ? "active" : ""}`}
+              onClick={() => setBlinkLightning((v) => !v)}
+            >
+              깜빡임
+            </button>
+          )}
             <button
               type="button"
               className={`range-btn sigmet-toggle ${showSigmet ? "active" : ""}`}
@@ -1346,23 +1427,49 @@ export default function InteractiveMap({
                 </div>
               </div>
             )}
-            {showEcho && echoInfo && (
-              <div className="rainrate-legend" aria-label="Radar rain rate legend">
-                <div className="rainrate-legend-title">mm/h</div>
-                <div className="rainrate-legend-scale">
-                  {RAINRATE_LEGEND.map((entry) => (
-                    <div key={entry.label} className="rainrate-legend-row">
-                      <span className="rainrate-legend-label">{entry.label}</span>
-                      <span
-                        className="rainrate-legend-swatch"
-                        style={{ backgroundColor: entry.color }}
-                        aria-hidden="true"
-                      />
+            {(showEcho && echoInfo) || showLightning ? (
+              <div className="map-right-legends">
+                {showEcho && echoInfo && (
+                  <div className="rainrate-legend" aria-label="Radar rain rate legend">
+                    <div className="rainrate-legend-title">mm/h</div>
+                    <div className="rainrate-legend-scale">
+                      {RAINRATE_LEGEND.map((entry) => (
+                        <div key={entry.label} className="rainrate-legend-row">
+                          <span className="rainrate-legend-label">{entry.label}</span>
+                          <span
+                            className="rainrate-legend-swatch"
+                            style={{ backgroundColor: entry.color }}
+                            aria-hidden="true"
+                          />
+                        </div>
+                      ))}
                     </div>
-                  ))}
-                </div>
+                  </div>
+                )}
+                {showLightning && (
+                  <div
+                    className="lightning-time-legend"
+                    aria-label="Lightning time legend"
+                  >
+                    <div className="lightning-time-legend-title">LIGHTNING</div>
+                    <div className="lightning-time-legend-sub">10 MIN</div>
+                    <div className="lightning-time-legend-current">{formatReferenceTimeLabel(lightningReferenceTimeMs)}</div>
+                    <div className="lightning-time-legend-scale">
+                      {lightningLegendEntries.map((entry) => (
+                        <div key={`${entry.min}-${entry.max}`} className="lightning-time-legend-row">
+                          <span className="lightning-time-legend-label">{entry.label}</span>
+                          <span
+                            className="lightning-time-legend-swatch"
+                            style={{ backgroundColor: entry.color }}
+                            aria-hidden="true"
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
-            )}
+            ) : null}
               <MapContainer
                 key={`interactive-map-${mapTheme}-${mapScope}`}
                 center={center}
@@ -1698,19 +1805,12 @@ export default function InteractiveMap({
 
             <Pane name="strike-pane" style={{ zIndex: 500 }}>
               {showLightning && visibleStrikes.map((strike, idx) => {
-                const { color, opacity } = getStrikeColor(strike.time);
+                const { color, opacity } = getStrikeColor(strike.time, lightningReferenceTimeMs);
                 return (
-                  <CircleMarker
+                  <Marker
                     key={`${strike.time}-${strike.lon}-${strike.lat}-${idx}`}
-                    center={[strike.lat, strike.lon]}
-                    radius={5}
-                    pathOptions={{
-                      color,
-                      opacity,
-                      fillColor: color,
-                      fillOpacity: opacity * 0.8,
-                      weight: 2,
-                    }}
+                    position={[strike.lat, strike.lon]}
+                    icon={createLightningIcon(color, opacity, blinkLightning)}
                   />
                 );
               })}

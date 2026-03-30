@@ -6,6 +6,7 @@ import { fileURLToPath } from "url";
 
 const require = createRequire(import.meta.url);
 const store = require("./backend/src/store");
+const config = require("./backend/src/config");
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
@@ -187,7 +188,11 @@ function readLightning() {
   let payload = {
     type: "lightning",
     fetched_at: new Date().toISOString(),
-    query: { itv_minutes: 3, range_km: 32, nationwide_range_km: 500 },
+    query: {
+      itv_minutes: config.lightning.itv_minutes,
+      nationwide_range_km: config.lightning.nationwide?.range_km || null,
+    },
+    history_window_minutes: 240,
     airports: {},
     nationwide: {
       summary: {

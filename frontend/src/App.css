@@ -1874,11 +1874,18 @@ body {
   color: #475569;
 }
 
-.rainrate-legend {
+.map-right-legends {
   position: absolute;
   top: 12px;
   right: 4px;
   z-index: 700;
+  display: grid;
+  gap: 8px;
+  justify-items: end;
+  align-items: end;
+}
+
+.rainrate-legend {
   display: grid;
   gap: 4px;
   width: 48px;
@@ -1929,6 +1936,74 @@ body {
   width: 9px;
   min-width: 9px;
   height: 14px;
+  border: 1px solid rgba(17, 24, 39, 0.12);
+}
+
+.lightning-time-legend {
+  display: grid;
+  gap: 4px;
+  width: 74px;
+  padding: 6px 4px 7px 6px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid rgba(17, 24, 39, 0.18);
+  box-shadow: 0 10px 26px rgba(15, 23, 42, 0.2);
+  backdrop-filter: blur(4px);
+}
+
+.lightning-time-legend-title,
+.lightning-time-legend-sub,
+.lightning-time-legend-current,
+.lightning-time-legend-label {
+  color: #111827;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.lightning-time-legend-title {
+  font-size: 0.62rem;
+  font-weight: 900;
+  line-height: 1;
+  letter-spacing: 0.04em;
+}
+
+.lightning-time-legend-sub {
+  font-size: 0.58rem;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.lightning-time-legend-current {
+  font-size: 0.68rem;
+  font-weight: 800;
+  line-height: 1.1;
+  margin-bottom: 1px;
+}
+
+.lightning-time-legend-scale {
+  display: grid;
+  gap: 0;
+}
+
+.lightning-time-legend-row {
+  display: grid;
+  grid-template-columns: 1fr 12px;
+  align-items: center;
+  gap: 4px;
+  min-height: 18px;
+}
+
+.lightning-time-legend-label {
+  font-size: 0.62rem;
+  line-height: 1;
+  letter-spacing: -0.02em;
+}
+
+.lightning-time-legend-swatch {
+  display: block;
+  width: 12px;
+  min-width: 12px;
+  height: 18px;
   border: 1px solid rgba(17, 24, 39, 0.12);
 }
 
@@ -2163,6 +2238,58 @@ body {
   font-size: 0.8rem;
   font-weight: 700;
   white-space: nowrap;
+}
+
+.leaflet-lightning-icon {
+  background: transparent;
+  border: 0;
+}
+
+.leaflet-lightning-glyph {
+  position: relative;
+  display: inline-block;
+  width: 22px;
+  height: 22px;
+  pointer-events: none;
+}
+
+.leaflet-lightning-stroke {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  box-shadow:
+    -1px -1px 0 rgba(0, 0, 0, 0.98),
+    1px -1px 0 rgba(0, 0, 0, 0.98),
+    -1px 1px 0 rgba(0, 0, 0, 0.98),
+    1px 1px 0 rgba(0, 0, 0, 0.98),
+    0 0 4px rgba(0, 0, 0, 0.7);
+}
+
+.leaflet-lightning-stroke--h {
+  width: 16px;
+  height: 2px;
+}
+
+.leaflet-lightning-stroke--v {
+  width: 2px;
+  height: 16px;
+}
+
+.leaflet-lightning-glyph--blink {
+  animation: lightning-blink 1s steps(2, end) infinite;
+}
+
+@keyframes lightning-blink {
+  0%, 45% {
+    opacity: 1;
+  }
+  50%, 95% {
+    opacity: 0.12;
+  }
+  100% {
+    opacity: 1;
+  }
 }
 
 .echo-toggle {
@@ -3175,6 +3302,23 @@ tr.row-danger td { background: #ffe9e7; }
 }
 
 [data-theme="dark"] .rainrate-legend-swatch {
+  border-color: rgba(255, 255, 255, 0.15);
+}
+
+[data-theme="dark"] .lightning-time-legend {
+  background: rgba(26, 29, 36, 0.92);
+  border-color: rgba(255, 255, 255, 0.1);
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.5);
+}
+
+[data-theme="dark"] .lightning-time-legend-title,
+[data-theme="dark"] .lightning-time-legend-sub,
+[data-theme="dark"] .lightning-time-legend-current,
+[data-theme="dark"] .lightning-time-legend-label {
+  color: #cbd5e1;
+}
+
+[data-theme="dark"] .lightning-time-legend-swatch {
   border-color: rgba(255, 255, 255, 0.15);
 }
 

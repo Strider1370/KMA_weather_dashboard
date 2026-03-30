@@ -277,6 +277,7 @@ node backend/test/run-once.js amos
 node backend/test/run-once.js warning
 node backend/test/run-once.js sigwx-low
 node backend/test/run-once.js lightning
+node backend/test/run-once.js lightning-backfill
 node backend/test/run-once.js radar-echo
 node backend/test/run-once.js adsb
 node backend/test/run-once.js satellite
@@ -316,6 +317,8 @@ $env:NODE_TLS_REJECT_UNAUTHORIZED="0"; node backend/test/run-once.js adsb
 - TAF 패널은 상단 토글로 `타임라인`과 `테이블`을 전환할 수 있으며, 테이블 뷰는 연속된 동일 조건을 시간 구간 단위로 병합해 축약 표시합니다.
 - 낙뢰 마커는 Airport/Korea 모드 모두 전국(`nationwide`) 데이터를 표시합니다.
 - Airport 모드의 8km/16km/32km 카운트는 선택 공항 기준 zone 집계를 그대로 유지합니다.
+- 낙뢰 데이터는 5분 간격 전국 1회 호출 결과를 4시간 롤링 히스토리로 누적 저장하며, 지도에서는 현재 선택된 레이더/위성 프레임 시각 기준 최근 60분만 표시합니다.
+- 낙뢰 토글이 켜지면 우측에 시간대 범례가 표시되고, `깜빡임` 버튼으로 낙뢰 마커 점멸 효과를 켜고 끌 수 있습니다.
 - 공항 선택은 경로별로 로컬 저장됩니다.
   - `/`: 기본 공항 `RKSI`, `TST1` 숨김
   - `/test`: 기본 공항 `TST1`, `TST1` 선택 가능

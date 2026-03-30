@@ -97,6 +97,11 @@ function parse(responseText, airport, zones, options = {}) {
       height: type === "C" && Number.isFinite(Number(htRaw)) ? Number(htRaw) : null
     };
 
+    if (options.classify === false) {
+      strikes.push(strike);
+      continue;
+    }
+
     const classified = classifyStrike(strike, airport, zones);
     const shouldInclude = classified.zone !== "outside" || options.includeOutside === true;
     if (!shouldInclude) continue;
@@ -118,6 +123,7 @@ function parse(responseText, airport, zones, options = {}) {
 
 module.exports = {
   parse,
+  classifyStrike,
   haversineKm,
   kstToUtcIso,
   kstToKstIso

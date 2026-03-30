@@ -52,6 +52,10 @@ function writeJson(filePath, data) {
   fs.writeFileSync(filePath, `${JSON.stringify(data, null, 2)}\n`, "utf8");
 }
 
+function getMaxFilesForType(type) {
+  return config.storage.max_files_by_type?.[type] || config.storage.max_files_per_category;
+}
+
 function rotateFiles(dir, maxCount = config.storage.max_files_per_category) {
   const files = fs
     .readdirSync(dir)
@@ -67,14 +71,14 @@ function rotateFiles(dir, maxCount = config.storage.max_files_per_category) {
   }
 }
 
-function saveAndUpdateLatest(dir, filename, data) {
+function saveAndUpdateLatest(dir, filename, data, type = null) {
   const filePath = path.join(dir, filename);
   writeJson(filePath, data);
 
   const latestPath = path.join(dir, "latest.json");
   writeJson(latestPath, data);
 
-  rotateFiles(dir);
+  rotateFiles(dir, getMaxFilesForType(type));
   return filePath;
 }
 
@@ -201,7 +205,7 @@ function save(type, data) {
     attempt += 1;
   }
   data.content_hash = decision.hash;
-  const filePath = saveAndUpdateLatest(dir, filename, data);
+  const filePath = saveAndUpdateLatest(dir, filename, data, type);
   updateCache(type, data, decision.hash);
 
   return { saved: true, filePath };

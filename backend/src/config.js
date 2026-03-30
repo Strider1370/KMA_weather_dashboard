@@ -40,11 +40,11 @@ module.exports = {
   airports,
   lightning: {
     range_km: 32,
-    itv_minutes: 3,
+    itv_minutes: 5,
     nationwide: {
       lat: 36.2,
       lon: 127.8,
-      range_km: 500
+      range_km: 800
     },
     zones: {
       alert: 8,
@@ -101,6 +101,9 @@ module.exports = {
   },
   storage: {
     base_path: resolveDataPath(process.env.DATA_PATH),
-    max_files_per_category: 10
+    max_files_per_category: 10,
+    max_files_by_type: {
+      lightning: 48
+    }
   }
 };
