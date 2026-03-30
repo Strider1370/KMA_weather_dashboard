@@ -5,6 +5,7 @@ const { parseRadarBinary, renderFullCoverageEcho } = require("../parsers/radar-e
 
 let backgroundFillRunning = false;
 const RENDER_VERSION = "rainrate-reproject-full-v2";
+const IMMEDIATE_FRAME_COUNT = 4;
 
 function ensureRadarDir() {
   const radarDir = path.join(config.storage.base_path, "radar");
@@ -227,14 +228,8 @@ async function process() {
     return !(fs.existsSync(filePath) && existingFrames.get(tm));
   });
 
-  let immediateTms = missingTms;
-  let deferredTms = [];
-
-  if (missingTms.length > 4) {
-    const immediateCount = Math.max(1, Math.ceil(missingTms.length / 4));
-    immediateTms = missingTms.slice(-immediateCount);
-    deferredTms = missingTms.slice(0, -immediateCount);
-  }
+  const immediateTms = missingTms.slice(-IMMEDIATE_FRAME_COUNT);
+  const deferredTms = missingTms.slice(0, -IMMEDIATE_FRAME_COUNT);
 
   for (const tm of immediateTms) {
     try {

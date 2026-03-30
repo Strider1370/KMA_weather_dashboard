@@ -61,6 +61,41 @@ export function getSeverityLevel({ visibility, wind, gust }) {
   return "ok";
 }
 
+const PRECIPITATION_WEATHER_TOKENS = ["RA", "SN", "DZ", "SG", "PL", "GR", "GS", "UP", "SH", "IC"];
+
+export function hasPrecipitationWeather(source) {
+  const raw = String(source?.display?.weather || source || "").toUpperCase();
+  if (!raw || raw === "NSW") return false;
+  return PRECIPITATION_WEATHER_TOKENS.some((token) => raw.includes(token));
+}
+
+export function hasHighWindCondition(wind, speedThreshold = 25, gustThreshold = 35) {
+  if (!wind || wind.calm) return false;
+  const speed = Number.isFinite(wind.speed) ? wind.speed : null;
+  const gust = Number.isFinite(wind.gust) ? wind.gust : null;
+  return (speed != null && speed >= speedThreshold) || (gust != null && gust >= gustThreshold);
+}
+
+export function pickRunwayDirection(runwayHdg, windDir) {
+  if (!Number.isFinite(runwayHdg)) return null;
+  if (!Number.isFinite(windDir)) return runwayHdg;
+  const optionA = runwayHdg;
+  const optionB = (runwayHdg + 180) % 360;
+  const diffA = Math.abs(((windDir - optionA + 180 + 360) % 360) - 180);
+  const diffB = Math.abs(((windDir - optionB + 180 + 360) % 360) - 180);
+  return diffA <= diffB ? optionA : optionB;
+}
+
+export function getCrosswindComponentKt(wind, runwayHdg) {
+  if (!wind || wind.calm) return 0;
+  if (!Number.isFinite(wind.speed) || !Number.isFinite(wind.direction) || !Number.isFinite(runwayHdg)) {
+    return null;
+  }
+  const selectedRunwayHdg = pickRunwayDirection(runwayHdg, wind.direction);
+  const relative = ((wind.direction - selectedRunwayHdg + 540) % 360) - 180;
+  return Math.abs(wind.speed * Math.sin((relative * Math.PI) / 180));
+}
+
 export function severityLabel(level) {
   if (level === "danger") return "High Risk";
   if (level === "warn") return "Advisory";

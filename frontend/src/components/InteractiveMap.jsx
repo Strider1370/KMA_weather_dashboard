@@ -186,6 +186,24 @@ const MIN_FRAME_MS = 100;
 const MAX_FRAME_MS = 2000;
 const FRAME_MS_STEP = 100;
 const AIRCRAFT_AIRPORT_RANGE_KM = 120;
+const framePreloadCache = new Map();
+
+function preloadFrameImages(frames) {
+  const imageRefs = [];
+
+  for (const frame of frames) {
+    if (!frame?.path) continue;
+    if (framePreloadCache.has(frame.path)) continue;
+
+    const img = new Image();
+    img.decoding = "async";
+    img.src = frame.path;
+    framePreloadCache.set(frame.path, true);
+    imageRefs.push(img);
+  }
+
+  return imageRefs;
+}
 
 function getStrikeColor(strikeTimeIso) {
   const elapsedMin = (Date.now() - new Date(strikeTimeIso).getTime()) / 60000;
@@ -1091,24 +1109,17 @@ export default function InteractiveMap({
   }, [resolveLoopIndex, loopStart, loopEnd]);
 
   useEffect(() => {
-    if (!echoFrames.length) return undefined;
-
-    const imageRefs = echoFrames
-      .map((frame) => {
-        if (!frame?.path) return null;
-        const img = new Image();
-        img.decoding = "async";
-        img.src = frame.path;
-        return img;
-      })
-      .filter(Boolean);
+    const imageRefs = [
+      ...preloadFrameImages(echoFrames),
+      ...preloadFrameImages(satFrames),
+    ];
 
     return () => {
       imageRefs.forEach((img) => {
         img.src = "";
       });
     };
-  }, [echoFrames]);
+  }, [echoFrames, satFrames]);
 
   function changePlaybackSpeed(delta) {
     setPlaybackMs((prev) => {
@@ -1132,7 +1143,7 @@ export default function InteractiveMap({
 
   const satInfo = useMemo(() => {
     if (!currentSatFrame?.path || !currentSatFrame?.bounds) return null;
-    const isVersioned = /sat_korea_\d{12}\.png$/.test(currentSatFrame.path);
+    const isVersioned = /sat_korea_\d{12}\.(?:png|webp)$/.test(currentSatFrame.path);
     return {
       url: isVersioned
         ? currentSatFrame.path
@@ -1141,6 +1152,15 @@ export default function InteractiveMap({
       tm: currentSatFrame.tm || satMeta?.tm || null,
     };
   }, [currentSatFrame, satMeta]);
+  const lastGoodSatInfoRef = useRef(null);
+
+  useEffect(() => {
+    if (satInfo) {
+      lastGoodSatInfoRef.current = satInfo;
+    }
+  }, [satInfo]);
+
+  const displaySatInfo = satInfo || lastGoodSatInfoRef.current;
 
   const radarCoverageBoundary = useMemo(() => {
     if (!RADAR_SITES.length) return null;
@@ -1225,8 +1245,8 @@ export default function InteractiveMap({
               type="button"
               className={`range-btn satellite-toggle ${showSatellite ? "active" : ""}`}
               onClick={() => setShowSatellite((v) => !v)}
-              title={satInfo ? `안개영상 (${satInfo.tm || ""})` : "안개영상을 사용할 수 없습니다"}
-              disabled={!satInfo}
+              title={displaySatInfo ? `안개영상 (${displaySatInfo.tm || ""})` : "안개영상을 사용할 수 없습니다"}
+              disabled={!displaySatInfo}
             >
               안개
             </button>
@@ -1376,11 +1396,11 @@ export default function InteractiveMap({
               </Pane>
             )}
 
-            {showSatellite && satInfo && (
+            {showSatellite && displaySatInfo && (
               <Pane name="satellite-pane" style={{ zIndex: 390 }}>
                 <ImageOverlay
-                  url={satInfo.url}
-                  bounds={satInfo.bounds}
+                  url={displaySatInfo.url}
+                  bounds={displaySatInfo.bounds}
                   opacity={1}
                 />
               </Pane>

@@ -10,6 +10,10 @@ import {
   getFlightCategory,
   FLIGHT_CATEGORY_META,
   isDarkTheme,
+  hasPrecipitationWeather,
+  hasHighWindCondition,
+  pickRunwayDirection,
+  getCrosswindComponentKt,
 } from "../utils/helpers";
 
 function catColors(cat) {
@@ -22,6 +26,8 @@ import WeatherIcon from "./WeatherIcon";
 import { convertWeatherToKorean } from "../utils/visual-mapper";
 import { resolveWeatherVisual } from "../utils/weather-visual-resolver";
 
+const CROSSWIND_ALERT_THRESHOLD_KT = 15;
+
 function getWindDirectionLabel(wind) {
   if (!wind) return "-";
   if (wind.calm) return "CALM";
@@ -30,26 +36,15 @@ function getWindDirectionLabel(wind) {
   return `${wind.direction}°`;
 }
 
-function pickRunwayDirection(runwayHdg, windDir) {
-  if (!Number.isFinite(runwayHdg)) return null;
-  if (!Number.isFinite(windDir)) return runwayHdg;
-  const optionA = runwayHdg;
-  const optionB = (runwayHdg + 180) % 360;
-  const diffA = Math.abs(((windDir - optionA + 180 + 360) % 360) - 180);
-  const diffB = Math.abs(((windDir - optionB + 180 + 360) % 360) - 180);
-  return diffA <= diffB ? optionA : optionB;
-}
-
 function formatCrosswindText(wind, runwayHdg) {
   if (!wind || wind.calm) return "측풍 0kt";
-  if (!Number.isFinite(wind.speed) || !Number.isFinite(wind.direction) || !Number.isFinite(runwayHdg)) {
+  const crosswind = getCrosswindComponentKt(wind, runwayHdg);
+  if (!Number.isFinite(crosswind)) {
     return "측풍 -";
   }
   const selectedRunwayHdg = pickRunwayDirection(runwayHdg, wind.direction);
   const relative = ((wind.direction - selectedRunwayHdg + 540) % 360) - 180;
-  const crosswindComponent = wind.speed * Math.sin((relative * Math.PI) / 180);
-  const side = crosswindComponent > 0 ? "R" : crosswindComponent < 0 ? "L" : "";
-  const crosswind = Math.abs(crosswindComponent);
+  const side = relative > 0 ? "R" : relative < 0 ? "L" : "";
   return side ? `측풍 ${side}/${Math.round(crosswind)}kt` : `측풍 ${Math.round(crosswind)}kt`;
 }
 
@@ -271,6 +266,15 @@ export default function MetarCard({
   const metarTimeText = metarTime.trim();
   const metarBadgeText = getMetarBadgeText(target.header, metarData?.type);
   const specialWeather = hasSpecialWeather(target.observation);
+  const precipitationWeather = hasPrecipitationWeather(target.observation);
+  const highWind = hasHighWindCondition(wind);
+  const crosswindComponentKt = getCrosswindComponentKt(wind, airportMeta?.runway_hdg ?? null);
+  const crosswindAlert = Number.isFinite(crosswindComponentKt) && crosswindComponentKt >= CROSSWIND_ALERT_THRESHOLD_KT;
+  const precipitationCardStyle = precipitationWeather
+    ? (isDarkTheme()
+      ? { backgroundColor: "rgba(14, 116, 144, 0.34)", borderColor: "rgba(125, 211, 252, 0.5)" }
+      : { backgroundColor: "rgba(186, 230, 253, 0.72)", borderColor: "rgba(125, 211, 252, 0.9)" })
+    : null;
 
   return (
     <section className="metar-panel">
@@ -386,7 +390,7 @@ export default function MetarCard({
           <div className="metar-section-head" />
           <div className="metar-section-body metar-section-body--weather">
             <div className="metar-weather-grid">
-              <article className="metar-surface-card metar-surface-card--wind">
+              <article className={`metar-surface-card metar-surface-card--wind${highWind ? " metar-card--alert-outline" : ""}`}>
                 <div className="metar-side-label">
                   <div className="metar-side-icon metar-side-icon--wind">
                     <span
@@ -413,7 +417,10 @@ export default function MetarCard({
                 </div>
               </article>
 
-              <article className={`metar-surface-card metar-surface-card--weather${specialWeather ? " metar-card--special-weather" : ""}`}>
+              <article
+                className={`metar-surface-card metar-surface-card--weather${specialWeather ? " metar-card--special-weather" : ""}${precipitationWeather ? " metar-card--precip-weather" : ""}`}
+                style={precipitationCardStyle || undefined}
+              >
                 <div className="metar-side-label">
                   <div className="metar-side-icon metar-side-icon--weather-image">
                     <img src="/weather-title.png" alt="" aria-hidden="true" />
@@ -437,7 +444,7 @@ export default function MetarCard({
             </div>
 
             <div className="metar-weather-grid metar-weather-grid--bottom">
-              <article className="metar-surface-card metar-surface-card--compact">
+              <article className={`metar-surface-card metar-surface-card--compact${crosswindAlert ? " metar-card--alert-outline" : ""}`}>
                 <div className="metar-side-label">
                   <div className="metar-side-icon metar-side-icon--metric">
                     <span className="metar-direction-arrow" aria-hidden="true">{crosswindArrow}</span>

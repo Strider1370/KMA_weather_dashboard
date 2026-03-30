@@ -670,6 +670,16 @@ body {
   outline-offset: -2px;
 }
 
+.metar-card--alert-outline {
+  outline: 2px dashed #dc2626;
+  outline-offset: -2px;
+}
+
+.metar-card--precip-weather .metar-weather-text,
+.metar-card--precip-weather .metar-rain-text {
+  color: var(--ink);
+}
+
 .metar-surface-card--weather,
 .metar-surface-card--wind {
   min-height: 0;
@@ -1273,6 +1283,20 @@ body {
   margin: 0 auto;
 }
 
+.taf-weather-cell--precip {
+  background: rgba(186, 230, 253, 0.72);
+  border-radius: 10px;
+  padding: 4px 8px;
+}
+
+.taf-wind-cell--alert {
+  width: auto;
+  padding: 4px 8px;
+  border: 2px dashed #dc2626;
+  border-radius: 10px;
+  margin: 0 auto;
+}
+
 .taf-table-center {
   text-align: center;
 }
@@ -1436,6 +1460,18 @@ body {
 
 .taf-new-seg--special-weather {
   border: 2px dashed #dc2626 !important;
+}
+
+.taf-new-seg--precip-weather {
+  border-color: rgba(14, 116, 144, 0.85);
+}
+
+.taf-new-seg--wind-alert {
+  border: 2px dashed #dc2626 !important;
+}
+
+[data-theme="dark"] .taf-weather-cell--precip {
+  background: rgba(14, 116, 144, 0.34);
 }
 
 .taf-new-seg .weather-icon-wrapper {

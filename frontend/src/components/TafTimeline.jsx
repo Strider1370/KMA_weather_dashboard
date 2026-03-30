@@ -8,6 +8,8 @@ import {
   classifyVisibilityCategory,
   classifyCeilingCategory,
   isDarkTheme,
+  hasPrecipitationWeather,
+  hasHighWindCondition,
 } from "../utils/helpers";
 import WeatherIcon from "./WeatherIcon";
 import {
@@ -38,7 +40,12 @@ const TINT_STYLE_DARK = {
 function getTintStyle(category) {
   return isDarkTheme() ? (TINT_STYLE_DARK[category] || TINT_STYLE_DARK.VFR) : (TINT_STYLE[category] || TINT_STYLE.VFR);
 }
-function getWeatherStyle() {
+function getWeatherStyle(hasPrecipitation) {
+  if (hasPrecipitation) {
+    return isDarkTheme()
+      ? { backgroundColor: "rgba(14, 116, 144, 0.34)", color: "#e0f2fe" }
+      : { backgroundColor: "rgba(186, 230, 253, 0.72)", color: "#0c4a6e" };
+  }
   return { backgroundColor: "var(--card-bg)", color: isDarkTheme() ? "#ffffff" : "#111111" };
 }
 
@@ -141,6 +148,10 @@ function getSegmentClassName(baseClass, density, extraClasses = "") {
 function hasSpecialWeather(slot) {
   const raw = String(slot?.display?.weather || "").toUpperCase();
   return ["TS", "SN", "FG"].some((token) => raw.includes(token));
+}
+
+function hasAlertWind(slot) {
+  return hasHighWindCondition(slot?.wind);
 }
 
 function getTafBadgeText(header) {
@@ -343,6 +354,7 @@ export default function TafTimeline({ tafData, icao, minimaSettings = null, vers
                     ? { ...weatherVisual, intensityOverlay: null }
                     : weatherVisual;
                   const [, weatherLabel = group.value] = String(group.value).split("|");
+                  const precipitationWeather = hasPrecipitationWeather(group.data);
 
                   return (
                     <div
@@ -350,9 +362,9 @@ export default function TafTimeline({ tafData, icao, minimaSettings = null, vers
                       className={getSegmentClassName(
                         "taf-new-seg--weather",
                         density,
-                        hasSpecialWeather(group.data) ? " taf-new-seg--special-weather" : ""
+                        `${hasSpecialWeather(group.data) ? " taf-new-seg--special-weather" : ""}${precipitationWeather ? " taf-new-seg--precip-weather" : ""}`
                       )}
-                      style={{ width: `${group.width}%`, ...getWeatherStyle() }}
+                      style={{ width: `${group.width}%`, ...getWeatherStyle(precipitationWeather) }}
                       title={weatherLabel}
                     >
                       <WeatherIcon visual={miniWeatherVisual} className="mini" />
@@ -372,10 +384,11 @@ export default function TafTimeline({ tafData, icao, minimaSettings = null, vers
                 const wind = group.data.wind;
                 const windText = `${wind?.speed ?? 0}${wind?.gust ? `G${wind.gust}` : ""}kt`;
                 const rotation = (wind?.direction || 0) + 180;
+                const alertWind = hasAlertWind(group.data);
                 return (
                   <div
                     key={i}
-                    className={getSegmentClassName("taf-new-seg--wind", density)}
+                    className={getSegmentClassName("taf-new-seg--wind", density, alertWind ? " taf-new-seg--wind-alert" : "")}
                     style={{ width: `${group.width}%`, ...WIND_STYLE }}
                     title={`${wind?.direction ?? "VRB"}° ${windText}`}
                   >
@@ -525,6 +538,8 @@ export default function TafTimeline({ tafData, icao, minimaSettings = null, vers
                 slot.clouds || []
               );
               const isSpecialWeather = hasSpecialWeather(slot);
+              const hasPrecipitation = hasPrecipitationWeather(slot);
+              const highWind = hasAlertWind(slot);
               const windRotation = (slot.wind?.direction || 0) + 180;
               const level = getSeverityLevel({
                 visibility: visibilityValue,
@@ -553,13 +568,13 @@ export default function TafTimeline({ tafData, icao, minimaSettings = null, vers
                     {formatCeiling(ceiling)}
                   </td>
                   <td className="taf-table-center">
-                    <span className="taf-wind-cell">
+                    <span className={`taf-wind-cell${highWind ? " taf-wind-cell--alert" : ""}`}>
                       <span className="wind-arrow-inline" style={{ transform: `rotate(${windRotation}deg)` }}>↑</span>
                       <span>{safe(slot.display?.wind)}</span>
                     </span>
                   </td>
                   <td className="taf-table-center">
-                    <span className={`taf-weather-cell${isSpecialWeather ? " taf-weather-cell--special" : ""}`}>
+                    <span className={`taf-weather-cell${isSpecialWeather ? " taf-weather-cell--special" : ""}${hasPrecipitation ? " taf-weather-cell--precip" : ""}`}>
                       <WeatherIcon visual={weatherVisual} className="mini" />
                       <span>{weatherLabel}</span>
                     </span>

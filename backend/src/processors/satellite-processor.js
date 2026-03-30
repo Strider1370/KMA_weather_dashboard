@@ -1,10 +1,12 @@
 const fs = require("fs");
 const path = require("path");
+const sharp = require("sharp");
 const config = require("../config");
 const { parseSatelliteNC, parseFogNC, renderFogImage } = require("../parsers/satellite-parser");
 
 let backgroundFillRunning = false;
-const RENDER_VERSION = "fog-composite-v2-kst-tm";
+const RENDER_VERSION = "fog-composite-v3-kst-tm-webp";
+const IMMEDIATE_FRAME_COUNT = 2;
 
 function ensureSatelliteDir() {
   const dir = path.join(config.storage.base_path, "satellite");
@@ -115,7 +117,7 @@ function buildFrameSpecs(latestRequestTm, frameCount) {
 }
 
 async function renderFrame(satDir, requestTm, displayTm) {
-  const filename = `sat_korea_${displayTm}.png`;
+  const filename = `sat_korea_${displayTm}.webp`;
   const filePath = path.join(satDir, filename);
 
   // Fetch both IR105 and FOG NC files in parallel
@@ -140,7 +142,11 @@ async function renderFrame(satDir, requestTm, displayTm) {
     result = await renderFogImage(irParsed, { fogData: null, delFta: null });
   }
 
-  fs.writeFileSync(filePath, result.pngBuffer);
+  const webpBuffer = await sharp(result.pngBuffer)
+    .webp({ quality: 90, effort: 6 })
+    .toBuffer();
+
+  fs.writeFileSync(filePath, webpBuffer);
 
   return {
     tm: displayTm,
@@ -182,7 +188,7 @@ function writeMeta(satDir, latestFrameSpec, frameSpecs, existingFrames) {
   const validNames = new Set(frames.map((frame) => path.basename(frame.path)));
 
   for (const filename of fs.readdirSync(satDir)) {
-    if (/^sat_korea_\d{12}\.png$/.test(filename) && !validNames.has(filename)) {
+    if (/^sat_korea_\d{12}\.(?:png|webp)$/.test(filename) && !validNames.has(filename)) {
       fs.unlinkSync(path.join(satDir, filename));
     }
   }
@@ -199,7 +205,7 @@ function scheduleBackgroundFill(satDir, pendingFrameSpecs, existingFrames, lates
   setTimeout(async () => {
     try {
       for (const frameSpec of pendingFrameSpecs) {
-        const filename = `sat_korea_${frameSpec.displayTm}.png`;
+        const filename = `sat_korea_${frameSpec.displayTm}.webp`;
         const filePath = path.join(satDir, filename);
         if (fs.existsSync(filePath) && existingFrames.get(frameSpec.displayTm)) continue;
 
@@ -245,7 +251,7 @@ async function process() {
     ((sameRenderVersion ? existingMeta?.frames : []) || []).map((frame) => [frame.tm, frame])
   );
   const missingFrameSpecs = frameSpecs.filter((frameSpec) => {
-    const filename = `sat_korea_${frameSpec.displayTm}.png`;
+    const filename = `sat_korea_${frameSpec.displayTm}.webp`;
     const filePath = path.join(satDir, filename);
     if (!fs.existsSync(filePath) || !existingFrames.get(frameSpec.displayTm)) return true;
     // Re-render frames where FOG fetch failed (fogPixelCount=null means FOG NC was unavailable)
@@ -254,14 +260,8 @@ async function process() {
     return false;
   });
 
-  let immediateFrameSpecs = missingFrameSpecs;
-  let deferredFrameSpecs = [];
-
-  if (missingFrameSpecs.length > 4) {
-    const immediateCount = Math.max(1, Math.ceil(missingFrameSpecs.length / 4));
-    immediateFrameSpecs = missingFrameSpecs.slice(-immediateCount);
-    deferredFrameSpecs = missingFrameSpecs.slice(0, -immediateCount);
-  }
+  const immediateFrameSpecs = missingFrameSpecs.slice(-IMMEDIATE_FRAME_COUNT);
+  const deferredFrameSpecs = missingFrameSpecs.slice(0, -IMMEDIATE_FRAME_COUNT);
 
   for (const frameSpec of immediateFrameSpecs) {
     try {

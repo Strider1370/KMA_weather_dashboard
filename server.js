@@ -41,6 +41,8 @@ const TST1_ROOT = path.join(DATA_ROOT, "TST1");
 const SHARED_AIRPORTS = path.resolve(__dirname, "shared/airports.js");
 const SHARED_WARNING_TYPES = path.resolve(__dirname, "shared/warning-types.js");
 const SHARED_ALERT_DEFAULTS = path.resolve(__dirname, "shared/alert-defaults.js");
+const FRAME_CACHE_TTL_MS = 3 * 60 * 60 * 1000;
+const frameAssetCache = new Map();
 
 function buildBaseHeaders(req) {
   const headers = {
@@ -227,7 +229,49 @@ function contentTypeFor(filePath) {
   if (filePath.endsWith(".svg")) return "image/svg+xml";
   if (filePath.endsWith(".ico")) return "image/x-icon";
   if (filePath.endsWith(".png")) return "image/png";
+  if (filePath.endsWith(".webp")) return "image/webp";
   return "text/plain; charset=utf-8";
+}
+
+function isFrameAsset(filePath) {
+  return /[\\/](radar[\\/]echo_korea_\d{12}\.png|satellite[\\/]sat_korea_\d{12}\.webp)$/.test(filePath);
+}
+
+function pruneFrameAssetCache(now = Date.now()) {
+  for (const [key, entry] of frameAssetCache.entries()) {
+    if ((now - entry.cachedAt) > FRAME_CACHE_TTL_MS) {
+      frameAssetCache.delete(key);
+    }
+  }
+}
+
+function readDataAsset(filePath) {
+  if (!isFrameAsset(filePath)) {
+    return fs.readFileSync(filePath);
+  }
+
+  const now = Date.now();
+  pruneFrameAssetCache(now);
+
+  const stat = fs.statSync(filePath);
+  const cached = frameAssetCache.get(filePath);
+  if (
+    cached &&
+    (now - cached.cachedAt) <= FRAME_CACHE_TTL_MS &&
+    cached.mtimeMs === stat.mtimeMs &&
+    cached.size === stat.size
+  ) {
+    return cached.body;
+  }
+
+  const body = fs.readFileSync(filePath);
+  frameAssetCache.set(filePath, {
+    body,
+    cachedAt: now,
+    mtimeMs: stat.mtimeMs,
+    size: stat.size,
+  });
+  return body;
 }
 
 function serveDataAsset(req, res) {
@@ -243,10 +287,9 @@ function serveDataAsset(req, res) {
     return true;
   }
 
-  const body = fs.readFileSync(filePath);
-  const immutableFramePattern = /[\\/](radar[\\/]echo_korea_\d{12}\.png|satellite[\\/]sat_korea_\d{12}\.png)$/;
-  const cacheControl = immutableFramePattern.test(filePath)
-    ? "public, max-age=31536000, immutable"
+  const body = readDataAsset(filePath);
+  const cacheControl = isFrameAsset(filePath)
+    ? "public, max-age=10800"
     : "no-cache";
   res.writeHead(200, {
     ...buildBaseHeaders(req),
