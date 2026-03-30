@@ -429,17 +429,29 @@ function advisoryLabel(item) {
 function advisoryAltitudeLabel(item) {
   const lower = item?.altitude?.lower_fl;
   const upper = item?.altitude?.upper_fl;
-  if (lower == null && upper == null) return "怨좊룄 誘몄긽";
+  if (lower == null && upper == null) return "고도 정보 없음";
   if (lower != null && upper != null) return `FL${String(lower).padStart(3, "0")} - FL${String(upper).padStart(3, "0")}`;
   if (lower != null) return `ABV FL${String(lower).padStart(3, "0")}`;
   return `BLW FL${String(upper).padStart(3, "0")}`;
+}
+
+function advisoryAltitudeParts(item) {
+  const lower = item?.altitude?.lower_fl;
+  const upper = item?.altitude?.upper_fl;
+  if (lower != null && upper != null) {
+    return {
+      upper: `FL${String(upper).padStart(3, "0")}`,
+      lower: `FL${String(lower).padStart(3, "0")}`,
+    };
+  }
+  return null;
 }
 
 function advisoryShowsAltitude(item) {
   const code = String(item?.phenomenon_code || "").toUpperCase();
   const label = String(item?.phenomenon_label || "").toUpperCase();
   if (code.includes("SFC_VIS") || code.includes("VIS")) return false;
-  if (label.includes("SURFACE VIS") || label.includes("SFC VIS") || label.includes("吏???쒖젙")) return false;
+  if (label.includes("SURFACE VIS") || label.includes("SFC VIS") || label.includes("지상시정")) return false;
   return true;
 }
 
@@ -527,15 +539,33 @@ function advisoryCenter(item) {
   return null;
 }
 
+function formatIconAltitudeText(value) {
+  return String(value || "").replace(/\bFL/g, "").replace(/\s+/g, " ").trim();
+}
+
 function createAdvisoryIcon(item, kind) {
   const label = advisoryPhenomenonLabel(item?.phenomenon_code);
+  const altitude = advisoryShowsAltitude(item) ? advisoryAltitudeLabel(item) : "";
+  const altitudeParts = advisoryShowsAltitude(item) ? advisoryAltitudeParts(item) : null;
+  const altitudeHtml = altitudeParts
+    ? `<span class="leaflet-advisory-icon-alt-stack"><span>${escapeHtml(formatIconAltitudeText(altitudeParts.upper))}</span><span class="leaflet-advisory-icon-alt-divider"></span><span>${escapeHtml(formatIconAltitudeText(altitudeParts.lower))}</span></span>`
+    : altitude && altitude !== "-"
+      ? `<span class="leaflet-advisory-icon-alt-single">${escapeHtml(formatIconAltitudeText(altitude))}</span>`
+      : "";
   const color = advisoryColor(item, kind);
-  const width = Math.max(53, Math.min(88, 15 + label.length * 7));
+  const maxLineLength = Math.max(
+    label.length,
+    altitudeParts
+      ? Math.max(formatIconAltitudeText(altitudeParts.upper).length, formatIconAltitudeText(altitudeParts.lower).length)
+      : formatIconAltitudeText(altitude).length
+  );
+  const width = Math.max(72, Math.min(118, 20 + (maxLineLength * 7)));
+  const height = altitudeHtml ? 42 : 24;
   return L.divIcon({
     className: `leaflet-advisory-icon leaflet-advisory-icon--${kind}`,
-    html: `<span class="leaflet-advisory-icon-badge" style="background:${color};">${label}</span>`,
-    iconSize: [width, 24],
-    iconAnchor: [Math.round(width / 2), 12]
+    html: `<span class="leaflet-advisory-icon-badge" style="background:${color};"><span class="leaflet-advisory-icon-label">${escapeHtml(label)}</span>${altitudeHtml}</span>`,
+    iconSize: [width, height],
+    iconAnchor: [Math.round(width / 2), Math.round(height / 2)]
   });
 }
 
@@ -553,11 +583,16 @@ function createSigwxBadgeIcon(item) {
   const altitude = sigwxAltitudeLabel(item);
   const altitudeParts = sigwxAltitudeParts(item);
   const altitudeHtml = altitudeParts
-    ? `<span class="leaflet-advisory-icon-alt-stack"><span>${escapeHtml(altitudeParts.upper)}</span><span class="leaflet-advisory-icon-alt-divider"></span><span>${escapeHtml(altitudeParts.lower)}</span></span>`
+    ? `<span class="leaflet-advisory-icon-alt-stack"><span>${escapeHtml(formatIconAltitudeText(altitudeParts.upper))}</span><span class="leaflet-advisory-icon-alt-divider"></span><span>${escapeHtml(formatIconAltitudeText(altitudeParts.lower))}</span></span>`
     : altitude && altitude !== "-"
-      ? `<span class="leaflet-advisory-icon-alt-single">${escapeHtml(altitude)}</span>`
+      ? `<span class="leaflet-advisory-icon-alt-single">${escapeHtml(formatIconAltitudeText(altitude))}</span>`
       : "";
-  const maxLineLength = Math.max(label.length, altitudeParts ? Math.max(altitudeParts.upper.length, altitudeParts.lower.length) : String(altitude || "").length);
+  const maxLineLength = Math.max(
+    label.length,
+    altitudeParts
+      ? Math.max(formatIconAltitudeText(altitudeParts.upper).length, formatIconAltitudeText(altitudeParts.lower).length)
+      : formatIconAltitudeText(altitude).length
+  );
   const width = Math.max(72, Math.min(118, 20 + (maxLineLength * 7)));
   const height = altitudeHtml ? 42 : 24;
   return L.divIcon({
