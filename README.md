@@ -314,6 +314,7 @@ $env:NODE_TLS_REJECT_UNAUTHORIZED="0"; node backend/test/run-once.js adsb
 - 공항을 전환하면 열려 있는 모든 알람 팝업과 마키 배너가 즉시 닫힙니다.
 - 설정창 `일반` 탭의 **사이트 테마** (라이트/다크)를 변경하면 사이트 전체 색상과 지도 타일이 함께 전환됩니다. 선택값은 `localStorage` 키 `map_theme`에 저장됩니다.
 - TAF 패널은 상단 토글로 `타임라인`과 `테이블`을 전환할 수 있으며, 테이블 뷰는 연속된 동일 조건을 시간 구간 단위로 병합해 축약 표시합니다.
+- TAF `테이블` 뷰도 타임라인 뷰와 동일한 외곽 패널 최소 높이를 유지하므로, 뷰 전환만으로 우측 지도 패널 높이가 출렁이지 않도록 맞춰져 있습니다.
 - 낙뢰 마커는 Airport/Korea 모드 모두 전국(`nationwide`) 데이터를 표시합니다.
 - Airport 모드의 8km/16km/32km 카운트는 선택 공항 기준 zone 집계를 그대로 유지합니다.
 - 낙뢰 데이터는 5분 간격 전국 1회 호출 결과를 4시간 롤링 히스토리로 누적 저장하며, 지도에서는 현재 선택된 레이더/위성 프레임 시각 기준 최근 60분만 표시합니다.
@@ -321,6 +322,7 @@ $env:NODE_TLS_REJECT_UNAUTHORIZED="0"; node backend/test/run-once.js adsb
 - 공항 선택은 경로별로 로컬 저장됩니다.
   - `/`: 기본 공항 `RKSI`, `TST1` 숨김
   - `/test`: 기본 공항 `TST1`, `TST1` 선택 가능
+- METAR `현재 날씨` 제목칸 아이콘은 `frontend/public/gisang-i/` 이미지를 사용합니다. `TS/TSRA -> TS.png`, `SN 계열 -> SN.png`, `RA/DZ/SHRA 계열 -> RN_DZ.png`, 그 외 clear 계열은 날짜 기반으로 `clear_*`를 순환 선택합니다. 계절 이미지는 해당 계절에만 후보군에 포함되고, `12월 24일/25일` clear 상태에서는 `clear_christmas.png`가 고정 선택됩니다.
 
 ## 배포 업데이트 예시
 

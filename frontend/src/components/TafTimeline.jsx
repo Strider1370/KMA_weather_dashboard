@@ -486,7 +486,7 @@ export default function TafTimeline({ tafData, icao, minimaSettings = null, vers
   }
 
   return (
-    <section className="panel">
+    <section className="taf-new-panel taf-new-panel--table">
       <div className="taf-legacy-header">
         <span className="taf-new-validity">
           <span className="panel-kind-badge">{tafBadgeText}</span>
