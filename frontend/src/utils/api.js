@@ -1,3 +1,12 @@
+function isTestPathActive() {
+  return typeof window !== "undefined" && window.location.pathname === "/test";
+}
+
+function withNoCache(url) {
+  const separator = url.includes("?") ? "&" : "?";
+  return `${url}${separator}ts=${Date.now()}`;
+}
+
 export async function fetchJson(url) {
   const response = await fetch(url);
   if (!response.ok) {
@@ -14,22 +23,35 @@ export async function fetchJsonOptional(url) {
   }
 }
 
+async function fetchPreferTest(testUrl, liveUrl, { optional = false } = {}) {
+  const fetcher = optional ? fetchJsonOptional : fetchJson;
+
+  if (isTestPathActive() && testUrl) {
+    const testData = await fetchJsonOptional(withNoCache(testUrl));
+    if (testData != null) {
+      return testData;
+    }
+  }
+
+  return fetcher(liveUrl);
+}
+
 export async function loadAllData() {
   const [metar, taf, warning, airports, warningTypes, lightning, echoMeta, adsb, sigmet, airmet, sigwxLow, sigwxLowHistory, amos, satMeta] = await Promise.all([
-    fetchJson("/api/metar"),
-    fetchJson("/api/taf"),
-    fetchJson("/api/warning"),
+    fetchPreferTest("/test/metar/latest.json", "/api/metar"),
+    fetchPreferTest("/test/taf/latest.json", "/api/taf"),
+    fetchPreferTest("/test/warning/latest.json", "/api/warning", { optional: true }),
     fetchJson("/api/airports"),
     fetchJson("/api/warning-types"),
-    fetchJsonOptional("/api/lightning"),
-    fetchJsonOptional("/data/radar/echo_meta.json"),
-    fetchJsonOptional("/api/adsb"),
-    fetchJsonOptional("/api/sigmet"),
-    fetchJsonOptional("/api/airmet"),
-    fetchJsonOptional("/api/sigwx-low"),
-    fetchJsonOptional("/api/sigwx-low-history"),
-    fetchJsonOptional("/api/amos"),
-    fetchJsonOptional("/data/satellite/sat_meta.json"),
+    fetchPreferTest("/test/lightning/latest.json", "/api/lightning", { optional: true }),
+    fetchPreferTest("/test/radar/echo_meta.json", "/data/radar/echo_meta.json", { optional: true }),
+    fetchPreferTest("/test/adsb/latest.json", "/api/adsb", { optional: true }),
+    fetchPreferTest("/test/sigmet/latest.json", "/api/sigmet", { optional: true }),
+    fetchPreferTest("/test/airmet/latest.json", "/api/airmet", { optional: true }),
+    fetchPreferTest("/test/sigwx-low/latest.json", "/api/sigwx-low", { optional: true }),
+    fetchPreferTest("/test/sigwx-low/history.json", "/api/sigwx-low-history", { optional: true }),
+    fetchPreferTest("/test/amos/latest.json", "/api/amos", { optional: true }),
+    fetchPreferTest("/test/satellite/sat_meta.json", "/data/satellite/sat_meta.json", { optional: true }),
   ]);
   return { metar, taf, warning, airports, warningTypes, lightning, echoMeta, adsb, sigmet, airmet, sigwxLow, sigwxLowHistory, amos, satMeta };
 }
@@ -48,6 +70,23 @@ export async function loadStaticData() {
 }
 
 export async function fetchSnapshotMeta() {
+  if (isTestPathActive()) {
+    const data = await loadAllData();
+    return {
+      metar: { hash: data.metar?.content_hash || null },
+      taf: { hash: data.taf?.content_hash || null },
+      warning: { hash: data.warning?.content_hash || null },
+      sigmet: { hash: data.sigmet?.content_hash || null },
+      airmet: { hash: data.airmet?.content_hash || null },
+      sigwx_low: { hash: data.sigwxLow?.content_hash || null },
+      amos: { hash: data.amos?.content_hash || null },
+      lightning: { hash: data.lightning?.content_hash || null },
+      adsb: { hash: data.adsb?.content_hash || null },
+      echo: data.echoMeta?.tm != null ? { tm: data.echoMeta.tm } : null,
+      satellite: data.satMeta?.tm != null ? { tm: data.satMeta.tm } : null,
+    };
+  }
+
   return fetchJson("/api/snapshot-meta");
 }
 
@@ -55,22 +94,22 @@ export async function loadChangedData(changes) {
   const fetches = [];
   const keys = [];
 
-  if (changes.metar) { fetches.push(fetchJson("/api/metar")); keys.push("metar"); }
-  if (changes.taf) { fetches.push(fetchJson("/api/taf")); keys.push("taf"); }
-  if (changes.warning) { fetches.push(fetchJson("/api/warning")); keys.push("warning"); }
-  if (changes.sigmet) { fetches.push(fetchJsonOptional("/api/sigmet")); keys.push("sigmet"); }
-  if (changes.airmet) { fetches.push(fetchJsonOptional("/api/airmet")); keys.push("airmet"); }
+  if (changes.metar) { fetches.push(fetchPreferTest("/test/metar/latest.json", "/api/metar")); keys.push("metar"); }
+  if (changes.taf) { fetches.push(fetchPreferTest("/test/taf/latest.json", "/api/taf")); keys.push("taf"); }
+  if (changes.warning) { fetches.push(fetchPreferTest("/test/warning/latest.json", "/api/warning", { optional: true })); keys.push("warning"); }
+  if (changes.sigmet) { fetches.push(fetchPreferTest("/test/sigmet/latest.json", "/api/sigmet", { optional: true })); keys.push("sigmet"); }
+  if (changes.airmet) { fetches.push(fetchPreferTest("/test/airmet/latest.json", "/api/airmet", { optional: true })); keys.push("airmet"); }
   if (changes.sigwxLow) {
-    fetches.push(fetchJsonOptional("/api/sigwx-low"));
+    fetches.push(fetchPreferTest("/test/sigwx-low/latest.json", "/api/sigwx-low", { optional: true }));
     keys.push("sigwxLow");
-    fetches.push(fetchJsonOptional("/api/sigwx-low-history"));
+    fetches.push(fetchPreferTest("/test/sigwx-low/history.json", "/api/sigwx-low-history", { optional: true }));
     keys.push("sigwxLowHistory");
   }
-  if (changes.amos) { fetches.push(fetchJsonOptional("/api/amos")); keys.push("amos"); }
-  if (changes.lightning) { fetches.push(fetchJsonOptional("/api/lightning")); keys.push("lightning"); }
-  if (changes.adsb) { fetches.push(fetchJsonOptional("/api/adsb")); keys.push("adsb"); }
-  if (changes.echoMeta) { fetches.push(fetchJsonOptional("/data/radar/echo_meta.json")); keys.push("echoMeta"); }
-  if (changes.satMeta) { fetches.push(fetchJsonOptional("/data/satellite/sat_meta.json")); keys.push("satMeta"); }
+  if (changes.amos) { fetches.push(fetchPreferTest("/test/amos/latest.json", "/api/amos", { optional: true })); keys.push("amos"); }
+  if (changes.lightning) { fetches.push(fetchPreferTest("/test/lightning/latest.json", "/api/lightning", { optional: true })); keys.push("lightning"); }
+  if (changes.adsb) { fetches.push(fetchPreferTest("/test/adsb/latest.json", "/api/adsb", { optional: true })); keys.push("adsb"); }
+  if (changes.echoMeta) { fetches.push(fetchPreferTest("/test/radar/echo_meta.json", "/data/radar/echo_meta.json", { optional: true })); keys.push("echoMeta"); }
+  if (changes.satMeta) { fetches.push(fetchPreferTest("/test/satellite/sat_meta.json", "/data/satellite/sat_meta.json", { optional: true })); keys.push("satMeta"); }
 
   const results = await Promise.all(fetches);
   const out = {};

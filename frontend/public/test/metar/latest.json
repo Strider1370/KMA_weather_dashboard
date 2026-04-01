@@ -1,0 +1,577 @@
+{
+  "type": "METAR",
+  "fetched_at": "2026-03-31T05:30:00.534Z",
+  "airports": {
+    "RKSI": {
+      "header": {
+        "icao": "RKSI",
+        "airport_name": "INCHEON INTERNATIONAL AIRPORT",
+        "report_type": "METAR",
+        "issue_time": "2026-03-30T04:00:00Z",
+        "observation_time": "2026-03-30T04:00:00Z",
+        "automated": false
+      },
+      "observation": {
+        "wind": {
+          "raw": "30002KT",
+          "direction": 300,
+          "speed": 2,
+          "gust": null,
+          "unit": "KT",
+          "variable": false,
+          "calm": false,
+          "barb": {
+            "barb_key": "0",
+            "rotation": 300,
+            "pennants": 0,
+            "long_barbs": 0,
+            "short_barbs": 0
+          }
+        },
+        "visibility": {
+          "value": 9999,
+          "minimum_value": null,
+          "minimum_direction_degrees": null,
+          "cavok": true
+        },
+        "weather": [],
+        "clouds": [],
+        "temperature": {
+          "air": 18,
+          "dewpoint": 2
+        },
+        "qnh": {
+          "value": 1014,
+          "unit": "hPa"
+        },
+        "wind_shear": null,
+        "rvr": [],
+        "display": {
+          "wind": "30002KT",
+          "visibility": "9999",
+          "minimum_visibility": null,
+          "weather": "",
+          "clouds": "NSC",
+          "temperature": "18/02",
+          "qnh": "Q1014",
+          "weather_icon": "CAVOK",
+          "weather_intensity": null
+        }
+      },
+      "cavok_flag": true,
+      "nsc_flag": false
+    },
+    "RKSS": {
+      "header": {
+        "icao": "RKSS",
+        "airport_name": "GIMPO INTERNATIONAL AIRPORT",
+        "report_type": "METAR",
+        "issue_time": "2026-03-30T04:00:00Z",
+        "observation_time": "2026-03-30T04:00:00Z",
+        "automated": false
+      },
+      "observation": {
+        "wind": {
+          "raw": "07002KT",
+          "direction": 70,
+          "speed": 2,
+          "gust": null,
+          "unit": "KT",
+          "variable": false,
+          "calm": false,
+          "barb": {
+            "barb_key": "0",
+            "rotation": 70,
+            "pennants": 0,
+            "long_barbs": 0,
+            "short_barbs": 0
+          }
+        },
+        "visibility": {
+          "value": 9999,
+          "minimum_value": null,
+          "minimum_direction_degrees": null,
+          "cavok": true
+        },
+        "weather": [],
+        "clouds": [],
+        "temperature": {
+          "air": 20,
+          "dewpoint": 1
+        },
+        "qnh": {
+          "value": 1014,
+          "unit": "hPa"
+        },
+        "wind_shear": null,
+        "rvr": [],
+        "display": {
+          "wind": "07002KT",
+          "visibility": "9999",
+          "minimum_visibility": null,
+          "weather": "",
+          "clouds": "NSC",
+          "temperature": "20/01",
+          "qnh": "Q1014",
+          "weather_icon": "CAVOK",
+          "weather_intensity": null
+        }
+      },
+      "cavok_flag": true,
+      "nsc_flag": false
+    },
+    "RKPC": {
+      "header": {
+        "icao": "RKPC",
+        "airport_name": "JEJU INTERNATIONAL AIRPORT",
+        "report_type": "METAR",
+        "issue_time": "2026-03-30T04:00:00Z",
+        "observation_time": "2026-03-30T04:00:00Z",
+        "automated": false
+      },
+      "observation": {
+        "wind": {
+          "raw": "06017KT",
+          "direction": 60,
+          "speed": 17,
+          "gust": null,
+          "unit": "KT",
+          "variable": false,
+          "calm": false,
+          "barb": {
+            "barb_key": "15",
+            "rotation": 60,
+            "pennants": 0,
+            "long_barbs": 1,
+            "short_barbs": 1
+          }
+        },
+        "visibility": {
+          "value": 3000,
+          "minimum_value": null,
+          "minimum_direction_degrees": null,
+          "cavok": false
+        },
+        "weather": [
+          {
+            "raw": "-RA",
+            "intensity": "LIGHT",
+            "descriptor": null,
+            "phenomena": [
+              "RA"
+            ],
+            "icon_key": "RA"
+          },
+          {
+            "raw": "BR",
+            "intensity": "MODERATE",
+            "descriptor": null,
+            "phenomena": [
+              "BR"
+            ],
+            "icon_key": "BR"
+          }
+        ],
+        "clouds": [
+          {
+            "amount": "FEW",
+            "base": 300,
+            "raw": "FEW003"
+          },
+          {
+            "amount": "BKN",
+            "base": 3000,
+            "raw": "BKN030"
+          },
+          {
+            "amount": "BKN",
+            "base": 10000,
+            "raw": "BKN100"
+          }
+        ],
+        "temperature": {
+          "air": 17,
+          "dewpoint": 16
+        },
+        "qnh": {
+          "value": 1010,
+          "unit": "hPa"
+        },
+        "wind_shear": null,
+        "rvr": [],
+        "display": {
+          "wind": "06017KT",
+          "visibility": "3000",
+          "minimum_visibility": null,
+          "weather": "-RA BR",
+          "clouds": "FEW003 BKN030 BKN100",
+          "temperature": "17/16",
+          "qnh": "Q1010",
+          "weather_icon": "RA",
+          "weather_intensity": "LIGHT"
+        }
+      },
+      "cavok_flag": false,
+      "nsc_flag": false
+    },
+    "RKPK": {
+      "header": {
+        "icao": "RKPK",
+        "airport_name": "GIMHAE INTERNATIONAL AIRPORT",
+        "report_type": "METAR",
+        "issue_time": "2026-03-30T04:00:00Z",
+        "observation_time": "2026-03-30T04:00:00Z",
+        "automated": true
+      },
+      "observation": {
+        "wind": {
+          "raw": "17002KT",
+          "direction": 170,
+          "speed": 2,
+          "gust": null,
+          "unit": "KT",
+          "variable": false,
+          "calm": false,
+          "barb": {
+            "barb_key": "0",
+            "rotation": 170,
+            "pennants": 0,
+            "long_barbs": 0,
+            "short_barbs": 0
+          }
+        },
+        "visibility": {
+          "value": 9999,
+          "minimum_value": null,
+          "minimum_direction_degrees": null,
+          "cavok": true
+        },
+        "weather": [],
+        "clouds": [],
+        "temperature": {
+          "air": 19,
+          "dewpoint": 5
+        },
+        "qnh": {
+          "value": 1014,
+          "unit": "hPa"
+        },
+        "wind_shear": null,
+        "rvr": [],
+        "display": {
+          "wind": "17002KT",
+          "visibility": "9999",
+          "minimum_visibility": null,
+          "weather": "",
+          "clouds": "NSC",
+          "temperature": "19/05",
+          "qnh": "Q1014",
+          "weather_icon": "CAVOK",
+          "weather_intensity": null
+        }
+      },
+      "cavok_flag": true,
+      "nsc_flag": false
+    },
+    "RKJB": {
+      "header": {
+        "icao": "RKJB",
+        "airport_name": "MUAN INTERNATIONAL AIRPORT",
+        "report_type": "METAR",
+        "issue_time": "2026-03-30T04:00:00Z",
+        "observation_time": "2026-03-30T04:00:00Z",
+        "automated": false
+      },
+      "observation": {
+        "wind": {
+          "raw": "09018G28KT",
+          "direction": 90,
+          "speed": 18,
+          "gust": 28,
+          "unit": "KT",
+          "variable": false,
+          "calm": false,
+          "barb": {
+            "barb_key": "20G30",
+            "rotation": 90,
+            "pennants": 0,
+            "long_barbs": 2,
+            "short_barbs": 0
+          }
+        },
+        "visibility": {
+          "value": 6000,
+          "minimum_value": 3200,
+          "minimum_direction_degrees": 140,
+          "cavok": false
+        },
+        "weather": [
+          {
+            "raw": "-RA",
+            "intensity": "LIGHT",
+            "descriptor": null,
+            "phenomena": [
+              "RA"
+            ],
+            "icon_key": "RA"
+          }
+        ],
+        "clouds": [
+          {
+            "amount": "BKN",
+            "base": 4500,
+            "raw": "BKN045"
+          },
+          {
+            "amount": "OVC",
+            "base": 10000,
+            "raw": "OVC100"
+          }
+        ],
+        "temperature": {
+          "air": 9,
+          "dewpoint": 9
+        },
+        "qnh": {
+          "value": 1012,
+          "unit": "hPa"
+        },
+        "wind_shear": null,
+        "rvr": [],
+        "display": {
+          "wind": "09018G28KT",
+          "visibility": "6000",
+          "minimum_visibility": "3200SE",
+          "weather": "-RA",
+          "clouds": "BKN045 OVC100",
+          "temperature": "09/09",
+          "qnh": "Q1012",
+          "weather_icon": "RA",
+          "weather_intensity": "LIGHT"
+        }
+      },
+      "cavok_flag": false,
+      "nsc_flag": false
+    },
+    "RKNY": {
+      "header": {
+        "icao": "RKNY",
+        "airport_name": "YANGYANG INTERNATIONAL AIRPORT",
+        "report_type": "METAR",
+        "issue_time": "2026-03-30T04:00:00Z",
+        "observation_time": "2026-03-30T04:00:00Z",
+        "automated": false
+      },
+      "observation": {
+        "wind": {
+          "raw": "12004KT",
+          "direction": 120,
+          "speed": 4,
+          "gust": null,
+          "unit": "KT",
+          "variable": false,
+          "calm": false,
+          "barb": {
+            "barb_key": "5",
+            "rotation": 120,
+            "pennants": 0,
+            "long_barbs": 0,
+            "short_barbs": 1
+          }
+        },
+        "visibility": {
+          "value": 9999,
+          "minimum_value": null,
+          "minimum_direction_degrees": null,
+          "cavok": true
+        },
+        "weather": [],
+        "clouds": [],
+        "temperature": {
+          "air": 15,
+          "dewpoint": 7
+        },
+        "qnh": {
+          "value": 1014,
+          "unit": "hPa"
+        },
+        "wind_shear": null,
+        "rvr": [],
+        "display": {
+          "wind": "12004KT",
+          "visibility": "9999",
+          "minimum_visibility": null,
+          "weather": "",
+          "clouds": "NSC",
+          "temperature": "15/07",
+          "qnh": "Q1014",
+          "weather_icon": "CAVOK",
+          "weather_intensity": null
+        }
+      },
+      "cavok_flag": true,
+      "nsc_flag": false
+    },
+    "RKPU": {
+      "header": {
+        "icao": "RKPU",
+        "airport_name": "ULSAN DOMESTIC AIRPORT",
+        "report_type": "METAR",
+        "issue_time": "2026-03-30T04:00:00Z",
+        "observation_time": "2026-03-30T04:00:00Z",
+        "automated": false
+      },
+      "observation": {
+        "wind": {
+          "raw": "17009KT",
+          "direction": 170,
+          "speed": 9,
+          "gust": null,
+          "unit": "KT",
+          "variable": false,
+          "calm": false,
+          "barb": {
+            "barb_key": "10",
+            "rotation": 170,
+            "pennants": 0,
+            "long_barbs": 1,
+            "short_barbs": 0
+          }
+        },
+        "visibility": {
+          "value": 8000,
+          "minimum_value": null,
+          "minimum_direction_degrees": null,
+          "cavok": false
+        },
+        "weather": [
+          {
+            "raw": "HZ",
+            "intensity": "MODERATE",
+            "descriptor": null,
+            "phenomena": [
+              "HZ"
+            ],
+            "icon_key": "HZ"
+          }
+        ],
+        "clouds": [
+          {
+            "amount": "FEW",
+            "base": 5000,
+            "raw": "FEW050"
+          },
+          {
+            "amount": "BKN",
+            "base": 10000,
+            "raw": "BKN100"
+          }
+        ],
+        "temperature": {
+          "air": 19,
+          "dewpoint": 6
+        },
+        "qnh": {
+          "value": 1015,
+          "unit": "hPa"
+        },
+        "wind_shear": null,
+        "rvr": [],
+        "display": {
+          "wind": "17009KT",
+          "visibility": "8000",
+          "minimum_visibility": null,
+          "weather": "HZ",
+          "clouds": "FEW050 BKN100",
+          "temperature": "19/06",
+          "qnh": "Q1015",
+          "weather_icon": "HZ",
+          "weather_intensity": "MODERATE"
+        }
+      },
+      "cavok_flag": false,
+      "nsc_flag": false
+    },
+    "RKJY": {
+      "header": {
+        "icao": "RKJY",
+        "airport_name": "YEOSU DOMESTIC AIRPORT",
+        "report_type": "METAR",
+        "issue_time": "2026-03-30T04:00:00Z",
+        "observation_time": "2026-03-30T04:00:00Z",
+        "automated": false
+      },
+      "observation": {
+        "wind": {
+          "raw": "07004KT",
+          "direction": 70,
+          "speed": 4,
+          "gust": null,
+          "unit": "KT",
+          "variable": false,
+          "calm": false,
+          "barb": {
+            "barb_key": "5",
+            "rotation": 70,
+            "pennants": 0,
+            "long_barbs": 0,
+            "short_barbs": 1
+          }
+        },
+        "visibility": {
+          "value": 9000,
+          "minimum_value": null,
+          "minimum_direction_degrees": null,
+          "cavok": false
+        },
+        "weather": [
+          {
+            "raw": "BR",
+            "intensity": "MODERATE",
+            "descriptor": null,
+            "phenomena": [
+              "BR"
+            ],
+            "icon_key": "BR"
+          }
+        ],
+        "clouds": [
+          {
+            "amount": "BKN",
+            "base": 3000,
+            "raw": "BKN030"
+          },
+          {
+            "amount": "OVC",
+            "base": 7000,
+            "raw": "OVC070"
+          }
+        ],
+        "temperature": {
+          "air": 15,
+          "dewpoint": 9
+        },
+        "qnh": {
+          "value": 1014,
+          "unit": "hPa"
+        },
+        "wind_shear": null,
+        "rvr": [],
+        "display": {
+          "wind": "07004KT",
+          "visibility": "9000",
+          "minimum_visibility": null,
+          "weather": "BR",
+          "clouds": "BKN030 OVC070",
+          "temperature": "15/09",
+          "qnh": "Q1014",
+          "weather_icon": "BR",
+          "weather_intensity": "MODERATE"
+        }
+      },
+      "cavok_flag": false,
+      "nsc_flag": false
+    }
+  },
+  "content_hash": "7905ef780e63ed7270e0918aea573a94621a6874fa44f09373c0be7871870c00"
+}

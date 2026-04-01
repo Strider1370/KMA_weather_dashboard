@@ -217,9 +217,12 @@ export default function TafTimeline({ tafData, icao, minimaSettings = null, vers
   const target = tafData?.airports?.[icao];
   const rawTimeline = target?.timeline || [];
   const now = Date.now();
-  const timeline = rawTimeline.filter(
-    (slot) => new Date(slot.time).getTime() + 3600 * 1000 > now
-  );
+  const isTestPage = typeof window !== "undefined" && window.location.pathname === "/test";
+  const timeline = isTestPage
+    ? rawTimeline
+    : rawTimeline.filter(
+      (slot) => new Date(slot.time).getTime() + 3600 * 1000 > now
+    );
   const isTimelineView = version === "v2";
   const tableSegments = buildTafTableSegments(timeline, icao, minimaSettings);
   const lastEnd = target?.header?.valid_end;

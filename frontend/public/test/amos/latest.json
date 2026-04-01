@@ -1,0 +1,18 @@
+{
+  "type": "AMOS",
+  "fetched_at": "2026-03-31T06:00:00.011Z",
+  "airports": {
+    "RKPK": {
+      "icao": "RKPK",
+      "amos_stn": null,
+      "daily_rainfall": {
+        "mm": null,
+        "rn_raw": null,
+        "observed_tm_kst": null,
+        "target_tm_kst": "202603311500",
+        "stale": false
+      }
+    }
+  },
+  "content_hash": "c510415043e203dd8a64eaaf0e13d18563879211a51c010456da09433b99de53"
+}

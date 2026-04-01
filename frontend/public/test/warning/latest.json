@@ -1,0 +1,22 @@
+{
+  "type": "AIRPORT_WARNINGS",
+  "fetched_at": "2026-03-30T04:07:47.813Z",
+  "total_count": 1,
+  "airports": {
+    "RKPC": {
+      "airport_name": "제주공항",
+      "warnings": [
+        {
+          "issued": "2026-03-29T22:17:00Z",
+          "wrng_type": "0",
+          "wrng_type_key": "WIND_SHEAR",
+          "wrng_type_name": "Wind Shear Warning",
+          "valid_start": "2026-03-29T22:16:00Z",
+          "valid_end": "2026-03-30T21:00:00Z",
+          "raw_message": "RKPC WS WRNG 2\n\n292217 VALID 292216/302100\n\nWS IN CLIMB-OUT OBS="
+        }
+      ]
+    }
+  },
+  "content_hash": "6053a14f7d550a8ba0116d3f81750cdcfe13821e5c394acad56ea4092344a422"
+}

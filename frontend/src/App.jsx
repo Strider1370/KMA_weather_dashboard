@@ -48,7 +48,7 @@ const AIRPORT_NAME_KO = {
 export default function App() {
   const pathname = typeof window !== "undefined" ? window.location.pathname : "/";
   const isTestPage = pathname === "/test";
-  const defaultAirport = isTestPage ? "TST1" : "RKSI";
+  const defaultAirport = "RKSI";
   const selectedAirportKey = isTestPage ? "selected_airport_test" : "selected_airport_main";
 
   const [data, setData] = useState({});
@@ -149,7 +149,7 @@ export default function App() {
           ...Object.keys(result.warning?.airports || {}),
           ...Object.keys(result.lightning?.airports || {}),
           ...(airports || [])
-            .filter((airport) => isTestPage || airport.icao !== "TST1")
+            .filter((airport) => airport.icao !== "TST1")
             .map((a) => a.icao),
         ]);
         if (prev && available.has(prev)) return prev;
@@ -338,11 +338,11 @@ export default function App() {
   ]);
   if (data.airports) {
     data.airports
-      .filter((airport) => isTestPage || airport.icao !== "TST1")
+      .filter((airport) => airport.icao !== "TST1")
       .forEach((a) => airportSet.add(a.icao));
   }
   const orderedAirports = (data.airports || [])
-    .filter((airport) => isTestPage || airport.icao !== "TST1")
+    .filter((airport) => airport.icao !== "TST1")
     .map((airport) => airport.icao)
     .filter((icao) => airportSet.has(icao));
   const remainingAirports = Array.from(airportSet)

@@ -137,6 +137,7 @@ Derived from `.editorconfig` + existing source files.
 - Snapshot polling metadata is served at `/api/snapshot-meta`.
 - `server.js` also serves SPA entry points for both `/` and `/test`.
 - Static data served under `/data/*` from `backend/data`.
+- `/test` may read static override JSON files from `frontend/public/test/` before falling back to live `/api/*` or `/data/*` responses.
 - AMOS daily rainfall is served separately at `/api/amos` and stored under `backend/data/amos/latest.json`.
 - SIGWX LOW is served at `/api/sigwx-low` and stored under `backend/data/sigwx_low/latest.json`.
 - Persisted category files generally follow:
@@ -195,6 +196,7 @@ Derived from `.editorconfig` + existing source files.
 - **Site-wide dark mode** is controlled by a single `mapTheme` state (`localStorage: "map_theme"`). When `mapTheme` changes, `document.documentElement.setAttribute("data-theme", mapTheme)` is called, toggling CSS variable overrides in `[data-theme="dark"]` block of `App.css`. The map tile filter (`.interactive-map-shell--dark`) follows automatically. The settings label is "사이트 테마" (was "지도 테마").
 - `isDarkTheme()` is exported from `helpers.js` and used in `MetarCard.jsx` (`catColors()`, `getRvrEntryStyle()`) and `TafTimeline.jsx` (`getTintStyle()`, `getWeatherStyle()`) to select dark-aware inline styles for flight-category-tinted panels, since those colors are injected as inline styles and cannot be overridden by CSS variables alone.
 - TAF timeline and table filter out expired hourly slots at render time: slots whose end time (`slot.time + 1h`) is already past `Date.now()` are removed before `groupElementsByValue` and `buildTafTableSegments` run, so remaining slots proportionally fill the full timeline width automatically. If all slots are expired, a "TAF 유효 기간이 만료됐습니다" message is shown.
+- `/test` hides the legacy `TST1` test airport from the selector, uses real airports backed by `frontend/public/test/*` snapshots when present, and bypasses the expired-slot TAF filter so snapshot timelines remain visible regardless of current time.
 - TAF `table` view reuses the same outer `taf-new-panel` shell as timeline view and keeps the timeline-oriented minimum panel height, so toggling between timeline/table should not change the overall left-column panel stack height or right map panel height.
 - A FOUC-prevention inline script in `frontend/index.html` applies `data-theme` before React mounts.
 - METAR `현재 날씨` title icon now uses files under `frontend/public/gisang-i/`. Mapping rule: thunder (`TS/TSRA`) -> `TS.png`, snow (`SN` variants) -> `SN.png`, rain/drizzle/showers (`RA`, `DZ`, `SHRA` variants) -> `RN_DZ.png`, otherwise clear-set rotation. Clear rotation is date-based within the active timezone, includes the matching seasonal clear image in the candidate pool, and forces `clear_christmas.png` on December 24-25.
