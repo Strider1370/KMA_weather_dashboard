@@ -5,8 +5,11 @@ const config = require("../config");
 const { parseSatelliteNC, parseFogNC, renderFogImage } = require("../parsers/satellite-parser");
 
 let backgroundFillRunning = false;
+const fogRetryTimers = new Map();
 const RENDER_VERSION = "fog-composite-v3-kst-tm-webp";
 const IMMEDIATE_FRAME_COUNT = 2;
+const FOG_RETRY_DELAY_MS = 3 * 60 * 1000;
+const MAX_FOG_RETRIES = 2;
 
 function ensureSatelliteDir() {
   const dir = path.join(config.storage.base_path, "satellite");
@@ -198,6 +201,48 @@ function writeMeta(satDir, latestFrameSpec, frameSpecs, existingFrames) {
   return meta;
 }
 
+function scheduleFogRetry(satDir, frameSpec, frameSpecs, attempt = 1) {
+  if (!frameSpec?.displayTm || attempt > MAX_FOG_RETRIES || fogRetryTimers.has(frameSpec.displayTm)) {
+    return;
+  }
+
+  const timer = setTimeout(async () => {
+    fogRetryTimers.delete(frameSpec.displayTm);
+
+    try {
+      const existingMeta = loadExistingMeta(satDir);
+      if (existingMeta?.render_version !== RENDER_VERSION) {
+        return;
+      }
+
+      const existingFrames = new Map((existingMeta.frames || []).map((frame) => [frame.tm, frame]));
+      const currentFrame = existingFrames.get(frameSpec.displayTm);
+      if (currentFrame && currentFrame.fogPixelCount !== null) {
+        return;
+      }
+
+      const frameInfo = await renderFrame(satDir, frameSpec.requestTm, frameSpec.displayTm);
+      if (!frameInfo) {
+        return;
+      }
+
+      existingFrames.set(frameSpec.displayTm, frameInfo);
+      writeMeta(satDir, frameSpec, frameSpecs, existingFrames);
+
+      if (frameInfo.fogPixelCount === null && attempt < MAX_FOG_RETRIES) {
+        scheduleFogRetry(satDir, frameSpec, frameSpecs, attempt + 1);
+      }
+    } catch (error) {
+      console.warn(`satellite: fog retry failed ${frameSpec.requestTm} (#${attempt}):`, error.message);
+      if (attempt < MAX_FOG_RETRIES) {
+        scheduleFogRetry(satDir, frameSpec, frameSpecs, attempt + 1);
+      }
+    }
+  }, FOG_RETRY_DELAY_MS);
+
+  fogRetryTimers.set(frameSpec.displayTm, timer);
+}
+
 function scheduleBackgroundFill(satDir, pendingFrameSpecs, existingFrames, latestFrameSpec, frameSpecs) {
   if (!pendingFrameSpecs.length || backgroundFillRunning) return;
 
@@ -274,6 +319,11 @@ async function process() {
 
   const meta = writeMeta(satDir, latestFrameSpec, frameSpecs, existingFrames);
   scheduleBackgroundFill(satDir, deferredFrameSpecs, existingFrames, latestFrameSpec, frameSpecs);
+
+  const latestFrame = existingFrames.get(latestFrameSpec.displayTm);
+  if (latestFrame?.fogPixelCount === null) {
+    scheduleFogRetry(satDir, latestFrameSpec, frameSpecs);
+  }
 
   return {
     type: "satellite",

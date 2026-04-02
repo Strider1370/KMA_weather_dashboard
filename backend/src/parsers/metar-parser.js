@@ -92,7 +92,14 @@ function pickCodeFromHref(value) {
 function extractRunwayDesignator(value) {
   const direct = text(value);
   if (direct) {
-    const m = String(direct).toUpperCase().match(/\b(\d{2}[LRC]?)\b/);
+    const normalized = String(direct).trim().toUpperCase();
+    const shortNumeric = normalized.match(/^\d[LRC]?$/);
+    if (shortNumeric) {
+      const suffix = /[LRC]$/.test(normalized) ? normalized.slice(-1) : "";
+      const digits = suffix ? normalized.slice(0, -1) : normalized;
+      return `${digits.padStart(2, "0")}${suffix}`;
+    }
+    const m = normalized.match(/\b(\d{2}[LRC]?)\b/);
     if (m) {
       return m[1];
     }
@@ -109,7 +116,14 @@ function extractRunwayDesignator(value) {
     null;
 
   if (nestedDesignator) {
-    const m = String(nestedDesignator).toUpperCase().match(/\b(\d{2}[LRC]?)\b/);
+    const normalized = String(nestedDesignator).trim().toUpperCase();
+    const shortNumeric = normalized.match(/^\d[LRC]?$/);
+    if (shortNumeric) {
+      const suffix = /[LRC]$/.test(normalized) ? normalized.slice(-1) : "";
+      const digits = suffix ? normalized.slice(0, -1) : normalized;
+      return `${digits.padStart(2, "0")}${suffix}`;
+    }
+    const m = normalized.match(/\b(\d{2}[LRC]?)\b/);
     if (m) {
       return m[1];
     }
