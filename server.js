@@ -78,6 +78,14 @@ function sendText(req, res, status, body, contentType = "text/plain; charset=utf
   res.end(body);
 }
 
+function redirect(req, res, location, status = 302) {
+  res.writeHead(status, {
+    ...buildBaseHeaders(req),
+    Location: location,
+  });
+  res.end();
+}
+
 function readJsonFile(file) {
   const raw = fs.readFileSync(file, "utf8").replace(/^\uFEFF/, "");
   return JSON.parse(raw);
@@ -307,7 +315,13 @@ function serveDataAsset(req, res) {
 
 function serveStatic(req, res) {
   const pathname = req.url.split("?")[0];
-  const target = pathname === "/" || pathname === "/test" ? "/index.html" : pathname;
+  if (pathname === "/") {
+    redirect(req, res, "/ops");
+    return;
+  }
+
+  const spaEntryPaths = new Set(["/ops", "/ground", "/test"]);
+  const target = spaEntryPaths.has(pathname) ? "/index.html" : pathname;
   const filePath = path.normalize(path.join(ROOT, target));
 
   if (!filePath.startsWith(ROOT)) {
@@ -392,6 +406,10 @@ const server = http.createServer(async (req, res) => {
       return sendJson(req, res, 200, readLatest("adsb"));
     }
 
+    if (req.url === "/api/ground-forecast") {
+      return sendJson(req, res, 200, readLatest("ground_forecast"));
+    }
+
     if (req.url === "/api/airports") {
       const airports = reloadCommonJs(SHARED_AIRPORTS);
       return sendJson(req, res, 200, airports);
@@ -438,6 +456,7 @@ const server = http.createServer(async (req, res) => {
         amos: { hash: readSnapshotHash("amos") },
         lightning: { hash: readSnapshotHash("lightning") },
         adsb: { hash: readSnapshotHash("adsb") },
+        ground_forecast: { hash: readSnapshotHash("ground_forecast") },
         echo: echoTm != null ? { tm: echoTm } : null,
         satellite: satTm != null ? { tm: satTm } : null,
       });

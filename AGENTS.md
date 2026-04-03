@@ -58,6 +58,7 @@ Use repo root unless noted.
   - `node backend/test/run-once.js lightning`
   - `node backend/test/run-once.js radar-echo`
   - `node backend/test/run-once.js adsb`
+  - `node backend/test/run-once.js ground-forecast`
   - `node backend/test/run-once.js satellite`
 - Valid target values are enforced in `backend/test/run-once.js`.
 
@@ -135,10 +136,11 @@ Derived from `.editorconfig` + existing source files.
 
 - API endpoints served by `server.js` under `/api/*`.
 - Snapshot polling metadata is served at `/api/snapshot-meta`.
-- `server.js` also serves SPA entry points for both `/` and `/test`.
+- `server.js` redirects `/` to `/ops` and serves SPA entry points for `/ops`, `/ground`, and `/test`.
 - Static data served under `/data/*` from `backend/data`.
 - `/test` may read static override JSON files from `frontend/public/test/` before falling back to live `/api/*` or `/data/*` responses.
 - AMOS daily rainfall is served separately at `/api/amos` and stored under `backend/data/amos/latest.json`.
+- Ground weekly forecast is served at `/api/ground-forecast` and stored under `backend/data/ground_forecast/latest.json`.
 - SIGWX LOW is served at `/api/sigwx-low` and stored under `backend/data/sigwx_low/latest.json`.
 - Persisted category files generally follow:
   - `backend/data/<type>/latest.json`
@@ -200,6 +202,7 @@ Derived from `.editorconfig` + existing source files.
 - TAF `table` view reuses the same outer `taf-new-panel` shell as timeline view and keeps the timeline-oriented minimum panel height, so toggling between timeline/table should not change the overall left-column panel stack height or right map panel height.
 - A FOUC-prevention inline script in `frontend/index.html` applies `data-theme` before React mounts.
 - METAR `현재 날씨` title icon now uses files under `frontend/public/gisang-i/`. Mapping rule: thunder (`TS/TSRA`) -> `TS.png`, snow (`SN` variants) -> `SN.png`, rain/drizzle/showers (`RA`, `DZ`, `SHRA` variants) -> `RN_DZ.png`, otherwise clear-set rotation. Clear rotation is date-based within the active timezone, includes the matching seasonal clear image in the candidate pool, and forces `clear_christmas.png` on December 24-25.
+- `/ground` replaces the TAF panel with a 7-day AM/PM weekly forecast panel backed by `ground_forecast`. Data is composed from KMA `getLandFcst`, `getMidLandFcst`, and `getMidTa`, scheduled at `30 6,11,18,23 * * *`, and uses partial-source fallback plus previous-payload preservation on degraded fetches.
 - In PowerShell, Korean UTF-8 files may render incorrectly with plain `Get-Content`.
 - When reading Korean text files, prefer explicit UTF-8 decoding:
   - `[Console]::OutputEncoding = [System.Text.Encoding]::UTF8`

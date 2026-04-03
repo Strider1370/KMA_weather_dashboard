@@ -13,8 +13,9 @@ const lightningProcessor = require("./processors/lightning-processor");
 const radarEchoProcessor = require("./processors/radar-echo-processor");
 const adsbProcessor = require("./processors/adsb-processor");
 const satelliteProcessor = require("./processors/satellite-processor");
+const groundForecastProcessor = require("./processors/ground-forecast-processor");
 
-const locks = { metar: false, taf: false, warning: false, sigmet: false, airmet: false, sigwx_low: false, amos: false, lightning: false, radar_echo: false, adsb: false, satellite: false };
+const locks = { metar: false, taf: false, warning: false, sigmet: false, airmet: false, sigwx_low: false, amos: false, lightning: false, radar_echo: false, adsb: false, satellite: false, ground_forecast: false };
 
 async function runWithLock(type, job) {
   if (locks[type]) {
@@ -53,6 +54,7 @@ async function main() {
   cron.schedule(config.schedule.radar_echo_interval, () => runWithLock("radar_echo", radarEchoProcessor.process));
   cron.schedule(config.schedule.adsb_interval, () => runWithLock("adsb", adsbProcessor.process));
   cron.schedule(config.schedule.satellite_interval, () => runWithLock("satellite", satelliteProcessor.process));
+  cron.schedule(config.schedule.ground_forecast_interval, () => runWithLock("ground_forecast", groundForecastProcessor.process));
 
   // 서버 시작 직후 1회 즉시 수집
   console.log("Running initial data collection...");
@@ -68,6 +70,7 @@ async function main() {
     runWithLock("radar_echo", radarEchoProcessor.process),
     runWithLock("adsb", adsbProcessor.process),
     runWithLock("satellite", satelliteProcessor.process),
+    runWithLock("ground_forecast", groundForecastProcessor.process),
   ]);
   console.log("Initial data collection complete.");
 }

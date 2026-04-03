@@ -17,6 +17,7 @@ import {
   convertWeatherToKorean,
 } from "../utils/visual-mapper";
 import { resolveWeatherVisual } from "../utils/weather-visual-resolver";
+import { getCurrentRouteContext } from "../utils/route-mode";
 
 const FC_COLORS = { VFR: "#15803d", MVFR: "#2563eb", IFR: "#f59e0b", LIFR: "#dc2626" };
 const WIND_STYLE = { backgroundColor: "var(--card-bg)", color: "var(--muted)" };
@@ -217,7 +218,7 @@ export default function TafTimeline({ tafData, icao, minimaSettings = null, vers
   const target = tafData?.airports?.[icao];
   const rawTimeline = target?.timeline || [];
   const now = Date.now();
-  const isTestPage = typeof window !== "undefined" && window.location.pathname === "/test";
+  const { isTestPage } = getCurrentRouteContext();
   const timeline = isTestPage
     ? rawTimeline
     : rawTimeline.filter(

@@ -2,7 +2,7 @@
 
 KMA 항공기상 수집기 + 대시보드 프로젝트입니다.
 
-이 프로젝트는 KMA 항공/기상 피드(METAR, TAF, AMOS 강수, 특보, 낙뢰, 레이더, 레이더 에코, 저고도 중요기상예보 SIGWX_LOW, GK2A 안개 위성영상)와 OpenSky ADS-B 항공기 위치를 주기적으로 수집하고, 정규화된 결과를 `backend/data/`에 저장한 뒤 React 대시보드로 제공합니다.
+이 프로젝트는 KMA 항공/기상 피드(METAR, TAF, AMOS 강수, 특보, 낙뢰, 레이더, 레이더 에코, 저고도 중요기상예보 SIGWX_LOW, GK2A 안개 위성영상, 일반근무자용 7일 주간예보)와 OpenSky ADS-B 항공기 위치를 주기적으로 수집하고, 정규화된 결과를 `backend/data/`에 저장한 뒤 React 대시보드로 제공합니다.
 
 ## 프로젝트가 하는 일
 
@@ -13,7 +13,8 @@ KMA 항공기상 수집기 + 대시보드 프로젝트입니다.
 - METAR/TAF/특보/낙뢰/레이더 에코/SIGWX_LOW를 단일 인터랙티브 지도 패널과 함께 렌더링합니다.
 - ADS-B `Traffic` 레이어로 한국 주변 상공 항공기 현재 위치를 지도에 표시합니다.
 - GK2A `안개` 레이어로 IR105 배경 + FOG 산출물을 합성한 위성영상을 지도에 표시합니다.
-- `/test` 경로에서는 `TST1` 테스트 공항을 선택할 수 있고, 메인 `/`에서는 `TST1`을 숨깁니다.
+- `/ops`는 기존 운항용 화면, `/ground`는 일반근무자용 화면입니다.
+- `/test` 경로에서는 `frontend/public/test/` 스냅샷이 있는 실제 공항을 사용하며, 레거시 `TST1` 테스트 공항은 숨깁니다.
 
 ## 기술 스택
 
@@ -59,7 +60,7 @@ backend/src/store.js -> backend/data/<type>/*
 server.js
   ├─ /api/*  (JSON)
   ├─ /data/* (저장된 정적 파일)
-  └─ /, /test (SPA 엔트리)
+  └─ /ops, /ground, /test (SPA 엔트리)
         |
         v
 frontend/src (React 대시보드)
@@ -77,6 +78,7 @@ frontend/src (React 대시보드)
 │   │   ├── warning/
 │   │   ├── lightning/
 │   │   ├── adsb/
+│   │   ├── ground_forecast/
 │   │   ├── radar/                    # 레이더 이미지 + echo png/meta
 │   │   └── satellite/                # GK2A 위성 png/meta
 │   ├── src/
@@ -88,6 +90,7 @@ frontend/src (React 대시보드)
 │   │   │   ├── sigwx-low-processor.js
 │   │   │   ├── lightning-processor.js
 │   │   │   ├── radar-echo-processor.js
+│   │   │   ├── ground-forecast-processor.js
 │   │   │   └── adsb-processor.js
 │   │   ├── parsers/
 │   │   ├── api-client.js
@@ -128,6 +131,7 @@ frontend/src (React 대시보드)
 - LIGHTNING: `*/5 * * * *`
 - RADAR_ECHO: `*/5 * * * *`
 - ADSB: `*/5 * * * *`
+- GROUND_FORECAST: `30 6,11,18,23 * * *`
 
 `runWithLock` 실행 잠금으로 동일 타입 중복 실행을 방지합니다.
 
@@ -138,6 +142,7 @@ frontend/src (React 대시보드)
 - AMOS 일강수량은 `backend/data/amos/latest.json`에 별도 저장되며, METAR payload와 분리된 snapshot hash를 가집니다.
 - 레이더 이미지/에코 에셋은 `backend/data/radar/`에 저장되며 `/data/radar/*`로 제공됩니다.
 - ADS-B 현재 위치 스냅샷은 `backend/data/adsb/latest.json`에 저장되며 `/api/adsb`로 제공됩니다.
+- 일반근무자용 7일 예보는 `backend/data/ground_forecast/latest.json`에 저장되며 `/api/ground-forecast`로 제공됩니다.
 - SIGWX_LOW 스냅샷은 `backend/data/sigwx_low/latest.json`에 저장되며 `/api/sigwx-low`로 제공됩니다.
 - GK2A 위성 스냅샷은 `backend/data/satellite/sat_meta.json`과 `sat_korea_<tm>.png`에 저장되며 `/data/satellite/*`로 제공됩니다. API 호출용 `tm`은 UTC, 저장/표시용 `tm`은 KST입니다.
 - 지도 경계는 `frontend/public/geo/korea_boundaries.v1.topojson`(시도/시군구 통합)과 `frontend/public/geo/korea_neighbors_masked.v1.geojson`을 사용합니다.
@@ -150,6 +155,7 @@ frontend/src (React 대시보드)
 - `backend/data/warning/latest.json`
 - `backend/data/lightning/latest.json`
 - `backend/data/adsb/latest.json`
+- `backend/data/ground_forecast/latest.json`
 - `backend/data/sigwx_low/latest.json`
 - `backend/data/radar/echo_meta.json`
 - `backend/data/radar/echo_korea_<tm>.png`
@@ -167,6 +173,7 @@ frontend/src (React 대시보드)
 - `/api/warning`
 - `/api/lightning`
 - `/api/adsb`
+- `/api/ground-forecast`
 - `/api/sigwx-low`
 - `/api/snapshot-meta`
 - `/api/airports`
@@ -279,6 +286,7 @@ node backend/test/run-once.js sigwx-low
 node backend/test/run-once.js lightning
 node backend/test/run-once.js radar-echo
 node backend/test/run-once.js adsb
+node backend/test/run-once.js ground-forecast
 node backend/test/run-once.js satellite
 ```
 
@@ -320,8 +328,9 @@ $env:NODE_TLS_REJECT_UNAUTHORIZED="0"; node backend/test/run-once.js adsb
 - 낙뢰 데이터는 5분 간격 전국 1회 호출 결과를 4시간 롤링 히스토리로 누적 저장하며, 지도에서는 현재 선택된 레이더/위성 프레임 시각 기준 최근 60분만 표시합니다.
 - 낙뢰 토글이 켜지면 우측에 시간대 범례가 표시되고, `깜빡임` 버튼으로 낙뢰 마커 점멸 효과를 켜고 끌 수 있습니다.
 - 공항 선택은 경로별로 로컬 저장됩니다.
-  - `/`: 기본 공항 `RKSI`, `TST1` 숨김
-  - `/test`: 기본 공항 `TST1`, `TST1` 선택 가능
+  - `/ops`: 기본 공항 `RKSI`, 운항용 레이아웃
+  - `/ground`: 기본 공항 `RKSI`, 일반근무자용 레이아웃 + 7일 주간예보 패널
+  - `/test`: `frontend/public/test/*` 스냅샷이 있는 실제 공항만 표시, 레거시 `TST1` 숨김
 - METAR `현재 날씨` 제목칸 아이콘은 `frontend/public/gisang-i/` 이미지를 사용합니다. `TS/TSRA -> TS.png`, `SN 계열 -> SN.png`, `RA/DZ/SHRA 계열 -> RN_DZ.png`, 그 외 clear 계열은 날짜 기반으로 `clear_*`를 순환 선택합니다. 계절 이미지는 해당 계절에만 후보군에 포함되고, `12월 24일/25일` clear 상태에서는 `clear_christmas.png`가 고정 선택됩니다.
 
 ## 배포 업데이트 예시

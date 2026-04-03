@@ -11,13 +11,14 @@ const lightningProcessor = require("../src/processors/lightning-processor");
 const radarEchoProcessor = require("../src/processors/radar-echo-processor");
 const adsbProcessor = require("../src/processors/adsb-processor");
 const satelliteProcessor = require("../src/processors/satellite-processor");
+const groundForecastProcessor = require("../src/processors/ground-forecast-processor");
 
 async function main() {
   const target = (process.argv[2] || "all").toLowerCase();
-  const allowed = new Set(["metar", "taf", "warning", "sigmet", "airmet", "sigwx-low", "amos", "lightning", "radar-echo", "adsb", "satellite", "all"]);
+  const allowed = new Set(["metar", "taf", "warning", "sigmet", "airmet", "sigwx-low", "amos", "lightning", "radar-echo", "adsb", "satellite", "ground-forecast", "all"]);
 
   if (!allowed.has(target)) {
-    console.error("Usage: node backend/test/run-once.js [metar|taf|warning|sigmet|airmet|sigwx-low|amos|lightning|radar-echo|adsb|satellite|all]");
+    console.error("Usage: node backend/test/run-once.js [metar|taf|warning|sigmet|airmet|sigwx-low|amos|lightning|radar-echo|adsb|satellite|ground-forecast|all]");
     process.exit(1);
   }
 
@@ -76,6 +77,10 @@ async function main() {
 
   if (target === "satellite" || target === "all") {
     await execute("satellite", () => satelliteProcessor.process());
+  }
+
+  if (target === "ground-forecast" || target === "all") {
+    await execute("ground-forecast", () => groundForecastProcessor.process());
   }
 
   console.log(JSON.stringify({ target, results }, null, 2));

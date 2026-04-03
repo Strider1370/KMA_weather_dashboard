@@ -37,6 +37,23 @@ module.exports = {
     timeout_ms: 10000,
     max_retries: 3
   },
+  ground_forecast: {
+    timeout_ms: 15000,
+    short_endpoint: "/VilageFcstMsgService/getLandFcst",
+    mid_land_endpoint: "/MidFcstInfoService/getMidLandFcst",
+    mid_temp_endpoint: "/MidFcstInfoService/getMidTa",
+    quality_drop_tolerance: 0,
+    airports: {
+      RKSS: { short_reg_id: "11B20102", mid_land_reg_id: "11B00000", mid_temp_reg_id: "11B20102" },
+      RKSI: { short_reg_id: "11B20201", mid_land_reg_id: "11B00000", mid_temp_reg_id: "11B20201" },
+      RKPC: { short_reg_id: "11G00201", mid_land_reg_id: "11G00000", mid_temp_reg_id: "11G00201" },
+      RKJY: { short_reg_id: "11F20401", mid_land_reg_id: "11F20000", mid_temp_reg_id: "11F20401" },
+      RKJB: { short_reg_id: "21F20804", mid_land_reg_id: "11F20000", mid_temp_reg_id: "21F20804" },
+      RKPU: { short_reg_id: "11H20101", mid_land_reg_id: "11H20000", mid_temp_reg_id: "11H20101" },
+      RKNY: { short_reg_id: "11D20403", mid_land_reg_id: "11D20000", mid_temp_reg_id: "11D20403" },
+      RKPK: { short_reg_id: "11H20304", mid_land_reg_id: "11H20000", mid_temp_reg_id: "11H20304" }
+    }
+  },
   airports,
   lightning: {
     range_km: 32,
@@ -97,7 +114,8 @@ module.exports = {
     lightning_interval: "*/5 * * * *",
     radar_echo_interval: "*/5 * * * *",
     satellite_interval: "*/10 * * * *",
-    adsb_interval: "*/5 * * * *"
+    adsb_interval: "*/5 * * * *",
+    ground_forecast_interval: "30 6,11,18,23 * * *"
   },
   storage: {
     base_path: resolveDataPath(process.env.DATA_PATH),

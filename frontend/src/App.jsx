@@ -23,11 +23,13 @@ import {
   DEFAULT_AIRPORT_MINIMA_RULES,
   normalizeAirportMinimaSettings,
 } from "./utils/helpers";
+import { getCurrentRouteContext } from "./utils/route-mode";
 import Header from "./components/Header";
 import MetarCard from "./components/MetarCard";
 import WarningList from "./components/WarningList";
 import TafTimeline from "./components/TafTimeline";
 import InteractiveMap from "./components/InteractiveMap";
+import GroundForecastPanel from "./components/GroundForecastPanel";
 import AlertPopup from "./components/alerts/AlertPopup";
 import AlertSound from "./components/alerts/AlertSound";
 import AlertMarquee from "./components/alerts/AlertMarquee";
@@ -46,10 +48,9 @@ const AIRPORT_NAME_KO = {
 };
 
 export default function App() {
-  const pathname = typeof window !== "undefined" ? window.location.pathname : "/";
-  const isTestPage = pathname === "/test";
+  const routeContext = getCurrentRouteContext();
+  const { isTestPage, dashboardMode, selectedAirportKey } = routeContext;
   const defaultAirport = "RKSI";
-  const selectedAirportKey = isTestPage ? "selected_airport_test" : "selected_airport_main";
 
   const [data, setData] = useState({});
   const [selectedAirport, setSelectedAirport] = useState(() => localStorage.getItem(selectedAirportKey) || defaultAirport);
@@ -122,7 +123,7 @@ export default function App() {
   const prevDataRef = useRef(null);
   const pollingRef = useRef(null);
   const pollingInFlightRef = useRef(false);
-  const snapshotHashRef = useRef({ metar: null, taf: null, warning: null, sigmet: null, airmet: null, sigwxLow: null, amos: null, lightning: null, adsb: null, echo: null, satellite: null });
+  const snapshotHashRef = useRef({ metar: null, taf: null, warning: null, sigmet: null, airmet: null, sigwxLow: null, amos: null, lightning: null, adsb: null, groundForecast: null, echo: null, satellite: null });
 
   // 디스패처 콜백 등록
   useEffect(() => {
@@ -167,6 +168,7 @@ export default function App() {
         amos: result.amos?.content_hash || null,
         lightning: result.lightning?.content_hash || null,
         adsb: result.adsb?.content_hash || null,
+        groundForecast: result.groundForecast?.content_hash || null,
         echo: result.echoMeta?.tm || null,
         satellite: result.satMeta?.tm || null,
       };
@@ -200,6 +202,7 @@ export default function App() {
         amos: snapshot.amos?.hash == null || snapshot.amos.hash !== saved.amos,
         lightning: snapshot.lightning?.hash == null || snapshot.lightning.hash !== saved.lightning,
         adsb: snapshot.adsb?.hash == null || snapshot.adsb.hash !== saved.adsb,
+        groundForecast: snapshot.ground_forecast?.hash == null || snapshot.ground_forecast.hash !== saved.groundForecast,
         echoMeta: snapshot.echo?.tm == null || snapshot.echo.tm !== saved.echo,
         satMeta: snapshot.satellite?.tm == null || snapshot.satellite.tm !== saved.satellite,
       };
@@ -238,6 +241,9 @@ export default function App() {
         adsb: changes.adsb && changedData.adsb?.content_hash != null
           ? changedData.adsb.content_hash
           : (snapshot.adsb?.hash ?? saved.adsb),
+        groundForecast: changes.groundForecast && changedData.groundForecast?.content_hash != null
+          ? changedData.groundForecast.content_hash
+          : (snapshot.ground_forecast?.hash ?? saved.groundForecast),
         echo: changes.echoMeta && changedData.echoMeta?.tm != null
           ? changedData.echoMeta.tm
           : (snapshot.echo?.tm ?? saved.echo),
@@ -413,7 +419,7 @@ export default function App() {
       )}
 
       {data.metar && (
-        <div className="dashboard-root">
+        <div className="dashboard-root" data-dashboard-mode={dashboardMode}>
           {/* Row 1 left: Header */}
           <div className="left-panel-header">
             <Header
@@ -456,14 +462,21 @@ export default function App() {
               tz={timeZone}
             />
 
-            <TafTimeline
-              tafData={data.taf}
-              icao={selectedAirport}
-              minimaSettings={airportMinimaSettings}
-              version={tafVersion}
-              onVersionToggle={setTafVersion}
-              tz={timeZone}
-            />
+            {dashboardMode === "ground" ? (
+              <GroundForecastPanel
+                groundForecastData={data.groundForecast}
+                icao={selectedAirport}
+              />
+            ) : (
+              <TafTimeline
+                tafData={data.taf}
+                icao={selectedAirport}
+                minimaSettings={airportMinimaSettings}
+                version={tafVersion}
+                onVersionToggle={setTafVersion}
+                tz={timeZone}
+              />
+            )}
           </div>
 
           {/* Row 2 right: Map panel */}
