@@ -318,6 +318,10 @@ $env:NODE_TLS_REJECT_UNAUTHORIZED="0"; node backend/test/run-once.js adsb
 - `Traffic` 레이어는 기본적으로 꺼져 있습니다.
 - `SIGWX_LOW`는 지도 우상단 토글로 켜고 끌 수 있으며, 전국 모드에서는 인천 FIR 경계와 함께 표시됩니다.
 - `SIGWX_LOW` 아이템은 영역(`item_type 4`)과 배지/텍스트(`item_type 7/10/12`)를 그룹화해 같은 현상으로 취급합니다.
+- `SIGWX_LOW` marker icon은 `frontend/public/icon_sigwx/` 자산을 사용합니다. 현상 아이콘은 흰 배경 없이 직접 표시하고, 필요한 보조 텍스트만 별도 흰 chip으로 붙입니다. `freezing_level`은 `빙결고도.png`를 사용하며 다른 아이콘보다 더 크게 표시합니다.
+- `SIGWX_LOW`의 `font_line`(`fl_cold`, `fl_worm`, `fl_occl`)은 더 이상 일반 GIS polyline으로 직접 그리지 않습니다. 백엔드에서 전선만 투명 PNG로 따로 렌더한 뒤 `/api/sigwx-low-fronts?tmfc=...`와 `/data/sigwx_low/fronts_<tmfc>_<hash>.png`를 통해 받아 `ImageOverlay`로 표시합니다.
+- `SIGWX_LOW` 전선 overlay는 현재 선택한 history frame의 `tmfc`와 맞춰서 다시 로드됩니다. 즉 과거 SIGWX를 보면 해당 발표시각에 대응하는 전선만 표시되고, 그 시각 snapshot에 `font_line`이 없으면 전선 overlay도 나타나지 않습니다.
+- `SIGWX_LOW`의 `type 9/10` 보조 annotation 중 일부는 화살표로 렌더됩니다. 현재 구현은 별도 방향 필드가 아니라 `lat_lngs` 점 순서를 화살표 방향으로 사용하며, `15`, `40km/h` 같은 speed label은 화살표 끝점 badge로 표시합니다. 단 `freezing_level` 옆 `type 10` 라벨은 화살표로 처리하지 않습니다.
 - `Traffic` 레이어는 설정창 `항적` 탭에서 호출부호(`KAL, AAR123`) 부분일치 필터와 1만 ft 단위 고도 필터를 함께 적용할 수 있습니다. 고도 밴드는 기본적으로 5개 전체가 선택된 상태이며, 아무것도 선택하지 않으면 항적이 전혀 표시되지 않습니다. 호출부호 필터가 비어 있으면 전체 표시, 값이 입력되면 해당 문자열 포함 항적만 표시됩니다. 선택 값은 `localStorage`(`traffic_altitude_bands`, `traffic_callsign_filter`)에 저장됩니다.
 - 공항을 전환하면 열려 있는 모든 알람 팝업과 마키 배너가 즉시 닫힙니다.
 - 설정창 `일반` 탭의 **사이트 테마** (라이트/다크)를 변경하면 사이트 전체 색상과 지도 타일이 함께 전환됩니다. 선택값은 `localStorage` 키 `map_theme`에 저장됩니다.
