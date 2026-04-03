@@ -3,7 +3,7 @@ const fs = require("fs");
 const path = require("path");
 const config = require("./config");
 
-const TYPES = ["metar", "taf", "warning", "lightning", "sigmet", "airmet", "sigwx_low", "amos", "adsb", "ground_forecast"];
+const TYPES = ["metar", "taf", "warning", "lightning", "sigmet", "airmet", "sigwx_low", "amos", "adsb", "ground_forecast", "ground_overview"];
 const FILE_PREFIX = {
   metar: "METAR",
   taf: "TAF",
@@ -13,7 +13,8 @@ const FILE_PREFIX = {
   airmet: "AIRMET",
   sigwx_low: "SIGWX_LOW",
   amos: "AMOS",
-  ground_forecast: "GROUND_FORECAST"
+  ground_forecast: "GROUND_FORECAST",
+  ground_overview: "GROUND_OVERVIEW"
 };
 
 const cache = {
@@ -27,6 +28,7 @@ const cache = {
   amos: { hash: null, prev_data: null },
   adsb: { hash: null, prev_data: null },
   ground_forecast: { hash: null, prev_data: null },
+  ground_overview: { hash: null, prev_data: null },
 };
 
 function ensureDirectories(basePath) {

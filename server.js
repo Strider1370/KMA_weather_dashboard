@@ -410,6 +410,10 @@ const server = http.createServer(async (req, res) => {
       return sendJson(req, res, 200, readLatest("ground_forecast"));
     }
 
+    if (req.url === "/api/ground-overview") {
+      return sendJson(req, res, 200, readLatest("ground_overview"));
+    }
+
     if (req.url === "/api/airports") {
       const airports = reloadCommonJs(SHARED_AIRPORTS);
       return sendJson(req, res, 200, airports);
@@ -457,6 +461,7 @@ const server = http.createServer(async (req, res) => {
         lightning: { hash: readSnapshotHash("lightning") },
         adsb: { hash: readSnapshotHash("adsb") },
         ground_forecast: { hash: readSnapshotHash("ground_forecast") },
+        ground_overview: { hash: readSnapshotHash("ground_overview") },
         echo: echoTm != null ? { tm: echoTm } : null,
         satellite: satTm != null ? { tm: satTm } : null,
       });

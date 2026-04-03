@@ -123,7 +123,7 @@ export default function App() {
   const prevDataRef = useRef(null);
   const pollingRef = useRef(null);
   const pollingInFlightRef = useRef(false);
-  const snapshotHashRef = useRef({ metar: null, taf: null, warning: null, sigmet: null, airmet: null, sigwxLow: null, amos: null, lightning: null, adsb: null, groundForecast: null, echo: null, satellite: null });
+  const snapshotHashRef = useRef({ metar: null, taf: null, warning: null, sigmet: null, airmet: null, sigwxLow: null, amos: null, lightning: null, adsb: null, groundForecast: null, groundOverview: null, echo: null, satellite: null });
 
   // 디스패처 콜백 등록
   useEffect(() => {
@@ -169,6 +169,7 @@ export default function App() {
         lightning: result.lightning?.content_hash || null,
         adsb: result.adsb?.content_hash || null,
         groundForecast: result.groundForecast?.content_hash || null,
+        groundOverview: result.groundOverview?.content_hash || null,
         echo: result.echoMeta?.tm || null,
         satellite: result.satMeta?.tm || null,
       };
@@ -203,6 +204,7 @@ export default function App() {
         lightning: snapshot.lightning?.hash == null || snapshot.lightning.hash !== saved.lightning,
         adsb: snapshot.adsb?.hash == null || snapshot.adsb.hash !== saved.adsb,
         groundForecast: snapshot.ground_forecast?.hash == null || snapshot.ground_forecast.hash !== saved.groundForecast,
+        groundOverview: snapshot.ground_overview?.hash == null || snapshot.ground_overview.hash !== saved.groundOverview,
         echoMeta: snapshot.echo?.tm == null || snapshot.echo.tm !== saved.echo,
         satMeta: snapshot.satellite?.tm == null || snapshot.satellite.tm !== saved.satellite,
       };
@@ -244,6 +246,9 @@ export default function App() {
         groundForecast: changes.groundForecast && changedData.groundForecast?.content_hash != null
           ? changedData.groundForecast.content_hash
           : (snapshot.ground_forecast?.hash ?? saved.groundForecast),
+        groundOverview: changes.groundOverview && changedData.groundOverview?.content_hash != null
+          ? changedData.groundOverview.content_hash
+          : (snapshot.ground_overview?.hash ?? saved.groundOverview),
         echo: changes.echoMeta && changedData.echoMeta?.tm != null
           ? changedData.echoMeta.tm
           : (snapshot.echo?.tm ?? saved.echo),
@@ -446,8 +451,10 @@ export default function App() {
           <div className="left-panel-body">
             <WarningList
               warningData={data.warning}
+              groundOverviewData={data.groundOverview}
               icao={selectedAirport}
               warningTypes={data.warningTypes}
+              dashboardMode={dashboardMode}
               tz={timeZone}
             />
 

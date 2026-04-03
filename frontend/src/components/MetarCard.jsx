@@ -50,6 +50,9 @@ function getCurrentWeatherTitleImage(observation, tz = "UTC") {
   if (/(^|\s)(TS|TSRA)(\s|$)/.test(normalized)) {
     return "/gisang-i/TS.png";
   }
+  if (/(^|\s)FG(\s|$)/.test(normalized)) {
+    return "/gisang-i/FG.jpg";
+  }
   if (/(^|\s)(\+SN|-SN|SN)(\s|$)/.test(normalized)) {
     return "/gisang-i/SN.png";
   }

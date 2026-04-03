@@ -27,8 +27,9 @@ function formatValidTime(value, tz = "UTC") {
   return `${day}일 ${hour}시 ${minute}분`;
 }
 
-export default function WarningList({ warningData, icao, warningTypes, tz = "UTC" }) {
+export default function WarningList({ warningData, groundOverviewData, icao, warningTypes, dashboardMode = "ops", tz = "UTC" }) {
   const block = warningData?.airports?.[icao];
+  const overview = groundOverviewData?.airports?.[icao] || null;
   const list = useMemo(() => (
     Array.isArray(block?.warnings) ? block.warnings : EMPTY_LIST
   ), [block?.warnings]);
@@ -177,6 +178,21 @@ export default function WarningList({ warningData, icao, warningTypes, tz = "UTC
   const incomingPage = displayPages[nextPageIndex] || activePage;
 
   if (list.length === 0) {
+    if (dashboardMode === "ground" && overview?.summary) {
+      return (
+        <div className="warning-banner warning-banner--ok warning-banner--overview">
+          <div className="warning-banner-side">
+            <span className="warning-banner-icon">&#9788;</span>
+            <span className="warning-banner-label">일기개황</span>
+          </div>
+          <div className="warning-banner-text warning-banner-text--overview">
+            <div className="warning-banner-overview-copy">
+              <span className="warning-banner-overview-summary">{overview.summary}</span>
+            </div>
+          </div>
+        </div>
+      );
+    }
     return (
       <div className="warning-banner warning-banner--ok">
         <div className="warning-banner-side warning-banner-side--single">
