@@ -489,13 +489,14 @@ export default function App() {
           {/* Row 2 right: Map panel */}
           <div className="map-panel-wrap">
             <div className="map-panel-title">기상 레이더</div>
-            <InteractiveMap
-              lightningData={data.lightning}
-              sigwxLowData={data.sigwxLow}
-              sigwxLowHistoryData={data.sigwxLowHistory}
-              sigmetData={data.sigmet}
-              airmetData={data.airmet}
-              adsbData={data.adsb}
+              <InteractiveMap
+                lightningData={data.lightning}
+                sigwxLowData={data.sigwxLow}
+                sigwxLowHistoryData={data.sigwxLowHistory}
+                sigwxLowFrontsData={data.sigwxLowFronts}
+                sigmetData={data.sigmet}
+                airmetData={data.airmet}
+                adsbData={data.adsb}
               selectedAirport={selectedAirport}
               airports={data.airports}
               windDir={(() => {

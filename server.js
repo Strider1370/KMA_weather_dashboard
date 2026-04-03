@@ -7,6 +7,7 @@ import { fileURLToPath } from "url";
 const require = createRequire(import.meta.url);
 const store = require("./backend/src/store");
 const config = require("./backend/src/config");
+const { renderSigwxFrontOverlay } = require("./backend/src/parsers/sigwx-front-overlay");
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
@@ -136,6 +137,62 @@ function readRecent(category, limit = 10) {
       .map((name) => readJsonFile(path.join(dir, name)));
   } catch {
     return [];
+  }
+}
+
+function readSigwxLowByTmfc(tmfc) {
+  const normalized = String(tmfc || "").trim();
+  if (!/^\d{10}$/.test(normalized)) return null;
+
+  const latest = readLatest("sigwx_low");
+  if (latest?.tmfc === normalized) return latest;
+
+  const dir = path.join(DATA_ROOT, "sigwx_low");
+  if (!fs.existsSync(dir)) return null;
+
+  try {
+    const names = fs
+      .readdirSync(dir)
+      .filter((name) => name.endsWith(".json") && name !== "latest.json" && name !== "fronts_meta.json")
+      .sort((a, b) => b.localeCompare(a));
+
+    for (const name of names) {
+      const payload = readJsonFile(path.join(dir, name));
+      if (payload?.tmfc === normalized) return payload;
+    }
+  } catch {
+    return null;
+  }
+
+  return null;
+}
+
+async function ensureSigwxLowFrontOverlay(sigwxPayload = null) {
+  const latest = sigwxPayload || readLatest("sigwx_low");
+  if (!latest) return null;
+
+  const sourceHash = latest?.content_hash || store.canonicalHash(latest);
+  const metaPath = path.join(DATA_ROOT, "sigwx_low", "fronts_meta.json");
+
+  try {
+    if (fs.existsSync(metaPath)) {
+      const existing = readJsonFile(metaPath);
+      const existingPath = existing?.latest?.path
+        ? path.join(DATA_ROOT, existing.latest.path.replace(/^\/data\//, ""))
+        : null;
+      if (existing?.source_hash === sourceHash && existingPath && fs.existsSync(existingPath)) {
+        return existing;
+      }
+    }
+  } catch {
+    // fall through to regenerate
+  }
+
+  try {
+    return await renderSigwxFrontOverlay(latest, DATA_ROOT, sourceHash);
+  } catch (error) {
+    console.warn("[SIGWX_FRONTS] Failed to render overlay:", error.message);
+    return null;
   }
 }
 
@@ -392,6 +449,13 @@ const server = http.createServer(async (req, res) => {
 
     if (req.url === "/api/sigwx-low-history") {
       return sendJson(req, res, 200, readRecent("sigwx_low", 10));
+    }
+
+    if (req.url.startsWith("/api/sigwx-low-fronts")) {
+      const reqUrl = new URL(req.url, "http://localhost");
+      const tmfc = reqUrl.searchParams.get("tmfc");
+      const payload = tmfc ? readSigwxLowByTmfc(tmfc) : null;
+      return sendJson(req, res, 200, await ensureSigwxLowFrontOverlay(payload));
     }
 
     if (req.url === "/api/amos") {

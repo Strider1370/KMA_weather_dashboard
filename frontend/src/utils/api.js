@@ -39,7 +39,7 @@ async function fetchPreferTest(testUrl, liveUrl, { optional = false } = {}) {
 }
 
 export async function loadAllData() {
-  const [metar, taf, warning, airports, warningTypes, lightning, echoMeta, adsb, sigmet, airmet, sigwxLow, sigwxLowHistory, amos, satMeta, groundForecast, groundOverview] = await Promise.all([
+  const [metar, taf, warning, airports, warningTypes, lightning, echoMeta, adsb, sigmet, airmet, sigwxLow, sigwxLowHistory, sigwxLowFronts, amos, satMeta, groundForecast, groundOverview] = await Promise.all([
     fetchPreferTest("/test/metar/latest.json", "/api/metar"),
     fetchPreferTest("/test/taf/latest.json", "/api/taf"),
     fetchPreferTest("/test/warning/latest.json", "/api/warning", { optional: true }),
@@ -52,12 +52,13 @@ export async function loadAllData() {
     fetchPreferTest("/test/airmet/latest.json", "/api/airmet", { optional: true }),
     fetchPreferTest("/test/sigwx-low/latest.json", "/api/sigwx-low", { optional: true }),
     fetchPreferTest("/test/sigwx-low/history.json", "/api/sigwx-low-history", { optional: true }),
+    fetchJsonOptional("/api/sigwx-low-fronts"),
     fetchPreferTest("/test/amos/latest.json", "/api/amos", { optional: true }),
     fetchPreferTest("/test/satellite/sat_meta.json", "/data/satellite/sat_meta.json", { optional: true }),
     fetchJsonOptional("/api/ground-forecast"),
     fetchJsonOptional("/api/ground-overview"),
   ]);
-  return { metar, taf, warning, airports, warningTypes, lightning, echoMeta, adsb, sigmet, airmet, sigwxLow, sigwxLowHistory, amos, satMeta, groundForecast, groundOverview };
+  return { metar, taf, warning, airports, warningTypes, lightning, echoMeta, adsb, sigmet, airmet, sigwxLow, sigwxLowHistory, sigwxLowFronts, amos, satMeta, groundForecast, groundOverview };
 }
 
 export async function loadAlertDefaults() {
@@ -96,6 +97,12 @@ export async function fetchSnapshotMeta() {
   return fetchJson("/api/snapshot-meta");
 }
 
+export async function fetchSigwxLowFronts(tmfc, { optional = true } = {}) {
+  const fetcher = optional ? fetchJsonOptional : fetchJson;
+  const suffix = tmfc ? `?tmfc=${encodeURIComponent(tmfc)}` : "";
+  return fetcher(`/api/sigwx-low-fronts${suffix}`);
+}
+
 export async function loadChangedData(changes) {
   const fetches = [];
   const keys = [];
@@ -110,6 +117,8 @@ export async function loadChangedData(changes) {
     keys.push("sigwxLow");
     fetches.push(fetchPreferTest("/test/sigwx-low/history.json", "/api/sigwx-low-history", { optional: true }));
     keys.push("sigwxLowHistory");
+    fetches.push(fetchJsonOptional("/api/sigwx-low-fronts"));
+    keys.push("sigwxLowFronts");
   }
   if (changes.amos) { fetches.push(fetchPreferTest("/test/amos/latest.json", "/api/amos", { optional: true })); keys.push("amos"); }
   if (changes.lightning) { fetches.push(fetchPreferTest("/test/lightning/latest.json", "/api/lightning", { optional: true })); keys.push("lightning"); }
