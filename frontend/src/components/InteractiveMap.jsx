@@ -14,6 +14,7 @@ import {
 import { formatDateTimeRange, formatUtc } from "../utils/helpers";
 import {
   sigwxCenter,
+  isSigwxArrowItem,
   sigwxLabel,
   sigwxNeedsLabelMarker,
   sigwxNeedsPath,
@@ -21,9 +22,11 @@ import {
   sigwxAltitudeLabel,
   sigwxAltitudeParts,
   sigwxPhenomenonLabel,
+  sigwxTypeLabel,
   sigwxStyle,
   smoothSigwxLatLngs,
 } from "../utils/sigwx";
+import { fetchSigwxLowFronts } from "../utils/api";
 import "leaflet/dist/leaflet.css";
 
 const ZONE_RADII = [
@@ -578,29 +581,196 @@ function escapeHtml(value) {
     .replace(/'/g, "&#39;");
 }
 
+const SIGWX_ICON_EXCLUDED_PREFIXES = ["L_", "BOX_"];
+
+function resolveSigwxIconAsset(iconName) {
+  const candidates = String(iconName || "")
+    .split("/")
+    .map((value) => value.trim())
+    .filter(Boolean);
+
+  for (const candidate of candidates) {
+    const upper = candidate.toUpperCase();
+    if (SIGWX_ICON_EXCLUDED_PREFIXES.some((prefix) => upper.startsWith(prefix))) continue;
+    return `/icon_sigwx/${encodeURIComponent(candidate)}`;
+  }
+
+  return null;
+}
+
+function resolveSigwxSpecialIconAsset(item) {
+  const contour = String(item?.contour_name || "").toLowerCase();
+  const itemName = String(item?.item_name || "").toLowerCase();
+
+  if (contour === "freezing_level") {
+    return `/icon_sigwx/${encodeURIComponent("빙결고도.png")}`;
+  }
+
+  if (contour === "sfc_wind" && itemName === "wind_strong") {
+    return "/icon_sigwx/box_wind.png";
+  }
+
+  return null;
+}
+
+function shouldHideSigwxIconAltitude(item) {
+  const contour = String(item?.contour_name || "").toLowerCase();
+  const itemName = String(item?.item_name || "").toLowerCase();
+  if (contour === "sfc_wind" && itemName === "wind_strong") return true;
+  if (contour === "freezing_level") return true;
+  if (contour === "sfc_vis") {
+    return [
+      "rain",
+      "fog",
+      "widespread_fog",
+      "widespread_mist",
+      "widespread_fog/widespread_mist",
+    ].includes(itemName);
+  }
+  return false;
+}
+
+function getSigwxIconScale(item) {
+  const contour = String(item?.contour_name || "").toLowerCase();
+  return contour === "freezing_level" ? 3 : 2;
+}
+
 function createSigwxBadgeIcon(item) {
   const label = sigwxPhenomenonLabel(item);
   const altitude = sigwxAltitudeLabel(item);
   const altitudeParts = sigwxAltitudeParts(item);
-  const altitudeHtml = altitudeParts
-    ? `<span class="leaflet-advisory-icon-alt-stack"><span>${escapeHtml(formatIconAltitudeText(altitudeParts.upper))}</span><span class="leaflet-advisory-icon-alt-divider"></span><span>${escapeHtml(formatIconAltitudeText(altitudeParts.lower))}</span></span>`
-    : altitude && altitude !== "-"
-      ? `<span class="leaflet-advisory-icon-alt-single">${escapeHtml(formatIconAltitudeText(altitude))}</span>`
-      : "";
-  const maxLineLength = Math.max(
-    label.length,
-    altitudeParts
-      ? Math.max(formatIconAltitudeText(altitudeParts.upper).length, formatIconAltitudeText(altitudeParts.lower).length)
-      : formatIconAltitudeText(altitude).length
-  );
-  const width = Math.max(72, Math.min(118, 20 + (maxLineLength * 7)));
-  const height = altitudeHtml ? 42 : 24;
+  const iconAsset = resolveSigwxSpecialIconAsset(item) || resolveSigwxIconAsset(item?.icon_name);
+  const hideAltitude = shouldHideSigwxIconAltitude(item);
+  const iconScale = getSigwxIconScale(item);
+  const altitudeHtml = hideAltitude
+    ? ""
+    : altitudeParts
+      ? `<span class="leaflet-advisory-icon-alt-stack"><span>${escapeHtml(formatIconAltitudeText(altitudeParts.upper))}</span><span class="leaflet-advisory-icon-alt-divider"></span><span>${escapeHtml(formatIconAltitudeText(altitudeParts.lower))}</span></span>`
+      : altitude && altitude !== "-"
+        ? `<span class="leaflet-advisory-icon-alt-single">${escapeHtml(formatIconAltitudeText(altitude))}</span>`
+        : "";
+  const maxLineLength = iconAsset
+    ? (altitudeParts
+        ? Math.max(formatIconAltitudeText(altitudeParts.upper).length, formatIconAltitudeText(altitudeParts.lower).length)
+        : formatIconAltitudeText(altitude).length)
+    : Math.max(
+        label.length,
+        altitudeParts
+          ? Math.max(formatIconAltitudeText(altitudeParts.upper).length, formatIconAltitudeText(altitudeParts.lower).length)
+          : formatIconAltitudeText(altitude).length
+      );
+  const width = iconAsset
+    ? Math.max(48, Math.min(110, 20 + (maxLineLength * 8)))
+    : Math.max(72, Math.min(118, 20 + (maxLineLength * 7)));
+  const height = iconAsset
+    ? (altitudeHtml ? (iconScale === 3 ? 92 : 72) : (iconScale === 3 ? 56 : 40))
+    : (altitudeHtml ? 42 : 24);
+  const labelHtml = iconAsset
+    ? `<span class="leaflet-advisory-icon-symbol-wrap leaflet-advisory-icon-symbol-wrap--scale-${iconScale}"><img class="leaflet-advisory-icon-symbol leaflet-advisory-icon-symbol--scale-${iconScale}" src="${iconAsset}" alt="${escapeHtml(label)}" /></span>`
+    : `<span class="leaflet-advisory-icon-label">${escapeHtml(label)}</span>`;
+  const contentHtml = iconAsset
+    ? `<span class="leaflet-advisory-icon-stack">${labelHtml}${altitudeHtml ? `<span class="leaflet-advisory-icon-text-chip">${altitudeHtml}</span>` : ""}</span>`
+    : `<span class="leaflet-advisory-icon-badge leaflet-advisory-icon-badge--sigwx">${labelHtml}${altitudeHtml}</span>`;
   return L.divIcon({
     className: "leaflet-advisory-icon leaflet-advisory-icon--sigwx",
-    html: `<span class="leaflet-advisory-icon-badge leaflet-advisory-icon-badge--sigwx" data-icon-name="${escapeHtml(item.icon_name || "")}"><span class="leaflet-advisory-icon-label">${escapeHtml(label)}</span>${altitudeHtml}</span>`,
+    html: `<span class="leaflet-advisory-icon-shell" data-icon-name="${escapeHtml(item.icon_name || "")}">${contentHtml}</span>`,
     iconSize: [width, height],
     iconAnchor: [Math.round(width / 2), Math.round(height / 2)],
   });
+}
+
+function createSigwxArrowLabelIcon(label) {
+  const safeLabel = escapeHtml(label || "");
+  const width = Math.max(28, Math.min(78, 12 + String(label || "").length * 8));
+  return L.divIcon({
+    className: "sigwx-arrow-label-icon",
+    html: `<span class="sigwx-arrow-label-badge">${safeLabel}</span>`,
+    iconSize: [width, 24],
+    iconAnchor: [Math.round(width / 2), 12],
+  });
+}
+
+function projectArrowHead(map, positions, sizePx = 16, spreadPx = 8) {
+  if (!map || !Array.isArray(positions) || positions.length < 2) return null;
+  const end = positions[positions.length - 1];
+  const prev = positions[positions.length - 2];
+  const endPoint = map.latLngToLayerPoint(end);
+  const prevPoint = map.latLngToLayerPoint(prev);
+  const dx = endPoint.x - prevPoint.x;
+  const dy = endPoint.y - prevPoint.y;
+  const length = Math.sqrt(dx * dx + dy * dy);
+  if (!Number.isFinite(length) || length < 0.001) return null;
+
+  const ux = dx / length;
+  const uy = dy / length;
+  const baseX = endPoint.x - ux * sizePx;
+  const baseY = endPoint.y - uy * sizePx;
+  const px = -uy;
+  const py = ux;
+
+  const left = L.point(baseX + px * spreadPx, baseY + py * spreadPx);
+  const right = L.point(baseX - px * spreadPx, baseY - py * spreadPx);
+
+  return [
+    map.layerPointToLatLng(endPoint),
+    map.layerPointToLatLng(left),
+    map.layerPointToLatLng(right),
+  ];
+}
+
+function SigwxArrowAnnotation({ item, hovered, onHoverStart, onHoverEnd }) {
+  const map = useMap();
+  const positions = item.smoothedLatLngs?.length ? item.smoothedLatLngs : item.lat_lngs;
+  const arrowHeadPositions = useMemo(
+    () => projectArrowHead(map, positions),
+    [map, positions]
+  );
+  const pathOptions = sigwxStyle(item, hovered);
+  const arrowLabel = String(item?.label || "").trim();
+  const endPosition = positions?.[positions.length - 1] || null;
+
+  return (
+    <>
+      <Polyline
+        key={`sigwx-arrow-line-${item.mapKey}`}
+        positions={positions}
+        pathOptions={pathOptions}
+        eventHandlers={{
+          mouseover: onHoverStart,
+          mouseout: onHoverEnd,
+        }}
+      >
+        <Tooltip sticky opacity={0.96} className="advisory-tooltip">
+          <div className="advisory-tooltip-body">
+            <strong>{sigwxPhenomenonLabel(item)}</strong>
+            {renderSigwxAltitude(item)}
+            <div className="advisory-tooltip-meta">{sigwxTypeLabel(item)}</div>
+          </div>
+        </Tooltip>
+      </Polyline>
+      {arrowHeadPositions && (
+        <Polygon
+          key={`sigwx-arrow-head-${item.mapKey}`}
+          positions={arrowHeadPositions}
+          pathOptions={{
+            stroke: false,
+            fill: true,
+            fillColor: pathOptions.color,
+            fillOpacity: hovered ? 0.95 : 0.88,
+            interactive: false,
+          }}
+        />
+      )}
+      {arrowLabel && endPosition && (
+        <Marker
+          key={`sigwx-arrow-label-${item.mapKey}`}
+          position={endPosition}
+          icon={createSigwxArrowLabelIcon(arrowLabel)}
+          interactive={false}
+        />
+      )}
+    </>
+  );
 }
 
 function renderSigwxAltitude(item) {
@@ -645,6 +815,7 @@ export default function InteractiveMap({
   lightningData,
   sigwxLowData = null,
   sigwxLowHistoryData = null,
+  sigwxLowFrontsData = null,
   sigmetData = null,
   airmetData = null,
   adsbData = null,
@@ -681,6 +852,7 @@ export default function InteractiveMap({
   const [loopStart, setLoopStart] = useState(0);
   const [loopEnd, setLoopEnd] = useState(0);
   const [sigwxHistoryIndex, setSigwxHistoryIndex] = useState(0);
+  const [sigwxFrontMeta, setSigwxFrontMeta] = useState(sigwxLowFrontsData);
   const loopTrackRef = useRef(null);
   const draggingRef = useRef(null); // "start" | "end" | null
   const isNationwide = mapScope === "nationwide";
@@ -713,10 +885,48 @@ export default function InteractiveMap({
   const arp = airportData?.arp || (airportMeta ? { lat: airportMeta.lat, lon: airportMeta.lon } : null);
   const strikes = airportData?.strikes || [];
   const sigwxHistoryEntries = useMemo(() => {
-    if (Array.isArray(sigwxLowHistoryData) && sigwxLowHistoryData.length > 0) return sigwxLowHistoryData;
-    return sigwxLowData ? [sigwxLowData] : [];
+    const history = Array.isArray(sigwxLowHistoryData) ? sigwxLowHistoryData : [];
+    if (!sigwxLowData) return history;
+    if (!history.length) return [sigwxLowData];
+
+    const first = history[0];
+    const sameEntry = (
+      (sigwxLowData?.content_hash && first?.content_hash && sigwxLowData.content_hash === first.content_hash) ||
+      (sigwxLowData?.tmfc && first?.tmfc && sigwxLowData.tmfc === first.tmfc)
+    );
+
+    return sameEntry ? history : [sigwxLowData, ...history];
   }, [sigwxLowData, sigwxLowHistoryData]);
   const selectedSigwxEntry = sigwxHistoryEntries[Math.min(sigwxHistoryIndex, Math.max(0, sigwxHistoryEntries.length - 1))] || null;
+  const sigwxFrontInfo = useMemo(() => {
+    const latest = sigwxFrontMeta?.latest;
+    if (!latest?.path || !latest?.bounds) return null;
+    return {
+      url: `${latest.path}?t=${sigwxFrontMeta?.source_hash || sigwxFrontMeta?.updated_at || Date.now()}`,
+      bounds: latest.bounds,
+    };
+  }, [sigwxFrontMeta]);
+
+  useEffect(() => {
+    setSigwxFrontMeta(sigwxLowFrontsData);
+  }, [sigwxLowFrontsData]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const tmfc = selectedSigwxEntry?.tmfc || null;
+
+    fetchSigwxLowFronts(tmfc).then((payload) => {
+      if (cancelled) return;
+      setSigwxFrontMeta(payload);
+    }).catch(() => {
+      if (cancelled) return;
+      setSigwxFrontMeta(null);
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedSigwxEntry?.tmfc]);
 
   const center = useMemo(() => (
     isNationwide
@@ -1558,6 +1768,16 @@ export default function InteractiveMap({
               </Pane>
             )}
 
+            {showSigwxLow && sigwxFrontInfo && (
+              <Pane name="sigwx-front-pane" style={{ zIndex: 405 }}>
+                <ImageOverlay
+                  url={sigwxFrontInfo.url}
+                  bounds={sigwxFrontInfo.bounds}
+                  opacity={1}
+                />
+              </Pane>
+            )}
+
             {showEcho && (
               <Pane name="radar-range-pane" style={{ zIndex: 420 }}>
                 {radarOutsideMaskPositions && (
@@ -1656,9 +1876,22 @@ export default function InteractiveMap({
 
             <Pane name="advisory-pane" style={{ zIndex: 520 }}>
               {showSigwxLow && visibleSigwxLowItems.map((item) => {
-                if (!sigwxNeedsPath(item)) return null;
                 const hoverKey = resolveSigwxHoverKey(item);
                 const hovered = hoveredAdvisoryId === hoverKey;
+
+                if (isSigwxArrowItem(item)) {
+                  return (
+                    <SigwxArrowAnnotation
+                      key={`sigwx-arrow-${item.mapKey}`}
+                      item={item}
+                      hovered={hovered}
+                      onHoverStart={() => setHoveredAdvisoryId(hoverKey)}
+                      onHoverEnd={() => setHoveredAdvisoryId((prev) => (prev === hoverKey ? null : prev))}
+                    />
+                  );
+                }
+
+                if (!sigwxNeedsPath(item)) return null;
                 const positions = item.smoothedLatLngs?.length ? item.smoothedLatLngs : item.lat_lngs;
                 const pathProps = {
                   pathOptions: sigwxStyle(item, hovered),
@@ -1675,6 +1908,7 @@ export default function InteractiveMap({
                         <div className="advisory-tooltip-body">
                           <strong>{sigwxPhenomenonLabel(item)}</strong>
                           {renderSigwxAltitude(item)}
+                          <div className="advisory-tooltip-meta">{sigwxTypeLabel(item)}</div>
                         </div>
                       </Tooltip>
                     </Polygon>
@@ -1687,6 +1921,7 @@ export default function InteractiveMap({
                       <div className="advisory-tooltip-body">
                         <strong>{sigwxPhenomenonLabel(item)}</strong>
                         {renderSigwxAltitude(item)}
+                        <div className="advisory-tooltip-meta">{sigwxTypeLabel(item)}</div>
                       </div>
                     </Tooltip>
                   </Polyline>
@@ -1764,6 +1999,7 @@ export default function InteractiveMap({
                       <div className="advisory-tooltip-body">
                         <strong>{sigwxPhenomenonLabel(item)}</strong>
                         {renderSigwxAltitude(item)}
+                        <div className="advisory-tooltip-meta">{sigwxTypeLabel(item)}</div>
                       </div>
                     </Tooltip>
                   </Marker>

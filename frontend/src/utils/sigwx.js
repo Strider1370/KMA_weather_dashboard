@@ -177,6 +177,13 @@ export function sigwxLabel(item) {
     || "SIGWX";
 }
 
+export function sigwxTypeLabel(item) {
+  const type = Number(item?.item_type);
+  const contour = normalizeSigwxText(item?.contour_name || "-");
+  const itemName = normalizeSigwxText(item?.item_name || "-");
+  return `type ${Number.isFinite(type) ? type : "-"} | contour: ${contour} | item: ${itemName}`;
+}
+
 export function sigwxStyle(item, hovered) {
   const weight = hovered ? (item?.line_width || 2) + 1 : (item?.line_width || 2);
   return {
@@ -199,14 +206,42 @@ export function sigwxCenter(item) {
 }
 
 export function sigwxNeedsLabelMarker(item) {
-  return [7, 10, 11, 12].includes(Number(item?.item_type));
+  const contour = String(item?.contour_name || "").toLowerCase();
+  const itemName = String(item?.item_name || "").toLowerCase();
+  if (contour === "freezing_level") return true;
+  if (contour === "sfc_wind" && itemName === "wind_strong") return true;
+  return [7, 8, 10, 11, 12].includes(Number(item?.item_type));
 }
 
 export function isPrimarySigwxItem(item) {
   return Number(item?.item_type) === 4;
 }
 
+export function isSigwxArrowItem(item) {
+  const type = Number(item?.item_type);
+  const contour = String(item?.contour_name || "").toLowerCase();
+  const label = String(item?.label || "").trim().toLowerCase();
+  const hasLine = Array.isArray(item?.lat_lngs) && item.lat_lngs.length >= 2;
+  if (!hasLine) return false;
+  if (contour === "freezing_level") return false;
+
+  if (type === 9) {
+    return contour === "cld" || contour === "font_line" || contour === "";
+  }
+
+  if (type === 10) {
+    return contour === "" || label.includes("km/h");
+  }
+
+  return false;
+}
+
 export function sigwxNeedsPath(item) {
+  const contour = String(item?.contour_name || "").toLowerCase();
+  const itemName = String(item?.item_name || "").toLowerCase();
+  if (isSigwxArrowItem(item)) return false;
+  if (contour === "font_line") return false;
+  if (contour === "sfc_wind" && itemName === "wind_strong") return false;
   return ![7, 10, 12].includes(Number(item?.item_type));
 }
 
