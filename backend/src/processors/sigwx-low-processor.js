@@ -1,6 +1,9 @@
 const apiClient = require("../api-client");
 const store = require("../store");
 const sigwxLowParser = require("../parsers/sigwx-low-parser");
+const config = require("../config");
+const { renderSigwxFrontOverlay } = require("../parsers/sigwx-front-overlay");
+const { renderSigwxCloudOverlay } = require("../parsers/sigwx-cloud-overlay");
 
 function formatTmfc(date) {
   const y = date.getUTCFullYear();
@@ -132,6 +135,15 @@ async function process() {
   };
 
   const saveResult = store.save("sigwx_low", result);
+  const sourceHash = result.content_hash || store.canonicalHash(result);
+  try {
+    await Promise.all([
+      renderSigwxFrontOverlay(result, config.storage.base_path, sourceHash),
+      renderSigwxCloudOverlay(result, config.storage.base_path, sourceHash),
+    ]);
+  } catch (error) {
+    console.warn("[SIGWX_LOW] Failed to precompute overlays:", error.message);
+  }
   return {
     type: "sigwx_low",
     saved: saveResult.saved,

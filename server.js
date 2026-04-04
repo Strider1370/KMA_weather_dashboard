@@ -7,7 +7,6 @@ import { fileURLToPath } from "url";
 const require = createRequire(import.meta.url);
 const store = require("./backend/src/store");
 const config = require("./backend/src/config");
-const { renderSigwxFrontOverlay } = require("./backend/src/parsers/sigwx-front-overlay");
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
@@ -129,9 +128,17 @@ function readRecent(category, limit = 10) {
   const dir = path.join(DATA_ROOT, category);
   if (!fs.existsSync(dir)) return [];
   try {
+    const historyPattern = category === "sigwx_low"
+      ? /^SIGWX_LOW_.*\.json$/
+      : null;
+
     return fs
       .readdirSync(dir)
-      .filter((name) => name.endsWith(".json") && name !== "latest.json")
+      .filter((name) => {
+        if (!name.endsWith(".json") || name === "latest.json") return false;
+        if (historyPattern) return historyPattern.test(name);
+        return true;
+      })
       .sort((a, b) => b.localeCompare(a))
       .slice(0, limit)
       .map((name) => readJsonFile(path.join(dir, name)));
@@ -153,7 +160,7 @@ function readSigwxLowByTmfc(tmfc) {
   try {
     const names = fs
       .readdirSync(dir)
-      .filter((name) => name.endsWith(".json") && name !== "latest.json" && name !== "fronts_meta.json")
+      .filter((name) => /^SIGWX_LOW_\d{10}\.json$/.test(name))
       .sort((a, b) => b.localeCompare(a));
 
     for (const name of names) {
@@ -167,31 +174,15 @@ function readSigwxLowByTmfc(tmfc) {
   return null;
 }
 
-async function ensureSigwxLowFrontOverlay(sigwxPayload = null) {
-  const latest = sigwxPayload || readLatest("sigwx_low");
-  if (!latest) return null;
-
-  const sourceHash = latest?.content_hash || store.canonicalHash(latest);
-  const metaPath = path.join(DATA_ROOT, "sigwx_low", "fronts_meta.json");
-
+function readSigwxOverlayMeta(kind, tmfc) {
+  const normalized = String(tmfc || "").trim();
+  if (!/^\d{10}$/.test(normalized)) return null;
+  const prefix = kind === "clouds" ? "clouds_meta_" : "fronts_meta_";
+  const file = path.join(DATA_ROOT, "sigwx_low", `${prefix}${normalized}.json`);
+  if (!fs.existsSync(file)) return null;
   try {
-    if (fs.existsSync(metaPath)) {
-      const existing = readJsonFile(metaPath);
-      const existingPath = existing?.latest?.path
-        ? path.join(DATA_ROOT, existing.latest.path.replace(/^\/data\//, ""))
-        : null;
-      if (existing?.source_hash === sourceHash && existingPath && fs.existsSync(existingPath)) {
-        return existing;
-      }
-    }
+    return readJsonFile(file);
   } catch {
-    // fall through to regenerate
-  }
-
-  try {
-    return await renderSigwxFrontOverlay(latest, DATA_ROOT, sourceHash);
-  } catch (error) {
-    console.warn("[SIGWX_FRONTS] Failed to render overlay:", error.message);
     return null;
   }
 }
@@ -453,9 +444,14 @@ const server = http.createServer(async (req, res) => {
 
     if (req.url.startsWith("/api/sigwx-low-fronts")) {
       const reqUrl = new URL(req.url, "http://localhost");
-      const tmfc = reqUrl.searchParams.get("tmfc");
-      const payload = tmfc ? readSigwxLowByTmfc(tmfc) : null;
-      return sendJson(req, res, 200, await ensureSigwxLowFrontOverlay(payload));
+      const tmfc = reqUrl.searchParams.get("tmfc") || readLatest("sigwx_low")?.tmfc || null;
+      return sendJson(req, res, 200, readSigwxOverlayMeta("fronts", tmfc));
+    }
+
+    if (req.url.startsWith("/api/sigwx-low-clouds")) {
+      const reqUrl = new URL(req.url, "http://localhost");
+      const tmfc = reqUrl.searchParams.get("tmfc") || readLatest("sigwx_low")?.tmfc || null;
+      return sendJson(req, res, 200, readSigwxOverlayMeta("clouds", tmfc));
     }
 
     if (req.url === "/api/amos") {

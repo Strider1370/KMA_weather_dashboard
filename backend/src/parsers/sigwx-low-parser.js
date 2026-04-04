@@ -72,8 +72,19 @@ function parsePoints(points) {
   })).filter((point) => Number.isFinite(point.x) && Number.isFinite(point.y));
 }
 
+function parseRectLabel(rectLabel) {
+  if (!rectLabel) return null;
+  const left = number(rectLabel?.["@_left"]);
+  const top = number(rectLabel?.["@_top"]);
+  const width = number(rectLabel?.["@_width"]);
+  const height = number(rectLabel?.["@_height"]);
+  if (![left, top, width, height].every(Number.isFinite)) return null;
+  return { left, top, width, height };
+}
+
 function parseItem(node, index, mapRangeMode, width, height) {
   const fpvPoints = parsePoints(node?.fpv?.list_pt_fpv?.pt);
+  const rectLabel = parseRectLabel(node?.fpv?.rect_label);
   const latLngs = fpvPoints
     .map((point) => fpvPointToLatLng({ "@_x": point.x, "@_y": point.y }, mapRangeMode, width, height))
     .filter(Boolean);
@@ -104,6 +115,7 @@ function parseItem(node, index, mapRangeMode, width, height) {
     label_pos_pt: number(node?.["@_label_pos_pt"], -1),
     label_pos_offset_x: number(node?.["@_label_pos_offset_x"], 0),
     label_pos_offset_y: number(node?.["@_label_pos_offset_y"], 0),
+    rect_label: rectLabel,
     points: listPoints,
     fpv_points: fpvPoints,
     lat_lngs: latLngs,

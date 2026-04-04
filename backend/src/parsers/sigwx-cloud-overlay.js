@@ -7,9 +7,12 @@ const sharp = require("sharp");
 const DEG2RAD = Math.PI / 180;
 const OUTPUT_WIDTH = 1400;
 const PADDING_RATIO = 0.06;
-const SAMPLE_OFFSET = 56;
-const SAMPLE_REPEAT = 132;
-const RENDER_VERSION = "sigwx-front-overlay-trial-v2";
+const SAMPLE_OFFSET = 44;
+const SAMPLE_REPEAT = 46;
+const SCALLOP_RADIUS = 24;
+const SCALLOP_OFFSET = 18;
+const RENDER_VERSION = "sigwx-cloud-overlay-trial-v3";
+const CB_COLOR = "#a52a2a";
 
 function lonToMercatorX(lon) {
   return (lon * Math.PI) / 180;
@@ -25,21 +28,6 @@ function mercatorYToLat(y) {
   return Math.atan(Math.sinh(y)) / DEG2RAD;
 }
 
-function classifyFrontType(item) {
-  const itemName = String(item?.item_name || "").toLowerCase();
-  if (itemName === "fl_cold") return "cold";
-  if (itemName === "fl_worm") return "warm";
-  if (itemName === "fl_occl") return "occluded";
-  return null;
-}
-
-function getFrontColor(frontType) {
-  if (frontType === "cold") return "#2563eb";
-  if (frontType === "warm") return "#dc2626";
-  if (frontType === "occluded") return "#7c3aed";
-  return "#ffffff";
-}
-
 function escapeXml(value) {
   return String(value || "")
     .replace(/&/g, "&amp;")
@@ -49,13 +37,20 @@ function escapeXml(value) {
     .replace(/'/g, "&apos;");
 }
 
-function buildBounds(frontItems) {
+function isCbCloudBoundary(item) {
+  return Number(item?.item_type) === 4
+    && String(item?.contour_name || "").toLowerCase() === "cld"
+    && String(item?.item_name || "").toLowerCase() === "cloud"
+    && /\bCB\b/i.test(String(item?.label || item?.text_label || "").replace(/&#10;/g, " "));
+}
+
+function buildBounds(items) {
   let minX = Infinity;
   let minY = Infinity;
   let maxX = -Infinity;
   let maxY = -Infinity;
 
-  for (const item of frontItems) {
+  for (const item of items) {
     for (const [lat, lon] of item.lat_lngs || []) {
       const x = lonToMercatorX(lon);
       const y = latToMercatorY(lat);
@@ -66,10 +61,7 @@ function buildBounds(frontItems) {
     }
   }
 
-  if (![minX, minY, maxX, maxY].every(Number.isFinite)) {
-    return null;
-  }
-
+  if (![minX, minY, maxX, maxY].every(Number.isFinite)) return null;
   const padX = Math.max((maxX - minX) * PADDING_RATIO, 0.01);
   const padY = Math.max((maxY - minY) * PADDING_RATIO, 0.01);
   return {
@@ -91,12 +83,9 @@ function projectPoint(lat, lon, bounds, width, height) {
 
 function pathFromPoints(points) {
   if (!Array.isArray(points) || points.length < 2) return "";
-  return points.map((point, index) => `${index === 0 ? "M" : "L"}${point.x.toFixed(2)} ${point.y.toFixed(2)}`).join(" ");
-}
-
-function quadraticPathFromPoints(points) {
-  if (!Array.isArray(points) || points.length < 2) return "";
-  if (points.length === 2) return pathFromPoints(points);
+  if (points.length === 2) {
+    return points.map((point, index) => `${index === 0 ? "M" : "L"}${point.x.toFixed(2)} ${point.y.toFixed(2)}`).join(" ");
+  }
 
   let d = `M${points[0].x.toFixed(2)} ${points[0].y.toFixed(2)}`;
   for (let i = 1; i < points.length - 1; i += 1) {
@@ -113,7 +102,6 @@ function quadraticPathFromPoints(points) {
 
 function smoothPolyline(points, iterations = 4) {
   if (!Array.isArray(points) || points.length < 3) return points;
-
   let current = points.map((point) => ({ x: point.x, y: point.y }));
   for (let i = 0; i < iterations; i += 1) {
     if (current.length < 3) break;
@@ -121,25 +109,17 @@ function smoothPolyline(points, iterations = 4) {
     for (let j = 0; j < current.length - 1; j += 1) {
       const p0 = current[j];
       const p1 = current[j + 1];
-      next.push({
-        x: 0.75 * p0.x + 0.25 * p1.x,
-        y: 0.75 * p0.y + 0.25 * p1.y,
-      });
-      next.push({
-        x: 0.25 * p0.x + 0.75 * p1.x,
-        y: 0.25 * p0.y + 0.75 * p1.y,
-      });
+      next.push({ x: 0.75 * p0.x + 0.25 * p1.x, y: 0.75 * p0.y + 0.25 * p1.y });
+      next.push({ x: 0.25 * p0.x + 0.75 * p1.x, y: 0.25 * p0.y + 0.75 * p1.y });
     }
     next.push(current[current.length - 1]);
     current = next;
   }
-
   return current;
 }
 
 function samplePolyline(points, offset = SAMPLE_OFFSET, repeat = SAMPLE_REPEAT) {
   if (!Array.isArray(points) || points.length < 2) return [];
-
   const segments = [];
   let totalLength = 0;
   for (let i = 1; i < points.length; i += 1) {
@@ -152,7 +132,6 @@ function samplePolyline(points, offset = SAMPLE_OFFSET, repeat = SAMPLE_REPEAT) 
     segments.push({ a, b, dx, dy, length, start: totalLength, end: totalLength + length });
     totalLength += length;
   }
-
   const samples = [];
   for (let distance = offset; distance < totalLength; distance += repeat) {
     const segment = segments.find((entry) => distance >= entry.start && distance <= entry.end);
@@ -164,49 +143,55 @@ function samplePolyline(points, offset = SAMPLE_OFFSET, repeat = SAMPLE_REPEAT) 
     const angle = Math.atan2(segment.dy, segment.dx) * (180 / Math.PI);
     samples.push({ x, y, angle });
   }
-
   return samples;
 }
 
-function createSymbolSvg(frontType, color, index) {
-  if (frontType === "cold") {
-    return `<path d="M0 0 L40 0 L22 26 Z" fill="${color}" stroke="none" />`;
+function polygonSignedArea(points) {
+  if (!Array.isArray(points) || points.length < 3) return 0;
+  let area = 0;
+  for (let i = 0; i < points.length; i += 1) {
+    const a = points[i];
+    const b = points[(i + 1) % points.length];
+    area += (a.x * b.y) - (b.x * a.y);
   }
-
-  if (frontType === "warm") {
-    return `<path d="M0 0 A20 20 0 0 1 40 0 Z" fill="${color}" stroke="${color}" stroke-width="1.8" stroke-linejoin="round" />`;
-  }
-
-  if (frontType === "occluded") {
-    if (index % 2 === 0) {
-      return `<path d="M0 0 A20 20 0 0 1 40 0 Z" fill="${color}" stroke="${color}" stroke-width="1.8" stroke-linejoin="round" />`;
-    }
-    return `<path d="M0 0 L40 0 L22 -26 Z" fill="${color}" stroke="none" />`;
-  }
-
-  return "";
+  return area / 2;
 }
 
-async function renderSigwxFrontOverlay(sigwxLow, dataRoot, canonicalHash) {
-  const frontItems = (sigwxLow?.items || [])
-    .filter((item) => String(item?.contour_name || "").toLowerCase() === "font_line")
-    .map((item) => ({
-      ...item,
-      frontType: classifyFrontType(item),
-    }))
-    .filter((item) => item.frontType && Array.isArray(item.lat_lngs) && item.lat_lngs.length >= 2);
+function applyOutwardOffset(samples, points) {
+  const signedArea = polygonSignedArea(points);
+  const isClockwise = signedArea < 0;
 
-  if (!frontItems.length) return null;
+  return samples.map((sample) => {
+    const rad = (sample.angle * Math.PI) / 180;
+    const nx = isClockwise ? Math.sin(rad) : -Math.sin(rad);
+    const ny = isClockwise ? -Math.cos(rad) : Math.cos(rad);
+    return {
+      ...sample,
+      x: sample.x + (nx * SCALLOP_OFFSET),
+      y: sample.y + (ny * SCALLOP_OFFSET),
+      nx,
+      ny,
+    };
+  });
+}
 
-  const boundsMerc = buildBounds(frontItems);
+function createScallopSvg(color) {
+  return `<path d="M-${SCALLOP_RADIUS} 0 A${SCALLOP_RADIUS} ${SCALLOP_RADIUS} 0 0 1 ${SCALLOP_RADIUS} 0" fill="none" stroke="${color}" stroke-width="6.2" stroke-linecap="round" />`;
+}
+
+async function renderSigwxCloudOverlay(sigwxLow, dataRoot, canonicalHash) {
+  const cloudItems = (sigwxLow?.items || [])
+    .filter((item) => isCbCloudBoundary(item) && Array.isArray(item.lat_lngs) && item.lat_lngs.length >= 3);
+
+  if (!cloudItems.length) return null;
+  const boundsMerc = buildBounds(cloudItems);
   if (!boundsMerc) return null;
 
   const width = OUTPUT_WIDTH;
   const height = Math.max(1, Math.round(((boundsMerc.maxY - boundsMerc.minY) / (boundsMerc.maxX - boundsMerc.minX)) * width));
-  const projected = frontItems.map((item) => ({
+  const projected = cloudItems.map((item) => ({
     ...item,
-    color: getFrontColor(item.frontType),
-    projectedPoints: item.lat_lngs.map(([lat, lon]) => projectPoint(lat, lon, boundsMerc, width, height)),
+    color: CB_COLOR,
     smoothedPoints: smoothPolyline(item.lat_lngs.map(([lat, lon]) => projectPoint(lat, lon, boundsMerc, width, height))),
   }));
 
@@ -216,29 +201,25 @@ async function renderSigwxFrontOverlay(sigwxLow, dataRoot, canonicalHash) {
   ];
 
   for (const item of projected) {
-    const pathD = quadraticPathFromPoints(item.smoothedPoints);
+    const closedPoints = [...item.smoothedPoints, item.smoothedPoints[0]];
+    const pathD = pathFromPoints(closedPoints);
     if (!pathD) continue;
-    svgParts.push(`<path d="${escapeXml(pathD)}" fill="none" stroke="${item.color}" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round" />`);
-
-    const samples = samplePolyline(item.smoothedPoints);
-    samples.forEach((sample, index) => {
-      const symbol = createSymbolSvg(item.frontType, item.color, index);
-      if (!symbol) return;
-      svgParts.push(`<g transform="translate(${sample.x.toFixed(2)} ${sample.y.toFixed(2)}) rotate(${sample.angle.toFixed(2)})">${symbol}</g>`);
+    svgParts.push(`<path d="${escapeXml(pathD)}" fill="none" stroke="${item.color}" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round" opacity="0.3" />`);
+    const samples = applyOutwardOffset(samplePolyline(closedPoints), item.smoothedPoints);
+    samples.forEach((sample) => {
+      svgParts.push(`<g transform="translate(${sample.x.toFixed(2)} ${sample.y.toFixed(2)}) rotate(${sample.angle.toFixed(2)})">${createScallopSvg(item.color)}</g>`);
     });
   }
 
   svgParts.push(`</svg>`);
-  const svg = svgParts.join("");
-  const pngBuffer = await sharp(Buffer.from(svg)).png({ compressionLevel: 3 }).toBuffer();
+  const pngBuffer = await sharp(Buffer.from(svgParts.join(""))).png({ compressionLevel: 3 }).toBuffer();
 
   const dir = path.join(dataRoot, "sigwx_low");
   fs.mkdirSync(dir, { recursive: true });
   const tmfc = sigwxLow?.tmfc || "latest";
-  const filename = `fronts_${tmfc}.png`;
-  const metaFilename = `fronts_meta_${tmfc}.json`;
-  const fullPath = path.join(dir, filename);
-  fs.writeFileSync(fullPath, pngBuffer);
+  const filename = `clouds_${tmfc}.png`;
+  const metaFilename = `clouds_meta_${tmfc}.json`;
+  fs.writeFileSync(path.join(dir, filename), pngBuffer);
 
   const south = mercatorYToLat(boundsMerc.minY);
   const north = mercatorYToLat(boundsMerc.maxY);
@@ -246,7 +227,7 @@ async function renderSigwxFrontOverlay(sigwxLow, dataRoot, canonicalHash) {
   const east = (boundsMerc.maxX * 180) / Math.PI;
 
   const meta = {
-    type: "SIGWX_LOW_FRONTS",
+    type: "SIGWX_LOW_CLOUDS",
     render_version: RENDER_VERSION,
     updated_at: new Date().toISOString(),
     tmfc,
@@ -261,7 +242,7 @@ async function renderSigwxFrontOverlay(sigwxLow, dataRoot, canonicalHash) {
       ],
       width,
       height,
-      frontCount: projected.length,
+      cloudCount: projected.length,
     },
   };
 
@@ -271,5 +252,5 @@ async function renderSigwxFrontOverlay(sigwxLow, dataRoot, canonicalHash) {
 
 module.exports = {
   RENDER_VERSION,
-  renderSigwxFrontOverlay,
+  renderSigwxCloudOverlay,
 };

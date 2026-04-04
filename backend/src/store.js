@@ -52,8 +52,22 @@ function formatFileTimestamp(date = new Date()) {
   return `${y}${m}${d}T${hh}${mm}${ss}${ms}Z`;
 }
 
+function formatSigwxLowFileLabel(tmfc) {
+  const normalized = String(tmfc || "").trim();
+  if (!/^\d{10}$/.test(normalized)) return null;
+  return normalized;
+}
+
 function writeJson(filePath, data) {
   fs.writeFileSync(filePath, `${JSON.stringify(data, null, 2)}\n`, "utf8");
+}
+
+function readJsonSafe(filePath) {
+  try {
+    return JSON.parse(fs.readFileSync(filePath, "utf8"));
+  } catch {
+    return null;
+  }
 }
 
 function getMaxFilesForType(type) {
@@ -84,6 +98,46 @@ function saveAndUpdateLatest(dir, filename, data, type = null) {
 
   rotateFiles(dir, getMaxFilesForType(type));
   return filePath;
+}
+
+function cleanupSigwxLowTmfcFiles(dir, tmfc, keepFilename) {
+  if (!tmfc) return;
+  const names = fs.readdirSync(dir).filter((name) => name.endsWith(".json") && name !== "latest.json" && name !== keepFilename);
+  for (const name of names) {
+    const fullPath = path.join(dir, name);
+    const payload = readJsonSafe(fullPath);
+    if (payload?.tmfc === tmfc) {
+      fs.unlinkSync(fullPath);
+    }
+  }
+}
+
+function cleanupSigwxLowOverlayFiles(dir) {
+  const existingTmfc = new Set(
+    fs.readdirSync(dir)
+      .filter((name) => /^SIGWX_LOW_\d{10}\.json$/.test(name))
+      .map((name) => name.match(/^SIGWX_LOW_(\d{10})\.json$/)?.[1])
+      .filter(Boolean)
+  );
+
+  const overlayPatterns = [
+    /^fronts_(\d{10})\.png$/,
+    /^fronts_meta_(\d{10})\.json$/,
+    /^clouds_(\d{10})\.png$/,
+    /^clouds_meta_(\d{10})\.json$/,
+  ];
+
+  for (const name of fs.readdirSync(dir)) {
+    for (const pattern of overlayPatterns) {
+      const match = name.match(pattern);
+      if (!match) continue;
+      const tmfc = match[1];
+      if (!existingTmfc.has(tmfc)) {
+        fs.unlinkSync(path.join(dir, name));
+      }
+      break;
+    }
+  }
 }
 
 function loadLatest(dir) {
@@ -202,14 +256,25 @@ function save(type, data) {
   }
 
   const prefix = FILE_PREFIX[type] || type.toUpperCase();
-  let filename = `${prefix}_${formatFileTimestamp()}.json`;
-  let attempt = 1;
-  while (fs.existsSync(path.join(dir, filename))) {
-    filename = `${prefix}_${formatFileTimestamp()}_${attempt}.json`;
-    attempt += 1;
+  let filename;
+
+  if (type === "sigwx_low") {
+    const sigwxLabel = formatSigwxLowFileLabel(data?.tmfc);
+    filename = sigwxLabel ? `${prefix}_${sigwxLabel}.json` : `${prefix}_${formatFileTimestamp()}.json`;
+  } else {
+    filename = `${prefix}_${formatFileTimestamp()}.json`;
+    let attempt = 1;
+    while (fs.existsSync(path.join(dir, filename))) {
+      filename = `${prefix}_${formatFileTimestamp()}_${attempt}.json`;
+      attempt += 1;
+    }
   }
   data.content_hash = decision.hash;
   const filePath = saveAndUpdateLatest(dir, filename, data, type);
+  if (type === "sigwx_low") {
+    cleanupSigwxLowTmfcFiles(dir, data?.tmfc, filename);
+    cleanupSigwxLowOverlayFiles(dir);
+  }
   updateCache(type, data, decision.hash);
 
   return { saved: true, filePath };
