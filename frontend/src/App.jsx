@@ -494,6 +494,7 @@ export default function App() {
                 sigwxLowData={data.sigwxLow}
                 sigwxLowHistoryData={data.sigwxLowHistory}
                 sigwxLowFrontsData={data.sigwxLowFronts}
+                sigwxLowCloudsData={data.sigwxLowClouds}
                 sigmetData={data.sigmet}
                 airmetData={data.airmet}
                 adsbData={data.adsb}

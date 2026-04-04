@@ -14,6 +14,7 @@ import {
 import { formatDateTimeRange, formatUtc } from "../utils/helpers";
 import {
   sigwxCenter,
+  sigwxLabelPosition,
   isSigwxArrowItem,
   sigwxLabel,
   sigwxNeedsLabelMarker,
@@ -26,7 +27,7 @@ import {
   sigwxStyle,
   smoothSigwxLatLngs,
 } from "../utils/sigwx";
-import { fetchSigwxLowFronts } from "../utils/api";
+import { fetchSigwxLowClouds, fetchSigwxLowFronts } from "../utils/api";
 import "leaflet/dist/leaflet.css";
 
 const ZONE_RADII = [
@@ -583,19 +584,20 @@ function escapeHtml(value) {
 
 const SIGWX_ICON_EXCLUDED_PREFIXES = ["L_", "BOX_"];
 
-function resolveSigwxIconAsset(iconName) {
+function resolveSigwxIconAssets(iconName) {
   const candidates = String(iconName || "")
     .split("/")
     .map((value) => value.trim())
     .filter(Boolean);
 
+  const assets = [];
   for (const candidate of candidates) {
     const upper = candidate.toUpperCase();
     if (SIGWX_ICON_EXCLUDED_PREFIXES.some((prefix) => upper.startsWith(prefix))) continue;
-    return `/icon_sigwx/${encodeURIComponent(candidate)}`;
+    assets.push(`/icon_sigwx/${encodeURIComponent(candidate)}`);
   }
 
-  return null;
+  return assets;
 }
 
 function resolveSigwxSpecialIconAsset(item) {
@@ -603,7 +605,7 @@ function resolveSigwxSpecialIconAsset(item) {
   const itemName = String(item?.item_name || "").toLowerCase();
 
   if (contour === "freezing_level") {
-    return `/icon_sigwx/${encodeURIComponent("빙결고도.png")}`;
+    return "/icon_sigwx/freezing_level.png";
   }
 
   if (contour === "sfc_wind" && itemName === "wind_strong") {
@@ -611,6 +613,12 @@ function resolveSigwxSpecialIconAsset(item) {
   }
 
   return null;
+}
+
+function resolveSigwxMarkerIconAssets(item) {
+  const special = resolveSigwxSpecialIconAsset(item);
+  if (special) return [special];
+  return resolveSigwxIconAssets(item?.icon_name);
 }
 
 function shouldHideSigwxIconAltitude(item) {
@@ -625,6 +633,7 @@ function shouldHideSigwxIconAltitude(item) {
       "widespread_fog",
       "widespread_mist",
       "widespread_fog/widespread_mist",
+      "rain/widespread_fog/widespread_mist",
     ].includes(itemName);
   }
   return false;
@@ -639,7 +648,8 @@ function createSigwxBadgeIcon(item) {
   const label = sigwxPhenomenonLabel(item);
   const altitude = sigwxAltitudeLabel(item);
   const altitudeParts = sigwxAltitudeParts(item);
-  const iconAsset = resolveSigwxSpecialIconAsset(item) || resolveSigwxIconAsset(item?.icon_name);
+  const iconAssets = resolveSigwxMarkerIconAssets(item);
+  const hasIconAssets = iconAssets.length > 0;
   const hideAltitude = shouldHideSigwxIconAltitude(item);
   const iconScale = getSigwxIconScale(item);
   const altitudeHtml = hideAltitude
@@ -649,7 +659,7 @@ function createSigwxBadgeIcon(item) {
       : altitude && altitude !== "-"
         ? `<span class="leaflet-advisory-icon-alt-single">${escapeHtml(formatIconAltitudeText(altitude))}</span>`
         : "";
-  const maxLineLength = iconAsset
+  const maxLineLength = hasIconAssets
     ? (altitudeParts
         ? Math.max(formatIconAltitudeText(altitudeParts.upper).length, formatIconAltitudeText(altitudeParts.lower).length)
         : formatIconAltitudeText(altitude).length)
@@ -659,16 +669,16 @@ function createSigwxBadgeIcon(item) {
           ? Math.max(formatIconAltitudeText(altitudeParts.upper).length, formatIconAltitudeText(altitudeParts.lower).length)
           : formatIconAltitudeText(altitude).length
       );
-  const width = iconAsset
-    ? Math.max(48, Math.min(110, 20 + (maxLineLength * 8)))
+  const width = hasIconAssets
+    ? Math.max(48, Math.min(160, 20 + (maxLineLength * 8) + Math.max(0, iconAssets.length - 1) * 24))
     : Math.max(72, Math.min(118, 20 + (maxLineLength * 7)));
-  const height = iconAsset
+  const height = hasIconAssets
     ? (altitudeHtml ? (iconScale === 3 ? 92 : 72) : (iconScale === 3 ? 56 : 40))
     : (altitudeHtml ? 42 : 24);
-  const labelHtml = iconAsset
-    ? `<span class="leaflet-advisory-icon-symbol-wrap leaflet-advisory-icon-symbol-wrap--scale-${iconScale}"><img class="leaflet-advisory-icon-symbol leaflet-advisory-icon-symbol--scale-${iconScale}" src="${iconAsset}" alt="${escapeHtml(label)}" /></span>`
+  const labelHtml = hasIconAssets
+    ? `<span class="leaflet-advisory-icon-symbol-row">${iconAssets.map((iconAsset, index) => `<span class="leaflet-advisory-icon-symbol-wrap leaflet-advisory-icon-symbol-wrap--scale-${iconScale}" data-icon-index="${index}"><img class="leaflet-advisory-icon-symbol leaflet-advisory-icon-symbol--scale-${iconScale}" src="${iconAsset}" alt="${escapeHtml(label)}" /></span>`).join("")}</span>`
     : `<span class="leaflet-advisory-icon-label">${escapeHtml(label)}</span>`;
-  const contentHtml = iconAsset
+  const contentHtml = hasIconAssets
     ? `<span class="leaflet-advisory-icon-stack">${labelHtml}${altitudeHtml ? `<span class="leaflet-advisory-icon-text-chip">${altitudeHtml}</span>` : ""}</span>`
     : `<span class="leaflet-advisory-icon-badge leaflet-advisory-icon-badge--sigwx">${labelHtml}${altitudeHtml}</span>`;
   return L.divIcon({
@@ -687,6 +697,97 @@ function createSigwxArrowLabelIcon(label) {
     html: `<span class="sigwx-arrow-label-badge">${safeLabel}</span>`,
     iconSize: [width, 24],
     iconAnchor: [Math.round(width / 2), 12],
+  });
+}
+
+function formatSigwxMultilineLabel(rawLabel) {
+  return String(rawLabel || "")
+    .split("&#10;")
+    .map((part) => part.trim())
+    .filter(Boolean);
+}
+
+function shouldRenderSigwxTextLabel(item) {
+  return Number(item?.item_type) === 4
+    && String(item?.contour_name || "").toLowerCase() === "cld"
+    && String(item?.item_name || "").toLowerCase() === "cloud"
+    && /\bCB\b/i.test(String(item?.label || item?.text_label || "").replace(/&#10;/g, " "));
+}
+
+function isSigwxCloudGroup(group) {
+  return String(group?.contour_name || "").toLowerCase() === "cld"
+    && String(group?.item_name || "").toLowerCase() === "cloud"
+    && /\bCB\b/i.test(String(group?.label || group?.text_label || "").replace(/&#10;/g, " "));
+}
+
+function isSigwxPressureGroup(group) {
+  return String(group?.contour_name || "").toLowerCase() === "pressure";
+}
+
+function isSigwxStandaloneFrontGroup(group) {
+  return String(group?.contour_name || "").toLowerCase() === "font_line";
+}
+
+function isSigwxPressureSystemItem(item) {
+  const contour = String(item?.contour_name || "").toLowerCase();
+  return contour === "pressure" || contour === "font_line";
+}
+
+function createSigwxPressureSystemGroup(items) {
+  const members = items.filter((item) => isSigwxPressureSystemItem(item));
+  if (!members.length) return null;
+
+  const pressureItem = members.find((item) => String(item?.contour_name || "").toLowerCase() === "pressure") || members[0];
+  const hasLow = members.some((item) => String(item?.item_name || "").toLowerCase() === "lx");
+  const hasHigh = members.some((item) => String(item?.item_name || "").toLowerCase() === "hx");
+  const groupLabel = hasLow
+    ? "LOW PRESSURE"
+    : hasHigh
+      ? "HIGH PRESSURE"
+      : "PRESSURE SYSTEM";
+
+  return {
+    ...pressureItem,
+    mapKey: `sigwx-system-${hasLow ? "low-pressure" : hasHigh ? "high-pressure" : "pressure"}`,
+    groupLabel,
+    childItems: members.filter((item) => item.mapKey !== pressureItem.mapKey).map((item) => ({
+      ...item,
+      parentMapKey: `sigwx-system-${hasLow ? "low-pressure" : hasHigh ? "high-pressure" : "pressure"}`,
+    })),
+    isSyntheticSigwxGroup: true,
+  };
+}
+
+function assignSigwxDisplayLabels(groups) {
+  const counts = new Map();
+  for (const group of groups) {
+    const label = String(group?.groupLabel || "SIGWX");
+    counts.set(label, (counts.get(label) || 0) + 1);
+  }
+
+  const seen = new Map();
+  return groups.map((group) => {
+    const label = String(group?.groupLabel || "SIGWX");
+    const total = counts.get(label) || 0;
+    if (total <= 1) return group;
+    const nextIndex = (seen.get(label) || 0) + 1;
+    seen.set(label, nextIndex);
+    return {
+      ...group,
+      groupLabel: `${label} ${nextIndex}`,
+    };
+  });
+}
+
+function createSigwxTextLabelIcon(item) {
+  const lines = formatSigwxMultilineLabel(item?.label || item?.text_label);
+  const width = Math.max(54, Math.min(120, 28 + Math.max(...lines.map((line) => line.length), 4) * 7));
+  const html = `<span class="sigwx-text-label-chip">${lines.map((line) => `<span>${escapeHtml(line)}</span>`).join("")}</span>`;
+  return L.divIcon({
+    className: "sigwx-text-label-icon",
+    html,
+    iconSize: [width, 18 + lines.length * 14],
+    iconAnchor: [Math.round(width / 2), 10],
   });
 }
 
@@ -816,6 +917,7 @@ export default function InteractiveMap({
   sigwxLowData = null,
   sigwxLowHistoryData = null,
   sigwxLowFrontsData = null,
+  sigwxLowCloudsData = null,
   sigmetData = null,
   airmetData = null,
   adsbData = null,
@@ -853,6 +955,7 @@ export default function InteractiveMap({
   const [loopEnd, setLoopEnd] = useState(0);
   const [sigwxHistoryIndex, setSigwxHistoryIndex] = useState(0);
   const [sigwxFrontMeta, setSigwxFrontMeta] = useState(sigwxLowFrontsData);
+  const [sigwxCloudMeta, setSigwxCloudMeta] = useState(sigwxLowCloudsData);
   const loopTrackRef = useRef(null);
   const draggingRef = useRef(null); // "start" | "end" | null
   const isNationwide = mapScope === "nationwide";
@@ -901,15 +1004,35 @@ export default function InteractiveMap({
   const sigwxFrontInfo = useMemo(() => {
     const latest = sigwxFrontMeta?.latest;
     if (!latest?.path || !latest?.bounds) return null;
+    const cacheKey = [
+      latest?.tmfc,
+      sigwxFrontMeta?.updated_at,
+    ].filter(Boolean).join(":");
     return {
-      url: `${latest.path}?t=${sigwxFrontMeta?.source_hash || sigwxFrontMeta?.updated_at || Date.now()}`,
+      url: `${latest.path}?t=${encodeURIComponent(cacheKey || String(Date.now()))}`,
       bounds: latest.bounds,
     };
   }, [sigwxFrontMeta]);
+  const sigwxCloudInfo = useMemo(() => {
+    const latest = sigwxCloudMeta?.latest;
+    if (!latest?.path || !latest?.bounds) return null;
+    const cacheKey = [
+      latest?.tmfc,
+      sigwxCloudMeta?.updated_at,
+    ].filter(Boolean).join(":");
+    return {
+      url: `${latest.path}?t=${encodeURIComponent(cacheKey || String(Date.now()))}`,
+      bounds: latest.bounds,
+    };
+  }, [sigwxCloudMeta]);
 
   useEffect(() => {
     setSigwxFrontMeta(sigwxLowFrontsData);
   }, [sigwxLowFrontsData]);
+
+  useEffect(() => {
+    setSigwxCloudMeta(sigwxLowCloudsData);
+  }, [sigwxLowCloudsData]);
 
   useEffect(() => {
     let cancelled = false;
@@ -921,6 +1044,23 @@ export default function InteractiveMap({
     }).catch(() => {
       if (cancelled) return;
       setSigwxFrontMeta(null);
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedSigwxEntry?.tmfc]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const tmfc = selectedSigwxEntry?.tmfc || null;
+
+    fetchSigwxLowClouds(tmfc).then((payload) => {
+      if (cancelled) return;
+      setSigwxCloudMeta(payload);
+    }).catch(() => {
+      if (cancelled) return;
+      setSigwxCloudMeta(null);
     });
 
     return () => {
@@ -1051,6 +1191,13 @@ export default function InteractiveMap({
       }))
   ), [selectedSigwxEntry]);
   const sigwxLowGroups = useMemo(() => buildSigwxGroups(sigwxLowItems), [sigwxLowItems]);
+  const sigwxPressureSystemGroup = useMemo(() => createSigwxPressureSystemGroup(sigwxLowItems), [sigwxLowItems]);
+  const sigwxPanelGroups = useMemo(() => (
+    assignSigwxDisplayLabels([
+      ...sigwxLowGroups.filter((group) => !isSigwxStandaloneFrontGroup(group) && !isSigwxPressureGroup(group)),
+      ...(sigwxPressureSystemGroup ? [sigwxPressureSystemGroup] : []),
+    ])
+  ), [sigwxLowGroups, sigwxPressureSystemGroup]);
   const sigwxLowParentMap = useMemo(() => {
     const next = new Map();
     for (const group of sigwxLowGroups) {
@@ -1059,8 +1206,15 @@ export default function InteractiveMap({
         next.set(child.mapKey, group.mapKey);
       }
     }
+    if (sigwxPressureSystemGroup) {
+      next.set(sigwxPressureSystemGroup.mapKey, sigwxPressureSystemGroup.mapKey);
+      const pressureMembers = sigwxLowItems.filter((item) => isSigwxPressureSystemItem(item));
+      for (const member of pressureMembers) {
+        next.set(member.mapKey, sigwxPressureSystemGroup.mapKey);
+      }
+    }
     return next;
-  }, [sigwxLowGroups]);
+  }, [sigwxLowGroups, sigwxPressureSystemGroup, sigwxLowItems]);
   const resolveSigwxHoverKey = useCallback((item) => (
     sigwxLowParentMap.get(item?.mapKey) || item?.parentMapKey || item?.mapKey || null
   ), [sigwxLowParentMap]);
@@ -1076,20 +1230,30 @@ export default function InteractiveMap({
   ), [airmetData]);
   const showFirDraft = isNationwide && (showSigwxLow || showSigmet || showAirmet) && firDraftGeoData;
   const advisoryBadgeItems = useMemo(() => ([
-    showSigwxLow ? { key: "sigwxLow", badgeClass: "sigwx-low", label: "SIGWX_LOW", count: sigwxLowGroups.length } : null,
+    showSigwxLow ? { key: "sigwxLow", badgeClass: "sigwx-low", label: "SIGWX_LOW", count: sigwxPanelGroups.length } : null,
     showSigmet ? { key: "sigmet", label: "SIGMET", count: sigmetItems.length } : null,
     showAirmet ? { key: "airmet", label: "AIRMET", count: airmetItems.length } : null
-  ].filter((item) => item && item.count > 0)), [showSigwxLow, showSigmet, showAirmet, sigwxLowGroups.length, sigmetItems.length, airmetItems.length]);
+  ].filter((item) => item && item.count > 0)), [showSigwxLow, showSigmet, showAirmet, sigwxPanelGroups.length, sigmetItems.length, airmetItems.length]);
   const advisoryPanelItems = useMemo(() => {
-    if (openAdvisoryPanel === "sigwxLow") return sigwxLowGroups;
+    if (openAdvisoryPanel === "sigwxLow") return sigwxPanelGroups;
     if (openAdvisoryPanel === "sigmet") return sigmetItems;
     if (openAdvisoryPanel === "airmet") return airmetItems;
     return [];
-  }, [openAdvisoryPanel, sigwxLowGroups, sigmetItems, airmetItems]);
+  }, [openAdvisoryPanel, sigwxPanelGroups, sigmetItems, airmetItems]);
   const visibleSigwxLowItems = useMemo(() => {
     const hidden = new Set(hiddenAdvisoryKeys.sigwxLow);
     return sigwxLowItems.filter((item) => !hidden.has(sigwxLowParentMap.get(item.mapKey) || item.mapKey));
   }, [hiddenAdvisoryKeys.sigwxLow, sigwxLowItems, sigwxLowParentMap]);
+  const hiddenSigwxLowKeys = useMemo(() => new Set(hiddenAdvisoryKeys.sigwxLow), [hiddenAdvisoryKeys.sigwxLow]);
+  const visibleSigwxPanelGroups = useMemo(() => (
+    sigwxPanelGroups.filter((group) => !hiddenSigwxLowKeys.has(group.mapKey))
+  ), [sigwxPanelGroups, hiddenSigwxLowKeys]);
+  const showVisibleSigwxFrontOverlay = useMemo(() => (
+    visibleSigwxPanelGroups.some((group) => isSigwxPressureGroup(group))
+  ), [visibleSigwxPanelGroups]);
+  const showVisibleSigwxCloudOverlay = useMemo(() => (
+    visibleSigwxPanelGroups.some((group) => isSigwxCloudGroup(group))
+  ), [visibleSigwxPanelGroups]);
   const visibleSigmetItems = useMemo(() => {
     const hidden = new Set(hiddenAdvisoryKeys.sigmet);
     return sigmetItems.filter((item) => !hidden.has(item.mapKey));
@@ -1106,8 +1270,8 @@ export default function InteractiveMap({
   }, [openAdvisoryPanel, showSigwxLow, showSigmet, showAirmet]);
 
   useEffect(() => {
-    setHiddenAdvisoryKeys((prev) => {
-      const sigwxLowKeySet = new Set(sigwxLowGroups.map((item) => item.mapKey));
+      setHiddenAdvisoryKeys((prev) => {
+      const sigwxLowKeySet = new Set(sigwxPanelGroups.map((item) => item.mapKey));
       const sigmetKeySet = new Set(sigmetItems.map((item) => item.mapKey));
       const airmetKeySet = new Set(airmetItems.map((item) => item.mapKey));
       const nextSigwxLow = prev.sigwxLow.filter((key) => sigwxLowKeySet.has(key));
@@ -1118,7 +1282,7 @@ export default function InteractiveMap({
       }
       return { sigwxLow: nextSigwxLow, sigmet: nextSigmet, airmet: nextAirmet };
     });
-  }, [sigwxLowGroups, sigmetItems, airmetItems]);
+  }, [sigwxPanelGroups, sigmetItems, airmetItems]);
 
   function toggleAdvisoryVisibility(kind, mapKey) {
     setHiddenAdvisoryKeys((prev) => {
@@ -1768,11 +1932,21 @@ export default function InteractiveMap({
               </Pane>
             )}
 
-            {showSigwxLow && sigwxFrontInfo && (
+            {showSigwxLow && showVisibleSigwxFrontOverlay && sigwxFrontInfo && (
               <Pane name="sigwx-front-pane" style={{ zIndex: 405 }}>
                 <ImageOverlay
                   url={sigwxFrontInfo.url}
                   bounds={sigwxFrontInfo.bounds}
+                  opacity={1}
+                />
+              </Pane>
+            )}
+
+            {showSigwxLow && showVisibleSigwxCloudOverlay && sigwxCloudInfo && (
+              <Pane name="sigwx-cloud-pane" style={{ zIndex: 406 }}>
+                <ImageOverlay
+                  url={sigwxCloudInfo.url}
+                  bounds={sigwxCloudInfo.bounds}
                   opacity={1}
                 />
               </Pane>
@@ -1990,6 +2164,31 @@ export default function InteractiveMap({
                     key={`sigwx-icon-${item.mapKey}`}
                     position={centerPoint}
                     icon={createSigwxBadgeIcon(item)}
+                    eventHandlers={{
+                      mouseover: () => setHoveredAdvisoryId(hoverKey),
+                      mouseout: () => setHoveredAdvisoryId((prev) => (prev === hoverKey ? null : prev)),
+                    }}
+                  >
+                    <Tooltip direction="top" offset={[0, -10]} opacity={0.96} className="advisory-tooltip">
+                      <div className="advisory-tooltip-body">
+                        <strong>{sigwxPhenomenonLabel(item)}</strong>
+                        {renderSigwxAltitude(item)}
+                        <div className="advisory-tooltip-meta">{sigwxTypeLabel(item)}</div>
+                      </div>
+                    </Tooltip>
+                  </Marker>
+                );
+              })}
+              {showSigwxLow && visibleSigwxLowItems.map((item) => {
+                if (!shouldRenderSigwxTextLabel(item)) return null;
+                const labelPoint = sigwxLabelPosition(item, selectedSigwxEntry?.source);
+                if (!labelPoint) return null;
+                const hoverKey = resolveSigwxHoverKey(item);
+                return (
+                  <Marker
+                    key={`sigwx-text-${item.mapKey}`}
+                    position={labelPoint}
+                    icon={createSigwxTextLabelIcon(item)}
                     eventHandlers={{
                       mouseover: () => setHoveredAdvisoryId(hoverKey),
                       mouseout: () => setHoveredAdvisoryId((prev) => (prev === hoverKey ? null : prev)),

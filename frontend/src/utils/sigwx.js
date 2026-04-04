@@ -25,6 +25,32 @@ function parseDashArray(lineType) {
   }
 }
 
+const SIGWX_MAP_RANGES = {
+  normal: {
+    minLat: 27.5,
+    maxLat: 39,
+    minLon: 121,
+    maxLon: 135,
+  },
+  wide: {
+    minLat: 27.3,
+    maxLat: 44,
+    minLon: 119,
+    maxLon: 135,
+  },
+};
+
+function fpvPointToLatLng(x, y, mapRangeMode, width, height) {
+  const bounds = SIGWX_MAP_RANGES[mapRangeMode] || SIGWX_MAP_RANGES.normal;
+  if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(width) || !Number.isFinite(height) || width === 0 || height === 0) {
+    return null;
+  }
+
+  const lon = bounds.minLon + (x / width) * (bounds.maxLon - bounds.minLon);
+  const lat = bounds.maxLat - (y / height) * (bounds.maxLat - bounds.minLat);
+  return [lat, lon];
+}
+
 function chaikinPass(points, isClosed) {
   if (!Array.isArray(points) || points.length < 2) return points || [];
   const next = [];
@@ -205,6 +231,34 @@ export function sigwxCenter(item) {
   return [lat, lon];
 }
 
+export function sigwxLabelPosition(item, source) {
+  const width = Number(source?.fpv_safe_bound_width);
+  const height = Number(source?.fpv_safe_bound_height);
+  const mapRangeMode = String(source?.map_range_mode || "normal");
+
+  const rectLabel = item?.rect_label;
+  if (rectLabel && Number.isFinite(rectLabel.left) && Number.isFinite(rectLabel.top) && Number.isFinite(rectLabel.width) && Number.isFinite(rectLabel.height)) {
+    const x = rectLabel.left + (rectLabel.width / 2);
+    const y = rectLabel.top + (rectLabel.height / 2);
+    return fpvPointToLatLng(x, y, mapRangeMode, width, height) || sigwxCenter(item);
+  }
+
+  const fpvPoints = Array.isArray(item?.fpv_points) ? item.fpv_points.filter((point) => Number.isFinite(point?.x) && Number.isFinite(point?.y)) : [];
+  if (!fpvPoints.length) return sigwxCenter(item);
+
+  const labelPosPt = Number(item?.label_pos_pt);
+  const anchorPoint = Number.isInteger(labelPosPt) && labelPosPt >= 0 && labelPosPt < fpvPoints.length
+    ? fpvPoints[labelPosPt]
+    : {
+        x: fpvPoints.reduce((sum, point) => sum + point.x, 0) / fpvPoints.length,
+        y: fpvPoints.reduce((sum, point) => sum + point.y, 0) / fpvPoints.length,
+      };
+
+  const offsetX = Number(item?.label_pos_offset_x) || 0;
+  const offsetY = Number(item?.label_pos_offset_y) || 0;
+  return fpvPointToLatLng(anchorPoint.x + offsetX, anchorPoint.y + offsetY, mapRangeMode, width, height) || sigwxCenter(item);
+}
+
 export function sigwxNeedsLabelMarker(item) {
   const contour = String(item?.contour_name || "").toLowerCase();
   const itemName = String(item?.item_name || "").toLowerCase();
@@ -226,7 +280,7 @@ export function isSigwxArrowItem(item) {
   if (contour === "freezing_level") return false;
 
   if (type === 9) {
-    return contour === "cld" || contour === "font_line" || contour === "";
+    return contour === "cld" || contour === "font_line" || contour === "pressure" || contour === "";
   }
 
   if (type === 10) {
@@ -240,6 +294,7 @@ export function sigwxNeedsPath(item) {
   const contour = String(item?.contour_name || "").toLowerCase();
   const itemName = String(item?.item_name || "").toLowerCase();
   if (isSigwxArrowItem(item)) return false;
+  if (contour === "cld" && itemName === "cloud") return false;
   if (contour === "font_line") return false;
   if (contour === "sfc_wind" && itemName === "wind_strong") return false;
   return ![7, 10, 12].includes(Number(item?.item_type));
