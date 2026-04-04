@@ -252,7 +252,7 @@
 
 special icon 예:
 
-- `freezing_level` -> `빙결고도.png`
+- `freezing_level` -> `freezing_level.png`
 - `sfc_wind + wind_strong` -> `box_wind.png`
 - `pressure` -> `Hx.png`, `Lx.png` 등은 원본 `icon_name` 사용
 
@@ -317,8 +317,8 @@ special icon 예:
 
 생성 파일 예:
 
-- `backend/data/sigwx_low/fronts_meta.json`
-- `backend/data/sigwx_low/fronts_<tmfc>_<hash>.png`
+- `backend/data/sigwx_low/fronts_meta_<tmfc>.json`
+- `backend/data/sigwx_low/fronts_<tmfc>.png`
 
 ### 9.4 왜 이미지 렌더를 선택했는가
 
@@ -353,7 +353,7 @@ special icon 예:
 전선 overlay는 latest 고정이 아니고 `tmfc`별로 맞춰서 표시한다.
 
 - 프론트가 현재 `selectedSigwxEntry.tmfc`를 기준으로 `/api/sigwx-low-fronts?tmfc=...` 요청
-- 서버가 해당 `tmfc` snapshot을 찾아 overlay 생성/반환
+- 서버는 이미 저장 시점에 생성된 `fronts_meta_<tmfc>.json`을 읽어 반환
 - 해당 시각에 `font_line`이 없으면 overlay도 없음
 
 이 정합은 “과거 SIGWX를 볼 때 최신 전선이 남아 있는 문제”를 해결하기 위해 추가되었다.
@@ -372,14 +372,31 @@ CB는 별도 `CB item`이라기보다 cloud contour + multiline label 조합으�
 
 또한 `cld` 계열에는 `type 9` 포인터/leader line이 같이 붙을 수 있다.
 
-즉 CB는 앞으로 다음 두 레이어로 분리해서 보는 것이 맞다.
+즉 CB는 다음 두 레이어로 분리해서 본다.
 
 - cloud area contour
 - cloud/CB text annotation + pointer
 
+현재 구현:
+
+- `cld/cloud`의 CB boundary는 `backend/src/parsers/sigwx-cloud-overlay.js`가 갈색 scalloped overlay로 렌더
+- 결과 파일은 `clouds_<tmfc>.png` + `clouds_meta_<tmfc>.json`
+- 원래 `line_type 5` dashed GIS path는 숨김
+- `ISOL / EMBD / CB / XXX / 010` 텍스트는 XML `rect_label` 우선으로 위치를 계산
+
 ---
 
-## 11. 현재 남은 과제
+## 11. 패널 토글 규칙
+
+- `font_line`은 상세 패널에서 개별 토글로 직접 노출하지 않는다
+- 대신 `pressure` + `font_line` 계열은 synthetic pressure-system 그룹으로 묶는다
+- 이 그룹을 끄면 pressure icon/label, pressure speed arrow, front overlay가 함께 숨겨진다
+- `CB` cloud 그룹을 끄면 cloud overlay도 함께 숨겨진다
+- 같은 이름의 그룹이 여러 개면 패널에는 `SFC_VIS 1`, `SFC_VIS 2`처럼 번호를 붙여 표시한다
+
+---
+
+## 12. 현재 남은 과제
 
 아직 추가로 다듬을 여지가 있는 항목:
 
@@ -392,7 +409,7 @@ CB는 별도 `CB item`이라기보다 cloud contour + multiline label 조합으�
 
 ---
 
-## 12. 요약
+## 13. 요약
 
 현재 `SIGWX_LOW`는 다음 원칙으로 정리되어 있다.
 
@@ -402,6 +419,7 @@ CB는 별도 `CB item`이라기보다 cloud contour + multiline label 조합으�
 - redundant text는 제거하고, 의미 있는 text만 유지
 - `type`만으로 판단하지 않고 `contour_name`, `item_name`, `label`까지 함께 본다
 - 전선(`font_line`)은 GIS line이 아니라 **별도 이미지 overlay**로 렌더한다
-- history 선택 시 전선도 `tmfc` 기준으로 같이 바뀐다
+- CB cloud 경계도 GIS dashed line이 아니라 **별도 scalloped image overlay**로 렌더한다
+- history 선택 시 전선/CB overlay도 `tmfc` 기준으로 같이 바뀐다
 
 즉 현재 구조는 “가능한 것은 GIS marker/path로 처리하고, 차트형 정밀도가 필요한 전선은 별도 이미지로 렌더”하는 하이브리드 방식이다.
