@@ -2483,6 +2483,36 @@ body {
   gap: 4px;
 }
 
+.leaflet-advisory-icon-top-row {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.leaflet-advisory-icon-anchor-column {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 60px;
+}
+
+.leaflet-advisory-icon-under-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 60px;
+  align-self: flex-start;
+}
+
+.leaflet-advisory-icon-icon-column {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+}
+
 .leaflet-advisory-icon-symbol-row {
   display: inline-flex;
   align-items: center;
@@ -2511,6 +2541,17 @@ body {
   min-height: 28px;
 }
 
+.leaflet-advisory-icon-symbol-wrap--scale-advisory {
+  min-width: 60px;
+  min-height: 42px;
+}
+
+.leaflet-advisory-icon-symbol-wrap--advisory-inline {
+  position: relative;
+  min-width: 92px;
+  min-height: 62px;
+}
+
 .leaflet-advisory-icon-symbol-wrap--scale-3 {
   min-width: 54px;
   min-height: 40px;
@@ -2519,6 +2560,31 @@ body {
 .leaflet-advisory-icon-symbol--scale-2 {
   max-width: 48px;
   max-height: 32px;
+}
+
+.leaflet-advisory-icon-symbol--scale-advisory {
+  max-width: 60px;
+  max-height: 42px;
+}
+
+.leaflet-advisory-icon-symbol--advisory-inline {
+  max-width: 92px;
+  max-height: 62px;
+}
+
+.leaflet-advisory-icon-inline-text {
+  position: absolute;
+  inset: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 10px;
+  color: #1d4ed8;
+  font-size: 0.68rem;
+  font-weight: 800;
+  line-height: 1;
+  text-align: center;
+  white-space: nowrap;
 }
 
 .leaflet-advisory-icon-symbol--scale-3 {
@@ -2537,6 +2603,37 @@ body {
   border: 1px solid rgba(15, 23, 42, 0.14);
   box-shadow: 0 4px 12px rgba(15, 23, 42, 0.14);
   color: #0f172a;
+}
+
+.leaflet-advisory-icon-text-chip--advisory {
+  flex-direction: column;
+  gap: 1px;
+  font-size: 0.72rem;
+  font-weight: 800;
+  line-height: 1.1;
+  white-space: nowrap;
+}
+
+.advisory-motion-arrow {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transform-origin: center;
+}
+
+.leaflet-advisory-icon-motion-inline {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+}
+
+.leaflet-advisory-icon-motion-text {
+  color: #1d4ed8;
+  font-size: 0.78rem;
+  font-weight: 800;
+  line-height: 1;
+  white-space: nowrap;
 }
 
 .leaflet-advisory-icon-label {
@@ -3408,6 +3505,9 @@ label { font-size: 0.9rem; font-weight: 700; }
 .ground-forecast-period-slot--precip {
   background: rgba(186, 230, 253, 0.72);
 }
+.ground-forecast-day-column.is-today .ground-forecast-period-slot--precip {
+  background: rgba(147, 197, 253, 0.9);
+}
 .ground-forecast-period--precip {
   color: #0c4a6e;
 }
@@ -3494,6 +3594,9 @@ label { font-size: 0.9rem; font-weight: 700; }
 }
 [data-theme="dark"] .ground-forecast-period-slot--precip {
   background: rgba(14, 116, 144, 0.34);
+}
+[data-theme="dark"] .ground-forecast-day-column.is-today .ground-forecast-period-slot--precip {
+  background: rgba(14, 116, 144, 0.5);
 }
 [data-theme="dark"] .ground-forecast-period--precip {
   color: #e0f2fe;

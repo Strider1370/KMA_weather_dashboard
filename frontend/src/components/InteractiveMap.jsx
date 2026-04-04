@@ -385,6 +385,60 @@ function advisoryPhenomenonIcon(code) {
   return "!";
 }
 
+function advisoryIconAsset(item, kind) {
+  const code = String(item?.phenomenon_code || "").toUpperCase();
+  const basePath = kind === "sigmet" ? "/icon_SIGMET" : "/icon_AIRMET";
+
+  if (kind === "sigmet") {
+    if (code.includes("SEV_TURB")) return `${basePath}/SEV_TURB.png`;
+    if (code.includes("SEV_ICE")) return `${basePath}/SEV_ICE.png`;
+    if (code.includes("EMBD_TS")) return `${basePath}/EMBD_TS.png`;
+    if (code.includes("ISOL_TS")) return `${basePath}/ISOL_TS.png`;
+    if (code.includes("TSGR")) return `${basePath}/TSGR.png`;
+    if (code === "TS" || code.includes(" TS")) return `${basePath}/TS.png`;
+    if (code.includes("VA")) return `${basePath}/VA.png`;
+    if (code.includes("RDOACT")) return `${basePath}/RDOACT.png`;
+    if (code.includes("DS")) return `${basePath}/DS.png`;
+    if (code.includes("SS")) return `${basePath}/SS.png`;
+    if (code.includes("MTW")) return `${basePath}/MTW.png`;
+    if (code.includes("ICE")) return `${basePath}/ICE.png`;
+    if (code.includes("TURB")) return `${basePath}/TURB.png`;
+    if (code.includes("TC")) {
+      if (code.includes("6_24")) return `${basePath}/TC_6_24.png`;
+      if (code.includes("12_24")) return `${basePath}/TC_12_24.png`;
+      if (code.includes("18_24")) return `${basePath}/TC_18_24.png`;
+      if (code.includes("24_24")) return `${basePath}/TC_24_24.png`;
+      if (code.includes("24")) return `${basePath}/TC_24.png`;
+      if (code.includes("48")) return `${basePath}/TC_48.png`;
+      return `${basePath}/TC.png`;
+    }
+  }
+
+  if (kind === "airmet") {
+    if (code.includes("SFC_WIND") || code.includes("SFCWIND")) return `${basePath}/SFC_WIND.png`;
+    if (code.includes("SFC_WSPD") || code.includes("SFCWSPD")) return `${basePath}/SFCWSPD.png`;
+    if (code.includes("SFC_VIS") || code.includes("SFCVIS")) return `${basePath}/SFC_VIS.png`;
+    if (code.includes("MTOBSC") || code.includes("OBSC")) return `${basePath}/MTOBSC.png`;
+    if (code.includes("MTW")) return `${basePath}/MTW.png`;
+    if (code.includes("TCU")) return `${basePath}/TCU.png`;
+    if (code === "CB" || code.includes("_CB")) return `${basePath}/CB.png`;
+    if (code.includes("CLD")) return `${basePath}/CLD.png`;
+    if (code.includes("ISOL_TS")) return `${basePath}/ISOL_TS.png`;
+    if (code.includes("TSGR")) return `${basePath}/TSGR.png`;
+    if (code === "TS" || code.includes(" TS")) return `${basePath}/TS.png`;
+    if (code.includes("MOD_ICE")) return `${basePath}/MOD_ICE.png`;
+    if (code.includes("ICE")) return `${basePath}/ICE.png`;
+    if (code.includes("MOD_TURB")) return `${basePath}/MOD_TURB.png`;
+    if (code.includes("TURB")) return `${basePath}/TURB.png`;
+  }
+
+  if (code.includes("CNL") || code.includes("CANCEL")) {
+    return `${basePath}/CANCEL.png`;
+  }
+
+  return null;
+}
+
 function advisoryPhenomenonLabel(code) {
   if (!code) return "ADV";
   if (code.includes("ICE")) return "ICING";
@@ -455,7 +509,9 @@ function advisoryShowsAltitude(item) {
   const code = String(item?.phenomenon_code || "").toUpperCase();
   const label = String(item?.phenomenon_label || "").toUpperCase();
   if (code.includes("SFC_VIS") || code.includes("VIS")) return false;
+  if (code.includes("SFC_WIND") || code.includes("SFCWIND") || code.includes("SFC_WSPD") || code.includes("SFCWSPD")) return false;
   if (label.includes("SURFACE VIS") || label.includes("SFC VIS") || label.includes("지상시정")) return false;
+  if (label.includes("SURFACE WIND") || label.includes("SFC WIND") || label.includes("지상풍속")) return false;
   return true;
 }
 
@@ -549,25 +605,32 @@ function formatIconAltitudeText(value) {
 
 function createAdvisoryIcon(item, kind) {
   const label = advisoryPhenomenonLabel(item?.phenomenon_code);
-  const altitude = advisoryShowsAltitude(item) ? advisoryAltitudeLabel(item) : "";
-  const altitudeParts = advisoryShowsAltitude(item) ? advisoryAltitudeParts(item) : null;
-  const altitudeHtml = altitudeParts
-    ? `<span class="leaflet-advisory-icon-alt-stack"><span>${escapeHtml(formatIconAltitudeText(altitudeParts.upper))}</span><span class="leaflet-advisory-icon-alt-divider"></span><span>${escapeHtml(formatIconAltitudeText(altitudeParts.lower))}</span></span>`
-    : altitude && altitude !== "-"
-      ? `<span class="leaflet-advisory-icon-alt-single">${escapeHtml(formatIconAltitudeText(altitude))}</span>`
-      : "";
+  const iconAsset = advisoryIconAsset(item, kind);
+  const inlineText = advisoryInlineText(item);
+  const lines = advisoryMarkerLines(item, kind);
+  const lineHtml = lines.length && !inlineText
+    ? `<span class="leaflet-advisory-icon-text-chip leaflet-advisory-icon-text-chip--advisory">${lines.map((line) => `<span>${escapeHtml(line)}</span>`).join("")}</span>`
+    : "";
+  const motionArrowHtml = kind === "sigmet" ? advisoryMotionArrowSvg(item) : "";
+  const maxLineLength = lines.length ? Math.max(...lines.map((line) => line.length)) : label.length;
+  const isInlineMarker = Boolean(inlineText && iconAsset);
+  const width = iconAsset
+    ? Math.max(isInlineMarker ? 110 : 84, Math.min(kind === "sigmet" ? 170 : 156, 36 + (maxLineLength * 8) + (motionArrowHtml ? 34 : 0)))
+    : Math.max(72, Math.min(118, 20 + (Math.max(label.length, maxLineLength) * 7)));
+  const height = iconAsset ? (isInlineMarker ? 80 : (lineHtml ? 100 : 52)) : 24;
   const color = advisoryColor(item, kind);
-  const maxLineLength = Math.max(
-    label.length,
-    altitudeParts
-      ? Math.max(formatIconAltitudeText(altitudeParts.upper).length, formatIconAltitudeText(altitudeParts.lower).length)
-      : formatIconAltitudeText(altitude).length
-  );
-  const width = Math.max(72, Math.min(118, 20 + (maxLineLength * 7)));
-  const height = altitudeHtml ? 42 : 24;
+  const labelHtml = iconAsset
+    ? `<span class="leaflet-advisory-icon-symbol-wrap ${isInlineMarker ? "leaflet-advisory-icon-symbol-wrap--scale-2 leaflet-advisory-icon-symbol-wrap--advisory-inline" : "leaflet-advisory-icon-symbol-wrap--scale-advisory"}"><img class="leaflet-advisory-icon-symbol ${isInlineMarker ? "leaflet-advisory-icon-symbol--scale-2 leaflet-advisory-icon-symbol--advisory-inline" : "leaflet-advisory-icon-symbol--scale-advisory"}" src="${iconAsset}" alt="${escapeHtml(label)}" />${inlineText ? `<span class="leaflet-advisory-icon-inline-text">${escapeHtml(inlineText)}</span>` : ""}</span>`
+    : `<span class="leaflet-advisory-icon-label">${escapeHtml(label)}</span>`;
+  const motionInlineHtml = motionArrowHtml && kind === "sigmet"
+    ? `<span class="leaflet-advisory-icon-motion-inline">${motionArrowHtml}<span class="leaflet-advisory-icon-motion-text">${escapeHtml(advisoryMotionCompact(item))}</span></span>`
+    : motionArrowHtml;
+  const contentHtml = iconAsset
+    ? `<span class="leaflet-advisory-icon-stack">${motionInlineHtml ? `<span class="leaflet-advisory-icon-top-row"><span class="leaflet-advisory-icon-anchor-column">${labelHtml}</span>${motionInlineHtml}</span>${lineHtml ? `<span class="leaflet-advisory-icon-under-icon">${lineHtml}</span>` : ""}` : `${labelHtml}${lineHtml}`}</span>`
+    : `<span class="leaflet-advisory-icon-badge" style="background:${color};"><span class="leaflet-advisory-icon-label">${escapeHtml(label)}</span></span>`;
   return L.divIcon({
     className: `leaflet-advisory-icon leaflet-advisory-icon--${kind}`,
-    html: `<span class="leaflet-advisory-icon-badge" style="background:${color};"><span class="leaflet-advisory-icon-label">${escapeHtml(label)}</span>${altitudeHtml}</span>`,
+    html: `<span class="leaflet-advisory-icon-shell">${contentHtml}</span>`,
     iconSize: [width, height],
     iconAnchor: [Math.round(width / 2), Math.round(height / 2)]
   });
@@ -613,6 +676,107 @@ function resolveSigwxSpecialIconAsset(item) {
   }
 
   return null;
+}
+
+function advisoryAltitudeCompact(item) {
+  const lower = item?.altitude?.lower_fl;
+  const upper = item?.altitude?.upper_fl;
+  if (lower != null && upper != null) return `FL${String(lower).padStart(3, "0")}/${String(upper).padStart(3, "0")}`;
+  if (lower != null) return `ABV FL${String(lower).padStart(3, "0")}`;
+  if (upper != null) return `BLW FL${String(upper).padStart(3, "0")}`;
+  return "";
+}
+
+function advisoryMotionCompact(item) {
+  const speed = item?.motion?.speed_kt;
+  if (!Number.isFinite(speed) || speed <= 0) return "";
+  return `${Math.round(speed)}KT`;
+}
+
+function advisorySurfaceWindCompact(item) {
+  const dir = item?.surface_wind?.direction_deg;
+  const speed = item?.surface_wind?.speed_kt;
+  if (!Number.isFinite(dir) && !Number.isFinite(speed)) return "";
+  const dirText = Number.isFinite(dir) ? String(Math.round(dir)).padStart(3, "0") : "///";
+  const speedText = Number.isFinite(speed) ? `${Math.round(speed)}KT` : "--KT";
+  return `${dirText}/${speedText}`;
+}
+
+function advisoryVisibilityCauseCompact(item) {
+  const labels = Array.isArray(item?.surface_visibility_cause_labels) ? item.surface_visibility_cause_labels.filter(Boolean) : [];
+  if (labels.length) return labels.join("/");
+  const codes = Array.isArray(item?.surface_visibility_causes) ? item.surface_visibility_causes.filter(Boolean) : [];
+  return codes.join("/");
+}
+
+function advisoryPhenomenonShortLabel(item) {
+  const code = String(item?.phenomenon_code || "").toUpperCase();
+  if (code.includes("SFC_VIS") || code.includes("SFCVIS")) return "SFC VIS";
+  if (code.includes("SFC_WIND") || code.includes("SFCWIND")) return "SFC WIND";
+  if (code.includes("SFC_WSPD") || code.includes("SFCWSPD")) return "SFC WSPD";
+  if (code.includes("SEV_TURB")) return "SEV TURB";
+  if (code.includes("MOD_TURB")) return "MOD TURB";
+  if (code.includes("SEV_ICE")) return "SEV ICE";
+  if (code.includes("MOD_ICE")) return "MOD ICE";
+  if (code.includes("EMBD_TS")) return "EMBD TS";
+  if (code.includes("ISOL_TS")) return "ISOL TS";
+  if (code.includes("TSGR")) return "TSGR";
+  if (code.includes("TCU")) return "TCU";
+  if (code === "CB" || code.includes("_CB")) return "CB";
+  if (code.includes("CLD")) return "CLD";
+  if (code.includes("MTW")) return "MTW";
+  if (code.includes("MTOBSC") || code.includes("OBSC")) return "MTOBSC";
+  if (code.includes("VA")) return "VA";
+  if (code.includes("RDOACT")) return "RDOACT";
+  if (code.includes("DS")) return "DS";
+  if (code.includes("SS")) return "SS";
+  if (code.includes("TC")) return code;
+  return advisoryPhenomenonLabel(code);
+}
+
+function advisoryMarkerLines(item, kind = null) {
+  const code = String(item?.phenomenon_code || "").toUpperCase();
+  const lines = [];
+  const altitude = advisoryShowsAltitude(item) ? advisoryAltitudeCompact(item) : "";
+  const motion = advisoryMotionCompact(item);
+  const surfaceWind = advisorySurfaceWindCompact(item);
+  const visCause = advisoryVisibilityCauseCompact(item);
+
+  if (code.includes("SFC_VIS") || code.includes("SFCVIS")) {
+    lines.push(advisoryPhenomenonShortLabel(item));
+    if (visCause) lines.push(visCause);
+    return lines;
+  }
+
+  if (code.includes("SFC_WIND") || code.includes("SFCWIND") || code.includes("SFC_WSPD") || code.includes("SFCWSPD")) {
+    return lines;
+  }
+
+  if (code.includes("CB") || code.includes("TCU") || code.includes("CLD")) {
+    lines.push(advisoryPhenomenonShortLabel(item));
+    if (altitude) lines.push(altitude);
+    return lines;
+  }
+
+  if (altitude) lines.push(altitude);
+  if (motion && kind !== "sigmet") lines.push(motion);
+  return lines;
+}
+
+function advisoryInlineText(item) {
+  const code = String(item?.phenomenon_code || "").toUpperCase();
+  if (code.includes("SFC_WIND") || code.includes("SFCWIND") || code.includes("SFC_WSPD") || code.includes("SFCWSPD")) {
+    return advisorySurfaceWindCompact(item);
+  }
+  return "";
+}
+
+function advisoryMotionArrowSvg(item) {
+  const direction = item?.motion?.direction_deg;
+  const speed = item?.motion?.speed_kt;
+  if (!Number.isFinite(direction) || !Number.isFinite(speed) || speed <= 0) return "";
+  const rotation = Number(direction) - 90;
+  return `<span class="advisory-motion-arrow" style="transform: rotate(${rotation}deg);"><svg viewBox="0 0 40 40" width="40" height="40" aria-hidden="true"><path d="M6 20 H29 M20 11 L29 20 L20 29" fill="none" stroke="#111827" stroke-width="3.8" stroke-linecap="round" stroke-linejoin="round" /></svg></span>`;
 }
 
 function resolveSigwxMarkerIconAssets(item) {
