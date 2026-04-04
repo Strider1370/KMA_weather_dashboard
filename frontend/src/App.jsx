@@ -30,6 +30,7 @@ import WarningList from "./components/WarningList";
 import TafTimeline from "./components/TafTimeline";
 import InteractiveMap from "./components/InteractiveMap";
 import GroundForecastPanel from "./components/GroundForecastPanel";
+import GroundCurrentWeatherCard from "./components/GroundCurrentWeatherCard";
 import AlertPopup from "./components/alerts/AlertPopup";
 import AlertSound from "./components/alerts/AlertSound";
 import AlertMarquee from "./components/alerts/AlertMarquee";
@@ -458,16 +459,26 @@ export default function App() {
               tz={timeZone}
             />
 
-            <MetarCard
-              metarData={data.metar}
-              amosData={data.amos}
-              icao={selectedAirport}
-              minimaSettings={airportMinimaSettings}
-              airportMeta={selectedAirportMeta}
-              metarTime={metarTime}
-              version={metarVersion}
-              tz={timeZone}
-            />
+            {dashboardMode === "ground" ? (
+              <GroundCurrentWeatherCard
+                metarData={data.metar}
+                groundForecastData={data.groundForecast}
+                icao={selectedAirport}
+                airportMeta={selectedAirportMeta}
+                tz={timeZone}
+              />
+            ) : (
+              <MetarCard
+                metarData={data.metar}
+                amosData={data.amos}
+                icao={selectedAirport}
+                minimaSettings={airportMinimaSettings}
+                airportMeta={selectedAirportMeta}
+                metarTime={metarTime}
+                version={metarVersion}
+                tz={timeZone}
+              />
+            )}
 
             {dashboardMode === "ground" ? (
               <GroundForecastPanel

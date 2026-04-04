@@ -603,24 +603,49 @@ function formatIconAltitudeText(value) {
   return String(value || "").replace(/\bFL/g, "").replace(/\s+/g, " ").trim();
 }
 
-function createAdvisoryIcon(item, kind) {
+function getMarkerZoomScale(zoom) {
+  if (!Number.isFinite(zoom)) return 1;
+  if (zoom <= 5) return 0.58;
+  if (zoom <= 6) return 0.7;
+  if (zoom <= 7) return 0.84;
+  return 1;
+}
+
+function shouldShowMarkerTextDetails(zoom) {
+  if (!Number.isFinite(zoom)) return true;
+  return zoom > 6;
+}
+
+function shouldShowMarkerSecondaryDetails(zoom) {
+  if (!Number.isFinite(zoom)) return true;
+  return zoom > 5;
+}
+
+function createAdvisoryIcon(item, kind, zoom = null) {
   const label = advisoryPhenomenonLabel(item?.phenomenon_code);
   const iconAsset = advisoryIconAsset(item, kind);
-  const inlineText = advisoryInlineText(item);
+  const zoomScale = getMarkerZoomScale(zoom);
+  const showTextDetails = shouldShowMarkerTextDetails(zoom);
+  const showSecondaryDetails = shouldShowMarkerSecondaryDetails(zoom);
+  const inlineText = showSecondaryDetails ? advisoryInlineText(item) : "";
   const lines = advisoryMarkerLines(item, kind);
-  const lineHtml = lines.length && !inlineText
+  const lineHtml = showTextDetails && lines.length && !inlineText
     ? `<span class="leaflet-advisory-icon-text-chip leaflet-advisory-icon-text-chip--advisory">${lines.map((line) => `<span>${escapeHtml(line)}</span>`).join("")}</span>`
     : "";
-  const motionArrowHtml = kind === "sigmet" ? advisoryMotionArrowSvg(item) : "";
+  const motionArrowHtml = showSecondaryDetails && kind === "sigmet" ? advisoryMotionArrowSvg(item) : "";
   const maxLineLength = lines.length ? Math.max(...lines.map((line) => line.length)) : label.length;
   const isInlineMarker = Boolean(inlineText && iconAsset);
-  const width = iconAsset
+  const baseWidth = iconAsset
     ? Math.max(isInlineMarker ? 110 : 84, Math.min(kind === "sigmet" ? 170 : 156, 36 + (maxLineLength * 8) + (motionArrowHtml ? 34 : 0)))
     : Math.max(72, Math.min(118, 20 + (Math.max(label.length, maxLineLength) * 7)));
-  const height = iconAsset ? (isInlineMarker ? 80 : (lineHtml ? 100 : 52)) : 24;
+  const baseHeight = iconAsset ? (isInlineMarker ? 80 : (lineHtml ? 100 : 52)) : 24;
+  const width = Math.max(32, Math.round(baseWidth * zoomScale));
+  const height = Math.max(20, Math.round(baseHeight * zoomScale));
   const color = advisoryColor(item, kind);
   const labelHtml = iconAsset
-    ? `<span class="leaflet-advisory-icon-symbol-wrap ${isInlineMarker ? "leaflet-advisory-icon-symbol-wrap--scale-2 leaflet-advisory-icon-symbol-wrap--advisory-inline" : "leaflet-advisory-icon-symbol-wrap--scale-advisory"}"><img class="leaflet-advisory-icon-symbol ${isInlineMarker ? "leaflet-advisory-icon-symbol--scale-2 leaflet-advisory-icon-symbol--advisory-inline" : "leaflet-advisory-icon-symbol--scale-advisory"}" src="${iconAsset}" alt="${escapeHtml(label)}" />${inlineText ? `<span class="leaflet-advisory-icon-inline-text">${escapeHtml(inlineText)}</span>` : ""}</span>`
+    ? `<span class="leaflet-advisory-icon-symbol-wrap ${isInlineMarker ? "leaflet-advisory-icon-symbol-wrap--scale-2 leaflet-advisory-icon-symbol-wrap--advisory-inline" : "leaflet-advisory-icon-symbol-wrap--scale-advisory"}" style="transform:scale(${zoomScale});transform-origin:center;">` +
+      `<img class="leaflet-advisory-icon-symbol ${isInlineMarker ? "leaflet-advisory-icon-symbol--scale-2 leaflet-advisory-icon-symbol--advisory-inline" : "leaflet-advisory-icon-symbol--scale-advisory"}" src="${iconAsset}" alt="${escapeHtml(label)}" />` +
+      `${inlineText ? `<span class="leaflet-advisory-icon-inline-text">${escapeHtml(inlineText)}</span>` : ""}</span>`
     : `<span class="leaflet-advisory-icon-label">${escapeHtml(label)}</span>`;
   const motionInlineHtml = motionArrowHtml && kind === "sigmet"
     ? `<span class="leaflet-advisory-icon-motion-inline">${motionArrowHtml}<span class="leaflet-advisory-icon-motion-text">${escapeHtml(advisoryMotionCompact(item))}</span></span>`
@@ -808,7 +833,7 @@ function getSigwxIconScale(item) {
   return contour === "freezing_level" ? 3 : 2;
 }
 
-function createSigwxBadgeIcon(item) {
+function createSigwxBadgeIcon(item, zoom = null) {
   const label = sigwxPhenomenonLabel(item);
   const altitude = sigwxAltitudeLabel(item);
   const altitudeParts = sigwxAltitudeParts(item);
@@ -816,6 +841,8 @@ function createSigwxBadgeIcon(item) {
   const hasIconAssets = iconAssets.length > 0;
   const hideAltitude = shouldHideSigwxIconAltitude(item);
   const iconScale = getSigwxIconScale(item);
+  const zoomScale = getMarkerZoomScale(zoom);
+  const showTextDetails = shouldShowMarkerTextDetails(zoom);
   const altitudeHtml = hideAltitude
     ? ""
     : altitudeParts
@@ -833,17 +860,19 @@ function createSigwxBadgeIcon(item) {
           ? Math.max(formatIconAltitudeText(altitudeParts.upper).length, formatIconAltitudeText(altitudeParts.lower).length)
           : formatIconAltitudeText(altitude).length
       );
-  const width = hasIconAssets
+  const baseWidth = hasIconAssets
     ? Math.max(48, Math.min(160, 20 + (maxLineLength * 8) + Math.max(0, iconAssets.length - 1) * 24))
     : Math.max(72, Math.min(118, 20 + (maxLineLength * 7)));
-  const height = hasIconAssets
+  const baseHeight = hasIconAssets
     ? (altitudeHtml ? (iconScale === 3 ? 92 : 72) : (iconScale === 3 ? 56 : 40))
     : (altitudeHtml ? 42 : 24);
+  const width = Math.max(30, Math.round(baseWidth * zoomScale));
+  const height = Math.max(18, Math.round(baseHeight * zoomScale));
   const labelHtml = hasIconAssets
-    ? `<span class="leaflet-advisory-icon-symbol-row">${iconAssets.map((iconAsset, index) => `<span class="leaflet-advisory-icon-symbol-wrap leaflet-advisory-icon-symbol-wrap--scale-${iconScale}" data-icon-index="${index}"><img class="leaflet-advisory-icon-symbol leaflet-advisory-icon-symbol--scale-${iconScale}" src="${iconAsset}" alt="${escapeHtml(label)}" /></span>`).join("")}</span>`
+    ? `<span class="leaflet-advisory-icon-symbol-row">${iconAssets.map((iconAsset, index) => `<span class="leaflet-advisory-icon-symbol-wrap leaflet-advisory-icon-symbol-wrap--scale-${iconScale}" data-icon-index="${index}" style="transform:scale(${zoomScale});transform-origin:center;"><img class="leaflet-advisory-icon-symbol leaflet-advisory-icon-symbol--scale-${iconScale}" src="${iconAsset}" alt="${escapeHtml(label)}" /></span>`).join("")}</span>`
     : `<span class="leaflet-advisory-icon-label">${escapeHtml(label)}</span>`;
   const contentHtml = hasIconAssets
-    ? `<span class="leaflet-advisory-icon-stack">${labelHtml}${altitudeHtml ? `<span class="leaflet-advisory-icon-text-chip">${altitudeHtml}</span>` : ""}</span>`
+    ? `<span class="leaflet-advisory-icon-stack">${labelHtml}${showTextDetails && altitudeHtml ? `<span class="leaflet-advisory-icon-text-chip">${altitudeHtml}</span>` : ""}</span>`
     : `<span class="leaflet-advisory-icon-badge leaflet-advisory-icon-badge--sigwx">${labelHtml}${altitudeHtml}</span>`;
   return L.divIcon({
     className: "leaflet-advisory-icon leaflet-advisory-icon--sigwx",
@@ -2327,7 +2356,7 @@ export default function InteractiveMap({
                   <Marker
                     key={`sigwx-icon-${item.mapKey}`}
                     position={centerPoint}
-                    icon={createSigwxBadgeIcon(item)}
+                    icon={createSigwxBadgeIcon(item, currentZoom)}
                     eventHandlers={{
                       mouseover: () => setHoveredAdvisoryId(hoverKey),
                       mouseout: () => setHoveredAdvisoryId((prev) => (prev === hoverKey ? null : prev)),
@@ -2375,7 +2404,7 @@ export default function InteractiveMap({
                   <Marker
                     key={`sigmet-icon-${item.mapKey}`}
                     position={centerPoint}
-                    icon={createAdvisoryIcon(item, "sigmet")}
+                    icon={createAdvisoryIcon(item, "sigmet", currentZoom)}
                     eventHandlers={{
                       mouseover: () => setHoveredAdvisoryId(item.mapKey),
                       mouseout: () => setHoveredAdvisoryId((prev) => (prev === item.mapKey ? null : prev))
@@ -2399,7 +2428,7 @@ export default function InteractiveMap({
                   <Marker
                     key={`airmet-icon-${item.mapKey}`}
                     position={centerPoint}
-                    icon={createAdvisoryIcon(item, "airmet")}
+                    icon={createAdvisoryIcon(item, "airmet", currentZoom)}
                     eventHandlers={{
                       mouseover: () => setHoveredAdvisoryId(item.mapKey),
                       mouseout: () => setHoveredAdvisoryId((prev) => (prev === item.mapKey ? null : prev))

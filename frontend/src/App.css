@@ -3577,6 +3577,144 @@ label { font-size: 0.9rem; font-weight: 700; }
   margin: 0;
   color: var(--muted);
 }
+
+.ground-current-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1.08fr) minmax(320px, 0.92fr);
+  gap: 22px;
+  align-items: stretch;
+  padding: 18px 24px;
+}
+
+.ground-current-card-main {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 16px;
+  padding: 8px 10px 8px 2px;
+}
+
+.ground-current-card-time {
+  color: var(--muted);
+  font-size: 1.16rem;
+  font-weight: 700;
+}
+
+.ground-current-card-hero {
+  display: flex;
+  align-items: center;
+  gap: 22px;
+}
+
+.ground-current-card-icon {
+  flex: 0 0 auto;
+  transform: scale(1.72);
+  transform-origin: center;
+}
+
+.ground-current-card-temp-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.ground-current-card-temp {
+  color: var(--text);
+  font-size: 5.2rem;
+  line-height: 0.9;
+  font-weight: 800;
+  letter-spacing: -0.075em;
+}
+
+.ground-current-card-summary {
+  color: var(--text);
+  font-size: 1.32rem;
+  font-weight: 700;
+}
+
+.ground-current-card-sun {
+  color: var(--muted);
+  font-size: 1.08rem;
+  font-weight: 600;
+}
+
+.ground-current-card-metrics {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  padding-left: 28px;
+  border-left: 1px solid color-mix(in srgb, var(--line) 88%, #ffffff);
+}
+
+.ground-current-metric {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 6px;
+  min-height: 58px;
+  padding: 12px 16px;
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--panel) 96%, #f6f1e7);
+  border: 1px solid color-mix(in srgb, var(--line) 72%, #ffffff);
+  box-shadow: none;
+}
+
+.ground-current-metric-label {
+  color: var(--muted);
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.ground-current-metric-value {
+  color: var(--text);
+  font-size: 1.72rem;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.ground-current-metric-dir {
+  color: var(--muted);
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.ground-current-metric-value--pending {
+  color: #0f766e;
+  font-size: 1.34rem;
+}
+
+.ground-current-metric-max {
+  color: #dc2626;
+}
+
+.ground-current-metric-min {
+  color: #2563eb;
+}
+
+.ground-current-metric-divider {
+  margin: 0 4px;
+  color: var(--muted);
+  font-size: 1.24rem;
+}
+
+.ground-current-empty {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.95rem;
+}
+
+@media (max-width: 900px) {
+  .ground-current-card {
+    grid-template-columns: 1fr;
+  }
+
+  .ground-current-card-metrics {
+    padding-left: 0;
+    border-left: 0;
+    padding-top: 6px;
+    border-top: 1px solid var(--line);
+  }
+}
 [data-theme="dark"] .ground-forecast-card {
   background: #272c35;
   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18);
