@@ -335,8 +335,11 @@ $env:NODE_TLS_REJECT_UNAUTHORIZED="0"; node backend/test/run-once.js adsb
 - 낙뢰 토글이 켜지면 우측에 시간대 범례가 표시되고, `깜빡임` 버튼으로 낙뢰 마커 점멸 효과를 켜고 끌 수 있습니다.
 - 공항 선택은 경로별로 로컬 저장됩니다.
   - `/ops`: 기본 공항 `RKSI`, 운항용 레이아웃
-  - `/ground`: 기본 공항 `RKSI`, 일반근무자용 레이아웃 + 7일 주간예보 패널
-  - `/test`: `frontend/public/test/*` 스냅샷이 있는 실제 공항만 표시, 레거시 `TST1` 숨김
+- `/ground`: 기본 공항 `RKSI`, 일반근무자용 레이아웃 + 7일 주간예보 패널
+- `/ground`는 기존 METAR 메타 패널 대신 현재날씨 카드(`GroundCurrentWeatherCard`)를 사용합니다. 현재 기온/날씨/바람은 METAR, 오늘 최고/최저는 `ground_forecast`, 체감온도/습도는 계산값, 일출/일몰은 공항 위경도 기반 계산값입니다. 미세먼지/초미세먼지/자외선은 현재 placeholder 상태입니다.
+- `/test`: `frontend/public/test/*` 스냅샷이 있는 실제 공항만 표시, 레거시 `TST1` 숨김
+- `SIGMET`/`AIRMET` marker는 텍스트 badge 대신 아이콘 기반 marker를 사용합니다. `SIGMET` motion 정보가 있으면 아이콘 옆에 더 큰 화살표와 `15KT` 같은 속도 텍스트를 배치하고, `AIRMET` `SFC_WIND`는 다이아몬드 내부에 `290/30KT` 같은 값을 직접 표시합니다.
+- 지도 축소 시 `SIGWX_LOW`, `SIGMET`, `AIRMET` marker는 zoom 단계에 따라 함께 작아지고, 저줌에서는 일부 보조 텍스트를 숨겨 겹침을 줄입니다.
 - METAR `현재 날씨` 제목칸 아이콘은 `frontend/public/gisang-i/` 이미지를 사용합니다. `TS/TSRA -> TS.png`, `SN 계열 -> SN.png`, `RA/DZ/SHRA 계열 -> RN_DZ.png`, 그 외 clear 계열은 날짜 기반으로 `clear_*`를 순환 선택합니다. 계절 이미지는 해당 계절에만 후보군에 포함되고, `12월 24일/25일` clear 상태에서는 `clear_christmas.png`가 고정 선택됩니다.
 
 ## 배포 업데이트 예시
