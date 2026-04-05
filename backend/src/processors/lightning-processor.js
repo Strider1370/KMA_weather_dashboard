@@ -73,7 +73,11 @@ function buildNationwideLightningUrl(tm) {
   return `${config.api.lightning_url}?${params.toString()}`;
 }
 
-async function fetchWithTimeout(url, timeoutMs = config.api.timeout_ms) {
+const LIGHTNING_TIMEOUT_MS = 30000;
+const LIGHTNING_MAX_RETRIES = 3;
+const LIGHTNING_RETRY_DELAY_MS = 3000;
+
+async function fetchWithTimeout(url, timeoutMs = LIGHTNING_TIMEOUT_MS) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
@@ -85,6 +89,21 @@ async function fetchWithTimeout(url, timeoutMs = config.api.timeout_ms) {
   } finally {
     clearTimeout(timer);
   }
+}
+
+async function fetchWithRetry(url) {
+  let lastError;
+  for (let attempt = 1; attempt <= LIGHTNING_MAX_RETRIES; attempt += 1) {
+    try {
+      return await fetchWithTimeout(url);
+    } catch (err) {
+      lastError = err;
+      if (attempt < LIGHTNING_MAX_RETRIES) {
+        await new Promise((res) => setTimeout(res, LIGHTNING_RETRY_DELAY_MS));
+      }
+    }
+  }
+  throw lastError;
 }
 
 function buildStrikeKey(strike) {
@@ -213,7 +232,7 @@ function buildProcessResponse(result, saveResult, airportErrors = {}) {
 }
 
 async function fetchNationwideStrikes(tm) {
-  const rawNationwide = await fetchWithTimeout(buildNationwideLightningUrl(tm));
+  const rawNationwide = await fetchWithRetry(buildNationwideLightningUrl(tm));
   const nationwidePoint = {
     lat: config.lightning.nationwide?.lat,
     lon: config.lightning.nationwide?.lon,
@@ -239,27 +258,7 @@ async function process() {
     return buildProcessResponse(result, saveResult);
   } catch (error) {
     if (previous) {
-      const staleResult = {
-        ...previous,
-        fetched_at: new Date().toISOString(),
-        query: {
-          ...(previous.query || {}),
-          tm,
-          itv_minutes: config.lightning.itv_minutes,
-          nationwide_range_km: config.lightning.nationwide?.range_km || null,
-        },
-        history_window_minutes: LIGHTNING_HISTORY_WINDOW_MINUTES,
-        _stale: true,
-        nationwide: previous.nationwide ? { ...previous.nationwide, _stale: true } : emptyNationwidePayload(),
-        airports: Object.fromEntries(
-          Object.entries(previous.airports || {}).map(([icao, payload]) => [
-            icao,
-            { ...payload, _stale: true },
-          ])
-        ),
-      };
-      const saveResult = store.save("lightning", staleResult);
-      return buildProcessResponse(staleResult, saveResult, { nationwide: error.message || "Unknown error" });
+      return buildProcessResponse(previous, { saved: false, reason: "fetch_failed" }, { nationwide: error.message || "Unknown error" });
     }
 
     throw error;
