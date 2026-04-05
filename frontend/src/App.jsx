@@ -564,6 +564,8 @@ export default function App() {
               tz={timeZone}
               trafficCallsignFilter={trafficCallsignFilter}
               trafficAltitudeBands={trafficAltitudeBands}
+              dashboardMode={dashboardMode}
+              tafData={data.taf}
             />
           </div>
         </div>

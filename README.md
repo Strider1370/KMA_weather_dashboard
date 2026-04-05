@@ -336,7 +336,9 @@ $env:NODE_TLS_REJECT_UNAUTHORIZED="0"; node backend/test/run-once.js adsb
 - 공항 선택은 경로별로 로컬 저장됩니다.
   - `/ops`: 기본 공항 `RKSI`, 운항용 레이아웃
 - `/ground`: 기본 공항 `RKSI`, 일반근무자용 레이아웃 + 7일 주간예보 패널
-- `/ground`는 기존 METAR 메타 패널 대신 현재날씨 카드(`GroundCurrentWeatherCard`)를 사용합니다. 현재 기온/날씨/바람은 METAR, 오늘 최고/최저는 `ground_forecast`, 체감온도/습도는 계산값, 일출/일몰은 공항 위경도 기반 계산값입니다. 미세먼지/초미세먼지/자외선은 현재 placeholder 상태입니다.
+- `/ground`는 기존 METAR 메타 패널 대신 현재날씨 카드(`GroundCurrentWeatherCard`)를 사용합니다. 현재 기온/날씨/바람은 METAR, 오늘 최고/최저는 `ground_forecast`, 체감온도/습도는 계산값, 일출/일몰은 공항 위경도 기반 계산값입니다. 미세먼지(PM10)/초미세먼지(PM2.5)/자외선은 `environment` 프로세서(AirKorea + Open-Meteo + KMA UV API)에서 10분 간격으로 수집합니다.
+- `/ground` 지도패널은 SIGMET/AIRMET/SIGWX_LOW 버튼을 숨기고, "전국/공항" 옆에 "예보" 탭을 추가합니다. "예보" 탭 선택 시 TAF 기반 시간 슬라이더 + AI 생성 공항 날씨 이미지를 보여줍니다(40초 루프 재생, 크로스페이드 전환).
+- 공항 날씨 이미지는 `scripts/generate-airport-weather-images.js`(Gemini API)로 공항별 30장(시간대 3종 × 날씨 10종)을 사전 생성하여 `frontend/public/airport_weather/{ICAO}/`에 저장합니다.
 - `/test`: `frontend/public/test/*` 스냅샷이 있는 실제 공항만 표시, 레거시 `TST1` 숨김
 - `SIGMET`/`AIRMET` marker는 텍스트 badge 대신 아이콘 기반 marker를 사용합니다. `SIGMET` motion 정보가 있으면 아이콘 옆에 더 큰 화살표와 `15KT` 같은 속도 텍스트를 배치하고, `AIRMET` `SFC_WIND`는 다이아몬드 내부에 `290/30KT` 같은 값을 직접 표시합니다.
 - 지도 축소 시 `SIGWX_LOW`, `SIGMET`, `AIRMET` marker는 zoom 단계에 따라 함께 작아지고, 저줌에서는 일부 보조 텍스트를 숨겨 겹침을 줄입니다.

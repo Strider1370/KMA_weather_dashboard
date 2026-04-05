@@ -4162,3 +4162,188 @@ tr.row-danger td { background: #ffe9e7; }
 [data-theme="dark"] .airport-dropdown-list li:hover {
   background: rgba(255, 255, 255, 0.06);
 }
+
+/* ── TAF Forecast View ── */
+.taf-forecast-view {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 8px 4px;
+  min-height: 0;
+}
+
+.taf-forecast-view--empty {
+  align-items: center;
+  justify-content: center;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.taf-forecast-slider {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.taf-forecast-slider-label {
+  font-size: 11px;
+  color: var(--muted);
+  white-space: nowrap;
+  min-width: 52px;
+}
+
+.taf-forecast-track {
+  flex: 1;
+  position: relative;
+  height: 28px;
+  background: var(--card-bg);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.taf-forecast-seg {
+  position: absolute;
+  top: 2px;
+  bottom: 2px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: opacity 0.15s, filter 0.15s;
+  opacity: 0.6;
+}
+
+.taf-forecast-seg:hover {
+  opacity: 0.85;
+}
+
+.taf-forecast-seg.active {
+  opacity: 1;
+  outline: 2px solid var(--accent);
+  outline-offset: -1px;
+  z-index: 1;
+}
+
+.taf-forecast-seg--golden { background: #f59e0b; }
+.taf-forecast-seg--day    { background: #3b82f6; }
+.taf-forecast-seg--night  { background: #4b5563; }
+
+.taf-forecast-info {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  padding: 4px 6px;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+}
+
+.taf-forecast-time {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ink);
+  white-space: nowrap;
+}
+
+.taf-forecast-weather-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--accent);
+}
+
+.taf-forecast-detail {
+  font-size: 11.5px;
+  color: var(--muted);
+  line-height: 1.4;
+}
+
+.taf-forecast-image-wrap {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border-radius: 8px;
+  background: var(--card-bg);
+  position: relative;
+}
+
+.taf-forecast-image {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  border-radius: 8px;
+  position: absolute;
+  inset: 0;
+  margin: auto;
+}
+
+/* Play button */
+.taf-forecast-play-btn {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: none;
+  background: var(--accent);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.15s, transform 0.1s;
+}
+
+.taf-forecast-play-btn:hover {
+  background: var(--accent-2);
+  transform: scale(1.08);
+}
+
+.taf-forecast-play-btn.playing {
+  background: var(--accent-2);
+}
+
+/* Playhead - vertical sweep line */
+.taf-forecast-playhead {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: var(--ink);
+  z-index: 5;
+  pointer-events: none;
+  transition: none;
+  box-shadow: 0 0 4px rgba(0, 0, 0, 0.3);
+}
+
+.taf-forecast-playhead::after {
+  content: "";
+  position: absolute;
+  top: -3px;
+  left: -3px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--ink);
+}
+
+/* Image crossfade */
+.taf-forecast-image--fade-in {
+  animation: forecastFadeIn 1s ease-out forwards;
+}
+
+.taf-forecast-image--fade-out {
+  animation: forecastFadeOut 1s ease-out forwards;
+  z-index: 1;
+}
+
+@keyframes forecastFadeIn {
+  from { opacity: 0; transform: scale(1.01); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+@keyframes forecastFadeOut {
+  from { opacity: 1; }
+  to   { opacity: 0; }
+}

@@ -28,6 +28,7 @@ import {
   smoothSigwxLatLngs,
 } from "../utils/sigwx";
 import { fetchSigwxLowClouds, fetchSigwxLowFronts } from "../utils/api";
+import TafForecastView from "./TafForecastView";
 import "leaflet/dist/leaflet.css";
 
 const ZONE_RADII = [
@@ -1124,7 +1125,10 @@ export default function InteractiveMap({
   tz = "UTC",
   trafficCallsignFilter = "",
   trafficAltitudeBands = [],
+  dashboardMode = "ops",
+  tafData = null,
 }) {
+  const isGround = dashboardMode === "ground";
   const [mapScope, setMapScope] = useState("nationwide");
   const [boundaryLevel, setBoundaryLevel] = useState("sido");
   const [currentZoom, setCurrentZoom] = useState(NATIONWIDE_ZOOM);
@@ -1886,7 +1890,7 @@ export default function InteractiveMap({
         <div className="panel-switch map-scope-switch" role="tablist" aria-label="지도 범위">
           <button
             type="button"
-            className={`panel-switch-btn ${isNationwide ? "active" : ""}`}
+            className={`panel-switch-btn ${mapScope === "nationwide" ? "active" : ""}`}
             onClick={() => {
               setMapScope("nationwide");
               setRecenterKey((prev) => prev + 1);
@@ -1896,7 +1900,7 @@ export default function InteractiveMap({
           </button>
           <button
             type="button"
-            className={`panel-switch-btn ${!isNationwide ? "active" : ""}`}
+            className={`panel-switch-btn ${mapScope === "airport" ? "active" : ""}`}
             onClick={() => {
               setMapScope("airport");
               setRecenterKey((prev) => prev + 1);
@@ -1904,7 +1908,17 @@ export default function InteractiveMap({
           >
             공항
           </button>
+          {isGround && (
+            <button
+              type="button"
+              className={`panel-switch-btn ${mapScope === "forecast" ? "active" : ""}`}
+              onClick={() => setMapScope("forecast")}
+            >
+              예보
+            </button>
+          )}
         </div>
+        {mapScope !== "forecast" && (
           <div className="time-range">
             <button
               type="button"
@@ -1919,10 +1933,10 @@ export default function InteractiveMap({
               type="button"
               className={`range-btn satellite-toggle ${showSatellite ? "active" : ""}`}
               onClick={() => setShowSatellite((v) => !v)}
-              title={displaySatInfo ? `안개영상 (${displaySatInfo.tm || ""})` : "안개영상을 사용할 수 없습니다"}
+              title={displaySatInfo ? `${isGround ? "위성영상" : "안개영상"} (${displaySatInfo.tm || ""})` : `${isGround ? "위성영상" : "안개영상"}을 사용할 수 없습니다`}
               disabled={!displaySatInfo}
             >
-              안개
+              {isGround ? "위성" : "안개"}
             </button>
           <button
             type="button"
@@ -1940,27 +1954,31 @@ export default function InteractiveMap({
               깜빡임
             </button>
           )}
-            <button
-              type="button"
-              className={`range-btn sigmet-toggle ${showSigmet ? "active" : ""}`}
-              onClick={() => setShowSigmet((v) => !v)}
-            >
-              SIGMET
-            </button>
-            <button
-              type="button"
-              className={`range-btn airmet-toggle ${showAirmet ? "active" : ""}`}
-              onClick={() => setShowAirmet((v) => !v)}
-            >
-              AIRMET
-            </button>
-            <button
-              type="button"
-              className={`range-btn sigwx-toggle ${showSigwxLow ? "active" : ""}`}
-              onClick={() => setShowSigwxLow((value) => !value)}
-            >
-              SIGWX_LOW
-            </button>
+            {!isGround && (
+              <>
+                <button
+                  type="button"
+                  className={`range-btn sigmet-toggle ${showSigmet ? "active" : ""}`}
+                  onClick={() => setShowSigmet((v) => !v)}
+                >
+                  SIGMET
+                </button>
+                <button
+                  type="button"
+                  className={`range-btn airmet-toggle ${showAirmet ? "active" : ""}`}
+                  onClick={() => setShowAirmet((v) => !v)}
+                >
+                  AIRMET
+                </button>
+                <button
+                  type="button"
+                  className={`range-btn sigwx-toggle ${showSigwxLow ? "active" : ""}`}
+                  onClick={() => setShowSigwxLow((value) => !value)}
+                >
+                  SIGWX_LOW
+                </button>
+              </>
+            )}
             <button
               type="button"
               className={`range-btn traffic-toggle ${showTraffic ? "active" : ""}`}
@@ -1969,9 +1987,12 @@ export default function InteractiveMap({
               TRAFFIC
             </button>
           </div>
+        )}
       </div>
 
-      {!isNationwide && !arp ? (
+      {mapScope === "forecast" ? (
+        <TafForecastView tafData={tafData} icao={selectedAirport} tz={tz} />
+      ) : !isNationwide && !arp ? (
         <p className="sub">이 공항의 낙뢰 데이터를 사용할 수 없습니다.</p>
       ) : (
         <>
