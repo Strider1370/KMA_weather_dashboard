@@ -144,9 +144,39 @@ function placeholderValue() {
   return "준비중";
 }
 
+function environmentMetric(value, grade, unit = "", fallback = placeholderValue()) {
+  if (value == null && !grade) {
+    return { label: fallback, numeric: null, pending: true, gradeClass: "" };
+  }
+  const label = grade || fallback;
+  const numeric = Number.isFinite(value) ? `(${Math.round(value * 10) / 10}${unit})` : null;
+  const gradeKey = String(grade || "").toLowerCase();
+  const gradeClass = gradeKey.includes("좋음") || gradeKey.includes("낮음")
+    ? "ground-current-metric-value--good"
+    : gradeKey.includes("보통")
+      ? "ground-current-metric-value--moderate"
+      : gradeKey.includes("나쁨") || gradeKey.includes("높음")
+        ? "ground-current-metric-value--warn"
+        : gradeKey.includes("매우") || gradeKey.includes("위험")
+          ? "ground-current-metric-value--bad"
+          : "";
+  return { label, numeric, pending: false, gradeClass };
+}
+
+function EnvironmentValue({ metric }) {
+  return (
+    <>
+      {metric.label}
+      {metric.numeric && <span className="ground-current-metric-numeric"> {metric.numeric}</span>}
+    </>
+  );
+}
+
 export default function GroundCurrentWeatherCard({
   metarData,
   groundForecastData,
+  environmentData,
+  amosData,
   icao,
   airportMeta = null,
   tz = "KST",
@@ -179,6 +209,11 @@ export default function GroundCurrentWeatherCard({
   const sunTimes = computeSunTimes(airportMeta?.lat, airportMeta?.lon, now, tz);
   const minTemp = forecastToday?.tempMin;
   const maxTemp = forecastToday?.tempMax;
+  const environment = environmentData?.airports?.[icao] || null;
+  const pm10 = environmentMetric(environment?.pm?.pm10?.value, environment?.pm?.pm10?.grade, "㎍/㎥");
+  const pm25 = environmentMetric(environment?.pm?.pm25?.value, environment?.pm?.pm25?.grade, "㎍/㎥");
+  const uv = environmentMetric(environment?.uv?.value, environment?.uv?.grade);
+  const rainfallMm = amosData?.airports?.[icao]?.daily_rainfall?.mm;
 
   return (
     <section className="ground-current-card panel">
@@ -187,14 +222,19 @@ export default function GroundCurrentWeatherCard({
         <div className="ground-current-card-hero">
           <WeatherIcon iconKey={currentCondition.iconKey} className="ground-current-card-icon" alt={currentCondition.summary} />
           <div className="ground-current-card-temp-wrap">
-            <div className="ground-current-card-temp">{Number.isFinite(tempC) ? `${Math.round(tempC)}°` : "-"}</div>
+            <div className="ground-current-card-temp">{Number.isFinite(tempC) ? `${Math.round(tempC)}°C` : "-"}</div>
             <div className="ground-current-card-summary">
               {currentCondition.summary}
-              {Number.isFinite(feelsLike?.value) ? ` · 체감 ${Math.round(feelsLike.value)}°` : ""}
+              {Number.isFinite(feelsLike?.value) ? ` · 체감 ${Math.round(feelsLike.value)}°C` : ""}
             </div>
           </div>
         </div>
-        <div className="ground-current-card-sun">일출 {sunTimes.sunrise} · 일몰 {sunTimes.sunset}</div>
+        <div className="ground-current-card-sun">
+          <span className="ground-current-metric-min">{Number.isFinite(minTemp) ? `${Math.round(minTemp)}°C` : "-"}</span>
+          <span className="ground-current-metric-divider">/</span>
+          <span className="ground-current-metric-max">{Number.isFinite(maxTemp) ? `${Math.round(maxTemp)}°C` : "-"}</span>
+        </div>
+        <div className="ground-current-card-suntime">일출 {sunTimes.sunrise} · 일몰 {sunTimes.sunset}</div>
       </div>
       <div className="ground-current-card-metrics">
         <article className="ground-current-metric">
@@ -206,24 +246,20 @@ export default function GroundCurrentWeatherCard({
           <strong className="ground-current-metric-value">{Number.isFinite(windMs) ? `${windMs.toFixed(0)} m/s` : "-"} <span className="ground-current-metric-dir">{windDirectionKo(windDirection)}</span></strong>
         </article>
         <article className="ground-current-metric">
-          <span className="ground-current-metric-label">미세먼지</span>
-          <strong className="ground-current-metric-value ground-current-metric-value--pending">{placeholderValue()}</strong>
+          <span className="ground-current-metric-label">미세먼지(PM10)</span>
+          <strong className={`ground-current-metric-value ${pm10.pending ? "ground-current-metric-value--pending" : pm10.gradeClass}`.trim()}><EnvironmentValue metric={pm10} /></strong>
         </article>
         <article className="ground-current-metric">
-          <span className="ground-current-metric-label">초미세먼지</span>
-          <strong className="ground-current-metric-value ground-current-metric-value--pending">{placeholderValue()}</strong>
+          <span className="ground-current-metric-label">초미세먼지(PM2.5)</span>
+          <strong className={`ground-current-metric-value ${pm25.pending ? "ground-current-metric-value--pending" : pm25.gradeClass}`.trim()}><EnvironmentValue metric={pm25} /></strong>
         </article>
         <article className="ground-current-metric">
           <span className="ground-current-metric-label">자외선</span>
-          <strong className="ground-current-metric-value ground-current-metric-value--pending">{placeholderValue()}</strong>
+          <strong className={`ground-current-metric-value ${uv.pending ? "ground-current-metric-value--pending" : uv.gradeClass}`.trim()}><EnvironmentValue metric={uv} /></strong>
         </article>
         <article className="ground-current-metric">
-          <span className="ground-current-metric-label">오늘 최고/최저</span>
-          <strong className="ground-current-metric-value">
-            <span className="ground-current-metric-max">{Number.isFinite(maxTemp) ? `${Math.round(maxTemp)}°` : "-"}</span>
-            <span className="ground-current-metric-divider">/</span>
-            <span className="ground-current-metric-min">{Number.isFinite(minTemp) ? `${Math.round(minTemp)}°` : "-"}</span>
-          </strong>
+          <span className="ground-current-metric-label">일강수량</span>
+          <strong className="ground-current-metric-value">{Number.isFinite(rainfallMm) ? `${rainfallMm.toFixed(1)} mm` : "-"}</strong>
         </article>
       </div>
     </section>

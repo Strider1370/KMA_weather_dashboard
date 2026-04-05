@@ -39,7 +39,7 @@ async function fetchPreferTest(testUrl, liveUrl, { optional = false } = {}) {
 }
 
 export async function loadAllData() {
-  const [metar, taf, warning, airports, warningTypes, lightning, echoMeta, adsb, sigmet, airmet, sigwxLow, sigwxLowHistory, sigwxLowFronts, sigwxLowClouds, amos, satMeta, groundForecast, groundOverview] = await Promise.all([
+  const [metar, taf, warning, airports, warningTypes, lightning, echoMeta, adsb, sigmet, airmet, sigwxLow, sigwxLowHistory, sigwxLowFronts, sigwxLowClouds, amos, satMeta, groundForecast, groundOverview, environment] = await Promise.all([
     fetchPreferTest("/test/metar/latest.json", "/api/metar"),
     fetchPreferTest("/test/taf/latest.json", "/api/taf"),
     fetchPreferTest("/test/warning/latest.json", "/api/warning", { optional: true }),
@@ -58,8 +58,9 @@ export async function loadAllData() {
     fetchPreferTest("/test/satellite/sat_meta.json", "/data/satellite/sat_meta.json", { optional: true }),
     fetchJsonOptional("/api/ground-forecast"),
     fetchJsonOptional("/api/ground-overview"),
+    fetchJsonOptional("/api/environment"),
   ]);
-  return { metar, taf, warning, airports, warningTypes, lightning, echoMeta, adsb, sigmet, airmet, sigwxLow, sigwxLowHistory, sigwxLowFronts, sigwxLowClouds, amos, satMeta, groundForecast, groundOverview };
+  return { metar, taf, warning, airports, warningTypes, lightning, echoMeta, adsb, sigmet, airmet, sigwxLow, sigwxLowHistory, sigwxLowFronts, sigwxLowClouds, amos, satMeta, groundForecast, groundOverview, environment };
 }
 
 export async function loadAlertDefaults() {
@@ -90,6 +91,7 @@ export async function fetchSnapshotMeta() {
       adsb: { hash: data.adsb?.content_hash || null },
       ground_forecast: { hash: data.groundForecast?.content_hash || null },
       ground_overview: { hash: data.groundOverview?.content_hash || null },
+      environment: { hash: data.environment?.content_hash || null },
       echo: data.echoMeta?.tm != null ? { tm: data.echoMeta.tm } : null,
       satellite: data.satMeta?.tm != null ? { tm: data.satMeta.tm } : null,
     };
@@ -134,6 +136,7 @@ export async function loadChangedData(changes) {
   if (changes.adsb) { fetches.push(fetchPreferTest("/test/adsb/latest.json", "/api/adsb", { optional: true })); keys.push("adsb"); }
   if (changes.groundForecast) { fetches.push(fetchJsonOptional("/api/ground-forecast")); keys.push("groundForecast"); }
   if (changes.groundOverview) { fetches.push(fetchJsonOptional("/api/ground-overview")); keys.push("groundOverview"); }
+  if (changes.environment) { fetches.push(fetchJsonOptional("/api/environment")); keys.push("environment"); }
   if (changes.echoMeta) { fetches.push(fetchPreferTest("/test/radar/echo_meta.json", "/data/radar/echo_meta.json", { optional: true })); keys.push("echoMeta"); }
   if (changes.satMeta) { fetches.push(fetchPreferTest("/test/satellite/sat_meta.json", "/data/satellite/sat_meta.json", { optional: true })); keys.push("satMeta"); }
 

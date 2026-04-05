@@ -49,12 +49,33 @@ const AIRPORT_NAME_KO = {
 };
 
 export default function App() {
-  const routeContext = getCurrentRouteContext();
-  const { isTestPage, dashboardMode, selectedAirportKey } = routeContext;
+  const initialRoute = getCurrentRouteContext();
+  const isTestPage = initialRoute.isTestPage;
+  const [dashboardMode, setDashboardMode] = useState(initialRoute.dashboardMode);
+  const selectedAirportKey = isTestPage
+    ? "selected_airport_test"
+    : dashboardMode === "ground"
+      ? "selected_airport_ground"
+      : "selected_airport_ops";
   const defaultAirport = "RKSI";
 
   const [data, setData] = useState({});
-  const [selectedAirport, setSelectedAirport] = useState(() => localStorage.getItem(selectedAirportKey) || defaultAirport);
+  const [selectedAirport, setSelectedAirportRaw] = useState(() => localStorage.getItem(selectedAirportKey) || defaultAirport);
+  const setSelectedAirport = useCallback((icao) => setSelectedAirportRaw(icao), []);
+
+  useEffect(() => {
+    setSelectedAirportRaw(localStorage.getItem(selectedAirportKey) || defaultAirport);
+  }, [selectedAirportKey]);
+
+  useEffect(() => {
+    const onPopState = () => {
+      const ctx = getCurrentRouteContext();
+      if (!ctx.isTestPage) setDashboardMode(ctx.dashboardMode);
+    };
+    window.addEventListener("popstate", onPopState);
+    return () => window.removeEventListener("popstate", onPopState);
+  }, []);
+
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [alertDefaults, setAlertDefaults] = useState(null);
@@ -436,8 +457,26 @@ export default function App() {
             />
           </div>
 
-          {/* Row 1 right: Settings icon */}
+          {/* Row 1 right: Mode switch + Settings icon */}
           <div className="right-panel-top">
+            {!isTestPage && (
+              <div className="panel-switch dashboard-mode-switch" role="tablist" aria-label="대시보드 모드">
+                <button
+                  type="button"
+                  className={`panel-switch-btn ${dashboardMode === "ops" ? "active" : ""}`}
+                  onClick={() => { setDashboardMode("ops"); window.history.pushState(null, "", "/ops"); }}
+                >
+                  운항
+                </button>
+                <button
+                  type="button"
+                  className={`panel-switch-btn ${dashboardMode === "ground" ? "active" : ""}`}
+                  onClick={() => { setDashboardMode("ground"); window.history.pushState(null, "", "/ground"); }}
+                >
+                  지상
+                </button>
+              </div>
+            )}
             <button
               className="settings-icon-btn"
               onClick={() => setShowSettings(true)}
@@ -463,6 +502,8 @@ export default function App() {
               <GroundCurrentWeatherCard
                 metarData={data.metar}
                 groundForecastData={data.groundForecast}
+                environmentData={data.environment}
+                amosData={data.amos}
                 icao={selectedAirport}
                 airportMeta={selectedAirportMeta}
                 tz={timeZone}

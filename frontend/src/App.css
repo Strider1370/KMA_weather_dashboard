@@ -60,6 +60,7 @@ body {
   display: flex;
   justify-content: flex-end;
   align-items: center;
+  gap: 8px;
   padding: 2px 4px;
 }
 
@@ -3592,6 +3593,7 @@ label { font-size: 0.9rem; font-weight: 700; }
   justify-content: center;
   gap: 16px;
   padding: 8px 10px 8px 2px;
+  position: relative;
 }
 
 .ground-current-card-time {
@@ -3608,7 +3610,7 @@ label { font-size: 0.9rem; font-weight: 700; }
 
 .ground-current-card-icon {
   flex: 0 0 auto;
-  transform: scale(1.72);
+  transform: scale(2.5);
   transform-origin: center;
 }
 
@@ -3620,7 +3622,7 @@ label { font-size: 0.9rem; font-weight: 700; }
 
 .ground-current-card-temp {
   color: var(--text);
-  font-size: 5.2rem;
+  font-size: 3.12rem;
   line-height: 0.9;
   font-weight: 800;
   letter-spacing: -0.075em;
@@ -3636,6 +3638,15 @@ label { font-size: 0.9rem; font-weight: 700; }
   color: var(--muted);
   font-size: 1.08rem;
   font-weight: 600;
+}
+
+.ground-current-card-suntime {
+  position: absolute;
+  right: 10px;
+  bottom: 0;
+  color: var(--muted);
+  font-size: 0.92rem;
+  font-weight: 500;
 }
 
 .ground-current-card-metrics {
@@ -3665,9 +3676,15 @@ label { font-size: 0.9rem; font-weight: 700; }
   font-weight: 600;
 }
 
+.ground-current-metric-numeric {
+  font-size: 0.72em;
+  font-weight: 600;
+  opacity: 0.7;
+}
+
 .ground-current-metric-value {
   color: var(--text);
-  font-size: 1.72rem;
+  font-size: 1.46rem;
   font-weight: 800;
   line-height: 1;
 }
@@ -3681,6 +3698,22 @@ label { font-size: 0.9rem; font-weight: 700; }
 .ground-current-metric-value--pending {
   color: #0f766e;
   font-size: 1.34rem;
+}
+
+.ground-current-metric-value--good {
+  color: #0f766e;
+}
+
+.ground-current-metric-value--moderate {
+  color: #a16207;
+}
+
+.ground-current-metric-value--warn {
+  color: #c2410c;
+}
+
+.ground-current-metric-value--bad {
+  color: #b91c1c;
 }
 
 .ground-current-metric-max {

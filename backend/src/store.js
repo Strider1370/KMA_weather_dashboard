@@ -3,7 +3,7 @@ const fs = require("fs");
 const path = require("path");
 const config = require("./config");
 
-const TYPES = ["metar", "taf", "warning", "lightning", "sigmet", "airmet", "sigwx_low", "amos", "adsb", "ground_forecast", "ground_overview"];
+const TYPES = ["metar", "taf", "warning", "lightning", "sigmet", "airmet", "sigwx_low", "amos", "adsb", "ground_forecast", "ground_overview", "environment"];
 const FILE_PREFIX = {
   metar: "METAR",
   taf: "TAF",
@@ -14,7 +14,8 @@ const FILE_PREFIX = {
   sigwx_low: "SIGWX_LOW",
   amos: "AMOS",
   ground_forecast: "GROUND_FORECAST",
-  ground_overview: "GROUND_OVERVIEW"
+  ground_overview: "GROUND_OVERVIEW",
+  environment: "ENVIRONMENT"
 };
 
 const cache = {
@@ -29,6 +30,7 @@ const cache = {
   adsb: { hash: null, prev_data: null },
   ground_forecast: { hash: null, prev_data: null },
   ground_overview: { hash: null, prev_data: null },
+  environment: { hash: null, prev_data: null },
 };
 
 function ensureDirectories(basePath) {
@@ -77,7 +79,8 @@ function getMaxFilesForType(type) {
 function rotateFiles(dir, maxCount = config.storage.max_files_per_category) {
   const files = fs
     .readdirSync(dir)
-    .filter((name) => name.endsWith(".json") && name !== "latest.json")
+    .filter((name) => name.endsWith(".json") && name !== "latest.json"
+      && !name.startsWith("fronts_meta_") && !name.startsWith("clouds_meta_"))
     .map((name) => ({
       name,
       fullPath: path.join(dir, name)
@@ -102,7 +105,8 @@ function saveAndUpdateLatest(dir, filename, data, type = null) {
 
 function cleanupSigwxLowTmfcFiles(dir, tmfc, keepFilename) {
   if (!tmfc) return;
-  const names = fs.readdirSync(dir).filter((name) => name.endsWith(".json") && name !== "latest.json" && name !== keepFilename);
+  const names = fs.readdirSync(dir).filter((name) => name.endsWith(".json") && name !== "latest.json" && name !== keepFilename
+    && !name.startsWith("fronts_meta_") && !name.startsWith("clouds_meta_"));
   for (const name of names) {
     const fullPath = path.join(dir, name);
     const payload = readJsonSafe(fullPath);

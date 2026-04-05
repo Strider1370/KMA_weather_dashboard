@@ -25,6 +25,8 @@ module.exports = {
     amos_url: process.env.AMOS_API_URL || "https://apihub.kma.go.kr/api/typ01/url/amos.php",
     sigwx_low_url: process.env.SIGWX_LOW_API_URL || "https://apihub.kma.go.kr/api/typ01/url/amo_sigwx.php",
     radar_url: process.env.RADAR_API_URL || "https://apihub.kma.go.kr/api/typ04/url/rdr_cmp_file.php",
+    airkorea_pm_url: process.env.AIRKOREA_PM_URL || "https://apis.data.go.kr/B552584/ArpltnInforInqireSvc/getMsrstnAcctoRltmMesureDnsty",
+    kma_uv_url: process.env.KMA_UV_URL || "https://apihub.kma.go.kr/api/typ01/url/kma_sfctm_uv.php",
     endpoints: {
       metar: "/AmmIwxxmService/getMetar",
       taf: "/AmmIwxxmService/getTaf",
@@ -33,9 +35,34 @@ module.exports = {
       airmet: "/AmmIwxxmService/getAirmet"
     },
     auth_key: process.env.API_AUTH_KEY || "",
+    airkorea_key: process.env.AIRKOREA_API_KEY || "",
+    kma_uv_key: process.env.KMA_UV_API_KEY || process.env.API_AUTH_KEY || "",
     default_params: { pageNo: 1, numOfRows: 10, dataType: "XML" },
     timeout_ms: 10000,
     max_retries: 3
+  },
+  environment: {
+    timeout_ms: 15000,
+    pm_station_by_airport: {
+      RKSI: "운서",
+      RKSS: "공항대로",
+      RKPC: "연동",
+      RKPK: "삼락동",
+      RKJB: "무안읍",
+      RKNY: "양양읍",
+      RKPU: "송정동",
+      RKJY: "율촌면",
+    },
+    uv_station_by_airport: {
+      RKSI: { stn: 112, name: "인천" },
+      RKSS: { stn: 108, name: "서울" },
+      RKPC: { stn: 185, name: "고산" },
+      RKPK: { stn: 159, name: "부산" },
+      RKJB: { stn: 165, name: "목포" },
+      RKNY: { stn: 105, name: "강릉" },
+      RKPU: { stn: 152, name: "울산" },
+      RKJY: { stn: 165, name: "목포" },
+    },
   },
   ground_forecast: {
     timeout_ms: 15000,
@@ -115,7 +142,8 @@ module.exports = {
     radar_echo_interval: "*/5 * * * *",
     satellite_interval: "*/10 * * * *",
     adsb_interval: "*/5 * * * *",
-    ground_forecast_interval: "30 6,11,18,23 * * *"
+    ground_forecast_interval: "30 6,11,18,23 * * *",
+    environment_interval: "10 * * * *"
   },
   storage: {
     base_path: resolveDataPath(process.env.DATA_PATH),
