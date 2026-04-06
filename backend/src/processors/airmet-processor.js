@@ -1,10 +1,37 @@
+const path = require("path");
 const apiClient = require("../api-client");
 const store = require("../store");
+const config = require("../config");
 const airmetParser = require("../parsers/airmet-parser");
 
+function mergeAdvisories(previous, incoming, nowMs) {
+  const merged = new Map();
+
+  for (const item of (previous || [])) {
+    const endMs = new Date(item.valid_to).getTime();
+    if (!Number.isFinite(endMs) || endMs <= nowMs) continue;
+    merged.set(item.id, item);
+  }
+
+  for (const item of (incoming || [])) {
+    const endMs = new Date(item.valid_to).getTime();
+    if (!Number.isFinite(endMs) || endMs <= nowMs) continue;
+    merged.set(item.id, item);
+  }
+
+  return Array.from(merged.values()).sort((a, b) =>
+    new Date(a.valid_from).getTime() - new Date(b.valid_from).getTime()
+  );
+}
+
 async function process() {
+  const previous = store.loadLatest(path.join(config.storage.base_path, "airmet"));
+  const nowMs = Date.now();
+
   const xml = await apiClient.fetch("airmet");
-  const items = airmetParser.parse(xml);
+  const incoming = airmetParser.parse(xml);
+  const items = mergeAdvisories(previous?.items, incoming, nowMs);
+
   const result = {
     type: "airmet",
     fetched_at: new Date().toISOString(),
@@ -16,7 +43,9 @@ async function process() {
     type: "airmet",
     saved: saveResult.saved,
     filePath: saveResult.filePath || null,
-    total: items.length
+    total: items.length,
+    incoming: incoming.length,
+    expired_removed: (previous?.items?.length || 0) + incoming.length - items.length,
   };
 }
 

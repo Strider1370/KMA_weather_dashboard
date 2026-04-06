@@ -245,24 +245,54 @@ async function fetchNationwideStrikes(tm) {
   );
 }
 
+const INCREMENTAL_LOOKBACK_STEPS = 12; // 12 × 5min = 60분치 window 조회
+
 async function process() {
-  const tm = getCurrentKstTm();
+  const baseTm = shiftKstTm(getAlignedKstTm(), -config.lightning.itv_minutes);
   const previous = store.loadLatest(path.join(config.storage.base_path, "lightning"));
   const nowMs = Date.now();
 
-  try {
-    const recentNationwideStrikes = await fetchNationwideStrikes(tm);
-    const mergedNationwideStrikes = mergeRecentStrikes(previous?.nationwide?.strikes || [], recentNationwideStrikes, nowMs);
-    const result = buildLightningResult(tm, mergedNationwideStrikes);
-    const saveResult = store.save("lightning", result);
-    return buildProcessResponse(result, saveResult);
-  } catch (error) {
-    if (previous) {
-      return buildProcessResponse(previous, { saved: false, reason: "fetch_failed" }, { nationwide: error.message || "Unknown error" });
-    }
-
-    throw error;
+  // 현재 기준 최대 60분 이전까지 window 목록 생성
+  const tms = [];
+  for (let i = INCREMENTAL_LOOKBACK_STEPS - 1; i >= 0; i--) {
+    tms.push(shiftKstTm(baseTm, -i * config.lightning.itv_minutes));
   }
+
+  const merged = new Map();
+  for (const strike of mergeRecentStrikes(previous?.nationwide?.strikes || [], [], nowMs)) {
+    merged.set(buildStrikeKey(strike), strike);
+  }
+
+  const failedTms = [];
+  let fetchedCount = 0;
+
+  for (const tm of tms) {
+    try {
+      const strikes = await fetchNationwideStrikes(tm);
+      for (const strike of strikes) {
+        const timeMs = new Date(strike.time).getTime();
+        if (!Number.isFinite(timeMs) || timeMs < nowMs - LIGHTNING_HISTORY_WINDOW_MINUTES * 60 * 1000) continue;
+        merged.set(buildStrikeKey(strike), strike);
+      }
+      fetchedCount++;
+    } catch {
+      failedTms.push(tm);
+    }
+  }
+
+  if (fetchedCount === 0 && previous) {
+    return buildProcessResponse(previous, { saved: false, reason: "fetch_failed" }, { nationwide: `all ${tms.length} windows failed` });
+  }
+
+  const mergedStrikes = Array.from(merged.values())
+    .sort((a, b) => new Date(b.time).getTime() - new Date(a.time).getTime());
+  const result = buildLightningResult(baseTm, mergedStrikes);
+  const saveResult = store.save("lightning", result);
+  return {
+    ...buildProcessResponse(result, saveResult, failedTms.length ? { nationwide: `${failedTms.length}/${tms.length} windows failed` } : {}),
+    fetchedWindows: fetchedCount,
+    failedWindows: failedTms.length,
+  };
 }
 
 async function processBackfill() {

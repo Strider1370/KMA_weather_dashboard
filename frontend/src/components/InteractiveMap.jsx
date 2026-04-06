@@ -694,6 +694,9 @@ function resolveSigwxSpecialIconAsset(item) {
   const itemName = String(item?.item_name || "").toLowerCase();
 
   if (contour === "freezing_level") {
+    const rawLabel = String(item?.label || item?.text_label || "").toLowerCase();
+    if (rawLabel.includes("sfc")) return "/icon_sigwx/freezing_level_sfc.png";
+    if (rawLabel.includes("050") || rawLabel.includes(":50")) return "/icon_sigwx/freezing_level_050.png";
     return "/icon_sigwx/freezing_level.png";
   }
 
@@ -1015,10 +1018,16 @@ function projectArrowHead(map, positions, sizePx = 16, spreadPx = 8) {
 
 function SigwxArrowAnnotation({ item, hovered, onHoverStart, onHoverEnd }) {
   const map = useMap();
+  const [zoom, setZoom] = useState(() => map.getZoom());
+  useEffect(() => {
+    const handler = () => setZoom(map.getZoom());
+    map.on("zoom", handler);
+    return () => map.off("zoom", handler);
+  }, [map]);
   const positions = item.smoothedLatLngs?.length ? item.smoothedLatLngs : item.lat_lngs;
   const arrowHeadPositions = useMemo(
     () => projectArrowHead(map, positions),
-    [map, positions]
+    [map, positions, zoom]
   );
   const pathOptions = sigwxStyle(item, hovered);
   const arrowLabel = String(item?.label || "").trim();
@@ -2373,6 +2382,17 @@ export default function InteractiveMap({
                 const centerPoint = sigwxCenter(item);
                 if (!centerPoint) return null;
                 const hoverKey = resolveSigwxHoverKey(item);
+                // pressure type10: 저기압 이동속도 배지 (화살표 끝 근처)
+                if (String(item.contour_name || "").toLowerCase() === "pressure" && Number(item.item_type) === 10) {
+                  return (
+                    <Marker
+                      key={`sigwx-icon-${item.mapKey}`}
+                      position={centerPoint}
+                      icon={createSigwxArrowLabelIcon(String(item.label || "").trim())}
+                      interactive={false}
+                    />
+                  );
+                }
                 return (
                   <Marker
                     key={`sigwx-icon-${item.mapKey}`}

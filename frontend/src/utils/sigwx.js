@@ -262,7 +262,7 @@ export function sigwxLabelPosition(item, source) {
 export function sigwxNeedsLabelMarker(item) {
   const contour = String(item?.contour_name || "").toLowerCase();
   const itemName = String(item?.item_name || "").toLowerCase();
-  if (contour === "freezing_level") return true;
+  if (contour === "freezing_level") return Number(item?.item_type) === 10;
   if (contour === "sfc_wind" && itemName === "wind_strong") return true;
   return [7, 8, 10, 11, 12].includes(Number(item?.item_type));
 }
@@ -310,6 +310,16 @@ function pointDistanceKm(a, b) {
   return Math.sqrt((dLat * dLat) + (dLon * dLon));
 }
 
+function minDistanceToPolyline(point, latLngs) {
+  if (!point || !Array.isArray(latLngs) || latLngs.length === 0) return Number.POSITIVE_INFINITY;
+  let min = Number.POSITIVE_INFINITY;
+  for (const vertex of latLngs) {
+    const d = pointDistanceKm(point, vertex);
+    if (d < min) min = d;
+  }
+  return min;
+}
+
 function pointInPolygon(point, polygon) {
   if (!point || !Array.isArray(polygon) || polygon.length < 3) return false;
   const [lat, lon] = point;
@@ -352,11 +362,16 @@ export function buildSigwxGroups(items) {
     ));
     const matchedCandidates = containingCandidates.length ? containingCandidates : candidates;
 
+    const usePolylineDist = String(item.contour_name || "").toLowerCase() === "freezing_level";
+    const candidateDist = (candidate) => usePolylineDist
+      ? minDistanceToPolyline(itemCenter, candidate.lat_lngs)
+      : pointDistanceKm(itemCenter, sigwxCenter(candidate));
+
     let bestGroup = matchedCandidates[0];
-    let bestDistance = pointDistanceKm(itemCenter, sigwxCenter(bestGroup));
+    let bestDistance = candidateDist(matchedCandidates[0]);
     for (let i = 1; i < matchedCandidates.length; i += 1) {
       const candidate = matchedCandidates[i];
-      const distance = pointDistanceKm(itemCenter, sigwxCenter(candidate));
+      const distance = candidateDist(candidate);
       if (distance < bestDistance) {
         bestDistance = distance;
         bestGroup = candidate;

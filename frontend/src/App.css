@@ -2389,18 +2389,16 @@ body {
 }
 
 .leaflet-lightning-glyph--blink {
-  animation: lightning-blink 1s steps(2, end) infinite;
+  will-change: opacity;
+  animation: lightning-blink 1.6s steps(1, end) infinite;
 }
 
 @keyframes lightning-blink {
-  0%, 45% {
+  0%, 49.9% {
     opacity: 1;
   }
-  50%, 95% {
-    opacity: 0.12;
-  }
-  100% {
-    opacity: 1;
+  50%, 99.9% {
+    opacity: 0;
   }
 }
 
