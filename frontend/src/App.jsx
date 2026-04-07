@@ -23,6 +23,11 @@ import {
   DEFAULT_AIRPORT_MINIMA_RULES,
   normalizeAirportMinimaSettings,
 } from "./utils/helpers";
+import {
+  loadAdvisoryFilterSettings,
+  saveAdvisoryFilterSettings,
+  getDefaultAdvisoryFilterSettings,
+} from "./utils/advisory-filter";
 import { getCurrentRouteContext } from "./utils/route-mode";
 import Header from "./components/Header";
 import MetarCard from "./components/MetarCard";
@@ -109,6 +114,7 @@ export default function App() {
       return normalizeAirportMinimaSettings(DEFAULT_AIRPORT_MINIMA_RULES);
     }
   });
+  const [advisoryFilter, setAdvisoryFilter] = useState(() => loadAdvisoryFilterSettings());
 
   useEffect(() => {
     localStorage.setItem("time_zone", timeZone);
@@ -361,6 +367,7 @@ export default function App() {
     } catch {
       setAirportMinimaSettings(normalizeAirportMinimaSettings(DEFAULT_AIRPORT_MINIMA_RULES));
     }
+    setAdvisoryFilter(loadAdvisoryFilterSettings());
   }
 
   const settings = alertDefaults ? resolveSettings(alertDefaults) : null;
@@ -566,6 +573,7 @@ export default function App() {
               trafficAltitudeBands={trafficAltitudeBands}
               dashboardMode={dashboardMode}
               tafData={data.taf}
+              advisoryFilter={advisoryFilter}
             />
           </div>
         </div>
@@ -586,6 +594,8 @@ export default function App() {
           setTrafficAltitudeBands={setTrafficAltitudeBands}
           minimaSettings={airportMinimaSettings}
           setMinimaSettings={setAirportMinimaSettings}
+          advisoryFilter={advisoryFilter}
+          setAdvisoryFilter={setAdvisoryFilter}
         />
       )}
     </>

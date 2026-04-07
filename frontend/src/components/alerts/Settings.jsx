@@ -8,6 +8,13 @@ import {
   DEFAULT_AIRPORT_MINIMA_RULES,
   normalizeAirportMinimaSettings,
 } from "../../utils/helpers";
+import {
+  SIGMET_FILTER_GROUPS,
+  AIRMET_FILTER_GROUPS,
+  SIGWX_FILTER_GROUPS,
+  getDefaultAdvisoryFilterSettings,
+  saveAdvisoryFilterSettings,
+} from "../../utils/advisory-filter";
 
 const TRIGGER_LABELS = {
   warning_issued: "경보 발령",
@@ -30,6 +37,38 @@ const TRAFFIC_ALTITUDE_OPTIONS = [
 
 const MINIMA_AIRPORT_ORDER = ["RKSI", "RKSS", "RKPC", "RKPK", "RKJY", "RKJB", "RKPU", "RKNY"];
 
+const SIGMET_FILTER_LABELS = {
+  thunderstorm:     "뇌우",
+  turbulence:       "난류",
+  icing:            "착빙",
+  hail:             "우박",
+  tropical_cyclone: "열대저기압",
+  volcanic_ash:     "화산재",
+  duststorm:        "황사/모래폭풍",
+};
+
+const AIRMET_FILTER_LABELS = {
+  turbulence:           "난류",
+  icing:                "착빙",
+  sfc_wind:             "지상강풍",
+  sfc_vis:              "지상시정",
+  llws:                 "저고도윈드시어",
+  mountain_obscuration: "산악차폐",
+};
+
+const SIGWX_FILTER_LABELS = {
+  cloud:                "구름/CB",
+  turbulence:           "난류",
+  icing_area:           "착빙구역",
+  freezing_level:       "빙결고도",
+  sfc_wind:             "지상바람",
+  sfc_vis:              "지상시정",
+  mountain_obscuration: "산악차폐",
+  pressure:             "저/고기압",
+  front_line:           "전선",
+  jet_stream:           "제트기류",
+};
+
 export default function Settings({
   defaults,
   onClose,
@@ -44,6 +83,8 @@ export default function Settings({
   setTrafficAltitudeBands,
   minimaSettings,
   setMinimaSettings,
+  advisoryFilter,
+  setAdvisoryFilter,
 }) {
   const current = resolveSettings(defaults);
 
@@ -65,6 +106,9 @@ export default function Settings({
   const [localTrafficAltitudeBands, setLocalTrafficAltitudeBands] = useState(trafficAltitudeBands || []);
   const [localMinimaSettings, setLocalMinimaSettings] = useState(
     normalizeAirportMinimaSettings(minimaSettings || DEFAULT_AIRPORT_MINIMA_RULES)
+  );
+  const [localAdvisoryFilter, setLocalAdvisoryFilter] = useState(
+    advisoryFilter || getDefaultAdvisoryFilterSettings()
   );
   const [activeTab, setActiveTab] = useState("general");
 
@@ -101,6 +145,20 @@ export default function Settings({
     ));
   }
 
+  function toggleAdvisoryChip(section, key) {
+    setLocalAdvisoryFilter((prev) => ({
+      ...prev,
+      [section]: { ...prev[section], [key]: !prev[section][key] },
+    }));
+  }
+
+  function setAllAdvisorySection(section, value) {
+    setLocalAdvisoryFilter((prev) => ({
+      ...prev,
+      [section]: Object.fromEntries(Object.keys(prev[section]).map((k) => [k, value])),
+    }));
+  }
+
   function updateMinimaValue(icao, key, value) {
     setLocalMinimaSettings((prev) => ({
       ...prev,
@@ -111,7 +169,7 @@ export default function Settings({
     }));
   }
 
-  function handleSave() {
+  function applySettings() {
     const overrides = {
       global: {
         alerts_enabled: globalEnabled,
@@ -133,14 +191,24 @@ export default function Settings({
     localStorage.setItem("traffic_callsign_filter", localTrafficCallsignFilter);
     localStorage.setItem("traffic_altitude_bands", JSON.stringify(localTrafficAltitudeBands));
     localStorage.setItem("airport_minima_settings", JSON.stringify(localMinimaSettings));
+    saveAdvisoryFilterSettings(localAdvisoryFilter);
 
     setTimeZone?.(localTimeZone);
     setMapTheme?.(localMapTheme);
     setTrafficCallsignFilter?.(localTrafficCallsignFilter);
     setTrafficAltitudeBands?.(localTrafficAltitudeBands);
     setMinimaSettings?.(normalizeAirportMinimaSettings(localMinimaSettings));
+    setAdvisoryFilter?.(localAdvisoryFilter);
 
     onSettingsChange?.(overrides);
+  }
+
+  function handleApply() {
+    applySettings();
+  }
+
+  function handleSave() {
+    applySettings();
     onClose();
   }
 
@@ -151,12 +219,14 @@ export default function Settings({
     localStorage.removeItem("traffic_callsign_filter");
     localStorage.removeItem("traffic_altitude_bands");
     localStorage.removeItem("airport_minima_settings");
+    localStorage.removeItem("advisory_filter_settings");
 
     setTimeZone?.("KST");
     setMapTheme?.("light");
     setTrafficCallsignFilter?.("");
     setTrafficAltitudeBands?.([]);
     setMinimaSettings?.(normalizeAirportMinimaSettings(DEFAULT_AIRPORT_MINIMA_RULES));
+    setAdvisoryFilter?.(getDefaultAdvisoryFilterSettings());
 
     onSettingsChange?.(null);
     onClose();
@@ -194,7 +264,13 @@ export default function Settings({
               className={`alert-settings-tab-btn${activeTab === "minima" ? " active" : ""}`}
               onClick={() => setActiveTab("minima")}
             >
-              MINIMA
+              LIFR
+            </button>
+            <button
+              className={`alert-settings-tab-btn${activeTab === "advisory" ? " active" : ""}`}
+              onClick={() => setActiveTab("advisory")}
+            >
+              공역예보
             </button>
           </div>
 
@@ -409,11 +485,52 @@ export default function Settings({
                 </div>
               </fieldset>
             )}
+            {activeTab === "advisory" && (
+              <div className="advisory-filter-tab">
+                {[
+                  { section: "sigmet", label: "SIGMET", groups: SIGMET_FILTER_GROUPS, labelMap: SIGMET_FILTER_LABELS },
+                  { section: "airmet", label: "AIRMET", groups: AIRMET_FILTER_GROUPS, labelMap: AIRMET_FILTER_LABELS },
+                  { section: "sigwx",  label: "SIGWX",  groups: SIGWX_FILTER_GROUPS,  labelMap: SIGWX_FILTER_LABELS  },
+                ].map(({ section, label, groups, labelMap }) => {
+                  const allOn = Object.keys(groups).every((k) => localAdvisoryFilter[section][k] !== false);
+                  return (
+                    <fieldset key={section} className="alert-settings-section advisory-filter-section">
+                      <legend className="advisory-filter-legend">
+                        <span>{label}</span>
+                        <button
+                          type="button"
+                          className="advisory-filter-toggle-all"
+                          onClick={() => setAllAdvisorySection(section, !allOn)}
+                        >
+                          {allOn ? "전체 해제" : "전체 선택"}
+                        </button>
+                      </legend>
+                      <div className="advisory-filter-chips">
+                        {Object.keys(groups).map((key) => {
+                          const on = localAdvisoryFilter[section][key] !== false;
+                          return (
+                            <button
+                              key={key}
+                              type="button"
+                              className={`advisory-filter-chip${on ? " active" : ""}`}
+                              onClick={() => toggleAdvisoryChip(section, key)}
+                            >
+                              {labelMap[key] || key}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </fieldset>
+                  );
+                })}
+              </div>
+            )}
           </div>
         </div>
 
         <div className="alert-settings-footer">
           <button className="btn-reset" onClick={handleReset}>초기화</button>
+          <button className="btn-apply" onClick={handleApply}>적용</button>
           <button className="btn-save" onClick={handleSave}>저장</button>
         </div>
       </div>

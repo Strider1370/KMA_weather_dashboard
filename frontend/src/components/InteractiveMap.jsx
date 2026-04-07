@@ -28,6 +28,7 @@ import {
   smoothSigwxLatLngs,
 } from "../utils/sigwx";
 import { fetchSigwxLowClouds, fetchSigwxLowFronts } from "../utils/api";
+import { getSigmetFilterKey, getAirmetFilterKey, getSigwxFilterKey } from "../utils/advisory-filter";
 import TafForecastView from "./TafForecastView";
 import "leaflet/dist/leaflet.css";
 
@@ -604,22 +605,16 @@ function formatIconAltitudeText(value) {
   return String(value || "").replace(/\bFL/g, "").replace(/\s+/g, " ").trim();
 }
 
-function getMarkerZoomScale(zoom) {
-  if (!Number.isFinite(zoom)) return 1;
-  if (zoom <= 5) return 0.58;
-  if (zoom <= 6) return 0.7;
-  if (zoom <= 7) return 0.84;
+function getMarkerZoomScale(_zoom) {
   return 1;
 }
 
-function shouldShowMarkerTextDetails(zoom) {
-  if (!Number.isFinite(zoom)) return true;
-  return zoom > 6;
+function shouldShowMarkerTextDetails(_zoom) {
+  return true;
 }
 
-function shouldShowMarkerSecondaryDetails(zoom) {
-  if (!Number.isFinite(zoom)) return true;
-  return zoom > 5;
+function shouldShowMarkerSecondaryDetails(_zoom) {
+  return true;
 }
 
 function createAdvisoryIcon(item, kind, zoom = null) {
@@ -1136,6 +1131,7 @@ export default function InteractiveMap({
   trafficAltitudeBands = [],
   dashboardMode = "ops",
   tafData = null,
+  advisoryFilter = null,
 }) {
   const isGround = dashboardMode === "ground";
   const [mapScope, setMapScope] = useState("nationwide");
@@ -1448,8 +1444,15 @@ export default function InteractiveMap({
   }, [openAdvisoryPanel, sigwxPanelGroups, sigmetItems, airmetItems]);
   const visibleSigwxLowItems = useMemo(() => {
     const hidden = new Set(hiddenAdvisoryKeys.sigwxLow);
-    return sigwxLowItems.filter((item) => !hidden.has(sigwxLowParentMap.get(item.mapKey) || item.mapKey));
-  }, [hiddenAdvisoryKeys.sigwxLow, sigwxLowItems, sigwxLowParentMap]);
+    return sigwxLowItems.filter((item) => {
+      if (hidden.has(sigwxLowParentMap.get(item.mapKey) || item.mapKey)) return false;
+      if (advisoryFilter) {
+        const key = getSigwxFilterKey(item.contour_name);
+        if (key && advisoryFilter.sigwx[key] === false) return false;
+      }
+      return true;
+    });
+  }, [hiddenAdvisoryKeys.sigwxLow, sigwxLowItems, sigwxLowParentMap, advisoryFilter]);
   const hiddenSigwxLowKeys = useMemo(() => new Set(hiddenAdvisoryKeys.sigwxLow), [hiddenAdvisoryKeys.sigwxLow]);
   const visibleSigwxPanelGroups = useMemo(() => (
     sigwxPanelGroups.filter((group) => !hiddenSigwxLowKeys.has(group.mapKey))
@@ -1462,12 +1465,26 @@ export default function InteractiveMap({
   ), [visibleSigwxPanelGroups]);
   const visibleSigmetItems = useMemo(() => {
     const hidden = new Set(hiddenAdvisoryKeys.sigmet);
-    return sigmetItems.filter((item) => !hidden.has(item.mapKey));
-  }, [hiddenAdvisoryKeys.sigmet, sigmetItems]);
+    return sigmetItems.filter((item) => {
+      if (hidden.has(item.mapKey)) return false;
+      if (advisoryFilter) {
+        const key = getSigmetFilterKey(item.phenomenon_code);
+        if (key && advisoryFilter.sigmet[key] === false) return false;
+      }
+      return true;
+    });
+  }, [hiddenAdvisoryKeys.sigmet, sigmetItems, advisoryFilter]);
   const visibleAirmetItems = useMemo(() => {
     const hidden = new Set(hiddenAdvisoryKeys.airmet);
-    return airmetItems.filter((item) => !hidden.has(item.mapKey));
-  }, [hiddenAdvisoryKeys.airmet, airmetItems]);
+    return airmetItems.filter((item) => {
+      if (hidden.has(item.mapKey)) return false;
+      if (advisoryFilter) {
+        const key = getAirmetFilterKey(item.phenomenon_code);
+        if (key && advisoryFilter.airmet[key] === false) return false;
+      }
+      return true;
+    });
+  }, [hiddenAdvisoryKeys.airmet, airmetItems, advisoryFilter]);
 
   useEffect(() => {
     if (openAdvisoryPanel === "sigwxLow" && !showSigwxLow) setOpenAdvisoryPanel(null);
