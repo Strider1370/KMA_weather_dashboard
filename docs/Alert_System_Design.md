@@ -3,7 +3,7 @@
 ## 1. 개요
 
 ### 1.1 목적
-현재 선택 공항의 METAR/TAF/WARNING/LIGHTNING 데이터를 평가해 이벤트성 알림을 생성하고, 팝업/사운드/마퀴 UI로 전달한다.
+현재 선택 공항의 METAR/TAF/WARNING/LIGHTNING 데이터를 평가해 이벤트성 알림을 생성하고, 팝업/사운드/하단 마퀴 UI로 전달한다.
 
 ### 1.2 실제 구현 기준 파일
 - `frontend/src/utils/alerts/alert-triggers.js`: 트리거 정의(T-01 ~ T-08)
@@ -113,6 +113,12 @@
   - 최소 severity 필터(`min_severity`)
   - 속도(`speed`) + 자동 숨김(`show_duration_seconds`)
 
+### 5.3 설정창 미리보기
+- `Settings.jsx`의 `알림 방식` 섹션에서 `팝업 사용`, `소리 사용`, `하단 알림 바 표시` 옆 `예시` 버튼을 제공한다.
+- 예시 버튼은 `App.jsx`의 `handlePreviewAlert()`를 통해 실제 `AlertPopup` / `AlertSound` / `AlertMarquee` 컴포넌트로 짧은 preview alert를 주입한다.
+- preview alert는 `preview-*` ID를 사용하며, 실제 active alert와 분리된 `previewAlerts` 상태로 관리되고 일정 시간 후 자동 제거된다.
+- 소리/팝업/마퀴 예시는 각각 독립 채널로 주입되어, 특정 채널 예시를 눌렀을 때 다른 채널이 같이 뜨지 않도록 분리되어 있다.
+
 주의:
 - dispatcher 레이어는 팝업/사운드/마퀴 `enabled`를 직접 차단하지 않는다.
 - 실제 표시 여부는 각 컴포넌트가 `settings`를 보고 결정한다.
@@ -152,6 +158,17 @@
 ### 6.3 조용 시간
 - `isQuietHours(quiet_hours)`가 현재 시각을 `HH:mm` 문자열로 비교
 - 자정 넘어가는 구간(`22:00~06:00`)도 지원
+
+### 6.4 설정창 정보 구조(UI)
+- 탭 구조는 `일반 / 알림 / 항적 / LIFR / 공역예보`를 유지한다.
+- `알림` 탭은 기술 카테고리(`METAR/TAF/...`) 대신 사용자 중심 섹션으로 재구성되어 있다.
+  - `알림 방식`: 알림 사용, 팝업 사용, 소리 사용, 하단 알림 바 표시, 야간 시작/종료, 볼륨
+  - `현재 위험`: 현재 관측/주변 상황 기반 알림 (`low_visibility`, `low_ceiling`, `high_wind`, `weather_phenomenon`, `lightning_detected`)
+  - `예고 / 공식 알림`: 예보/경보 기반 알림 (`taf_adverse_weather`, `warning_issued`, `warning_cleared`)
+  - `반복 알림 방식`: 재알림 간격(`cooldown_seconds`)과 팝업 체류 시간(`auto_dismiss_seconds`)
+- 각 알림의 세부 임계값 입력은 별도 `고급 설정` 섹션이 아니라 해당 알림 토글 바로 아래에 인라인으로 노출된다.
+- 섹션 설명은 항상 노출하지 않고, 제목 옆 `i` 버튼을 눌렀을 때 펼쳐진다.
+- 설정 모달은 탭 전환 시 창 높이가 흔들리지 않도록 고정 높이(`min(85vh, 720px)`)를 사용하고, 본문/탭 목록만 내부 스크롤한다.
 
 ---
 
