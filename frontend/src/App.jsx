@@ -85,6 +85,7 @@ export default function App() {
   const [error, setError] = useState(null);
   const [alertDefaults, setAlertDefaults] = useState(null);
   const [activeAlerts, setActiveAlerts] = useState([]);
+  const [previewAlerts, setPreviewAlerts] = useState([]);
   const [showSettings, setShowSettings] = useState(false);
 
   // UI Version states (kept for dead-code paths in MetarCard/TafTimeline)
@@ -355,6 +356,56 @@ export default function App() {
 
   function handleDismissAlert(id) {
     setActiveAlerts((prev) => prev.filter((a) => a.id !== id));
+    setPreviewAlerts((prev) => prev.filter((a) => a.id !== id));
+  }
+
+  function handlePreviewAlert(channel, previewDispatchers = null) {
+    if (!settings) return;
+
+    const dispatchers = previewDispatchers || settings.dispatchers;
+
+    const previewChannels = {
+      popup: channel === "popup",
+      sound: channel === "sound",
+      marquee: channel === "marquee",
+    };
+
+    const previewAlert = {
+      id: `preview-${channel}-${Date.now()}`,
+      severity: channel === "sound" ? "critical" : "warning",
+      title: channel === "popup"
+        ? "팝업 알림 예시"
+        : channel === "sound"
+          ? "소리 알림 예시"
+          : "하단 알림 바 예시",
+      message: channel === "popup"
+        ? "실제 알림이 뜨면 이런 팝업이 표시됩니다."
+        : channel === "sound"
+          ? "현재 설정된 사운드 크기와 패턴으로 재생됩니다."
+          : "하단 알림 바에는 이런 식으로 메시지가 표시됩니다.",
+      icao: selectedAirport || "RKSI",
+      triggerId: `preview_${channel}`,
+      timestamp: new Date().toISOString(),
+      previewChannels,
+    };
+
+    setPreviewAlerts((prev) => [previewAlert, ...prev].slice(0, 10));
+
+    const popupLifetimeMs = previewChannels.popup
+      ? Math.max((dispatchers.popup?.auto_dismiss_seconds ?? 10) * 1000, 3000)
+      : 0;
+    const marqueeLifetimeMs = previewChannels.marquee
+      ? Math.max((dispatchers.marquee?.show_duration_seconds ?? 30) * 1000, 5000)
+      : 0;
+    const soundRepeat = dispatchers.sound?.repeat_count?.critical ?? 3;
+    const soundLifetimeMs = previewChannels.sound
+      ? Math.max(soundRepeat * 500 + 1000, 2500)
+      : 0;
+    const lifetimeMs = Math.max(popupLifetimeMs, marqueeLifetimeMs, soundLifetimeMs, 4000);
+
+    window.setTimeout(() => {
+      setPreviewAlerts((prev) => prev.filter((alert) => alert.id !== previewAlert.id));
+    }, lifetimeMs);
   }
 
   function handleSettingsChange() {
@@ -371,6 +422,9 @@ export default function App() {
   }
 
   const settings = alertDefaults ? resolveSettings(alertDefaults) : null;
+  const popupAlerts = [...previewAlerts.filter((alert) => alert.previewChannels?.popup), ...activeAlerts];
+  const soundAlerts = [...previewAlerts.filter((alert) => alert.previewChannels?.sound), ...activeAlerts];
+  const marqueeAlerts = [...previewAlerts.filter((alert) => alert.previewChannels?.marquee), ...activeAlerts];
 
   const airportSet = new Set([
     ...Object.keys(data.metar?.airports || {}),
@@ -425,16 +479,16 @@ export default function App() {
       {settings && (
         <>
           <AlertPopup
-            alerts={activeAlerts}
+            alerts={popupAlerts}
             onDismiss={handleDismissAlert}
             settings={settings.dispatchers.popup}
           />
           <AlertSound
-            alerts={activeAlerts}
+            alerts={soundAlerts}
             settings={settings.dispatchers.sound}
           />
           <AlertMarquee
-            alerts={activeAlerts}
+            alerts={marqueeAlerts}
             settings={settings.dispatchers.marquee}
           />
         </>
@@ -594,10 +648,11 @@ export default function App() {
           setTrafficAltitudeBands={setTrafficAltitudeBands}
           minimaSettings={airportMinimaSettings}
           setMinimaSettings={setAirportMinimaSettings}
-          advisoryFilter={advisoryFilter}
-          setAdvisoryFilter={setAdvisoryFilter}
-        />
-      )}
+            advisoryFilter={advisoryFilter}
+            setAdvisoryFilter={setAdvisoryFilter}
+            onPreviewAlert={handlePreviewAlert}
+          />
+        )}
     </>
   );
 }

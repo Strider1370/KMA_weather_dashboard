@@ -17,14 +17,14 @@ import {
 } from "../../utils/advisory-filter";
 
 const TRIGGER_LABELS = {
-  warning_issued: "경보 발령",
-  warning_cleared: "경보 해제",
-  low_visibility: "저시정",
-  high_wind: "강풍",
-  weather_phenomenon: "특이기상 (TS/SN/FG)",
-  low_ceiling: "저운고",
-  taf_adverse_weather: "TAF 악기상",
-  lightning_detected: "낙뢰 탐지",
+  warning_issued: "공항경보가 발령되면 알림",
+  warning_cleared: "공항경보 해제는 조용히 표시",
+  low_visibility: "시정이 나빠지면 알림",
+  high_wind: "바람이 강해지면 알림",
+  weather_phenomenon: "특이기상(TS/SN/FG)이 나타나면 알림",
+  low_ceiling: "구름고도가 낮아지면 알림",
+  taf_adverse_weather: "예보에 악기상이 들어오면 알림",
+  lightning_detected: "공항 주변 낙뢰가 발생하면 알림",
 };
 
 const TRAFFIC_ALTITUDE_OPTIONS = [
@@ -69,10 +69,36 @@ const SIGWX_FILTER_LABELS = {
   jet_stream:           "제트기류",
 };
 
+const ALERT_USER_SECTIONS = [
+  {
+    id: "method",
+    title: "알림 방식",
+    description: "알림이 어떤 방식으로 표시될지 정합니다.",
+  },
+  {
+    id: "current-risk",
+    title: "현재 위험",
+    description: "현재 관측이나 주변 상황이 위험해질 때 알립니다.",
+    triggerIds: ["low_visibility", "low_ceiling", "high_wind", "weather_phenomenon", "lightning_detected"],
+  },
+  {
+    id: "forecast-official",
+    title: "예고 / 공식 알림",
+    description: "앞으로 대비해야 할 상황이나 공식 경보를 알려줍니다.",
+    triggerIds: ["taf_adverse_weather", "warning_issued", "warning_cleared"],
+  },
+  {
+    id: "repeat",
+    title: "반복 알림 방식",
+    description: "한 번 알린 뒤 언제 다시 알릴지 정합니다.",
+  },
+];
+
 export default function Settings({
   defaults,
   onClose,
   onSettingsChange,
+  onPreviewAlert,
   timeZone,
   setTimeZone,
   mapTheme,
@@ -111,6 +137,7 @@ export default function Settings({
     advisoryFilter || getDefaultAdvisoryFilterSettings()
   );
   const [activeTab, setActiveTab] = useState("general");
+  const [openAlertHelp, setOpenAlertHelp] = useState({});
 
   const [triggers, setTriggers] = useState(() => {
     const nextTriggers = {};
@@ -232,6 +259,149 @@ export default function Settings({
     onClose();
   }
 
+  function toggleAlertHelp(sectionId) {
+    setOpenAlertHelp((prev) => ({
+      ...prev,
+      [sectionId]: !prev[sectionId],
+    }));
+  }
+
+  function renderAlertSectionHeader(sectionId, title, description) {
+    const isOpen = Boolean(openAlertHelp[sectionId]);
+
+    return (
+      <>
+        <legend className="alert-settings-section-head">
+          <span>{title}</span>
+          <button
+            type="button"
+            className={`alert-settings-info-btn${isOpen ? " is-open" : ""}`}
+            onClick={() => toggleAlertHelp(sectionId)}
+            aria-label={`${title} 설명 보기`}
+            aria-expanded={isOpen}
+          >
+            i
+          </button>
+        </legend>
+        {isOpen && <p className="alert-settings-help">{description}</p>}
+      </>
+    );
+  }
+
+  function renderTriggerFields(id, cfg) {
+    if (cfg.enabled && id === "low_visibility") {
+      return (
+        <label className="alert-settings-row alert-settings-sub">
+          <span>시정 임계치(m)</span>
+          <input
+            type="number"
+            min={100}
+            max={10000}
+            step={100}
+            value={cfg.params.threshold}
+            onChange={(e) => updateTriggerParam(id, "threshold", Number(e.target.value))}
+          />
+        </label>
+      );
+    }
+
+    if (cfg.enabled && id === "high_wind") {
+      return (
+        <>
+          <label className="alert-settings-row alert-settings-sub">
+            <span>풍속 임계치(kt)</span>
+            <input
+              type="number"
+              min={10}
+              max={100}
+              value={cfg.params.speed_threshold}
+              onChange={(e) => updateTriggerParam(id, "speed_threshold", Number(e.target.value))}
+            />
+          </label>
+          <label className="alert-settings-row alert-settings-sub">
+            <span>돌풍 임계치(kt)</span>
+            <input
+              type="number"
+              min={10}
+              max={100}
+              value={cfg.params.gust_threshold}
+              onChange={(e) => updateTriggerParam(id, "gust_threshold", Number(e.target.value))}
+            />
+          </label>
+        </>
+      );
+    }
+
+    if (cfg.enabled && id === "low_ceiling") {
+      return (
+        <label className="alert-settings-row alert-settings-sub">
+          <span>운고 임계치(ft)</span>
+          <input
+            type="number"
+            min={100}
+            max={5000}
+            step={100}
+            value={cfg.params.threshold}
+            onChange={(e) => updateTriggerParam(id, "threshold", Number(e.target.value))}
+          />
+        </label>
+      );
+    }
+
+    if (cfg.enabled && id === "taf_adverse_weather") {
+      return (
+        <label className="alert-settings-row alert-settings-sub">
+          <span>TAF 시정 임계치(m)</span>
+          <input
+            type="number"
+            min={500}
+            max={10000}
+            step={500}
+            value={cfg.params.vis_threshold}
+            onChange={(e) => updateTriggerParam(id, "vis_threshold", Number(e.target.value))}
+          />
+        </label>
+      );
+    }
+
+    return null;
+  }
+
+  function renderTriggerToggle(id) {
+    const cfg = triggers[id];
+    if (!cfg) return null;
+
+    return (
+      <div key={id} className="alert-settings-trigger">
+        <label className="alert-settings-row">
+          <span>{TRIGGER_LABELS[id] || id}</span>
+          <input type="checkbox" checked={cfg.enabled} onChange={() => toggleTrigger(id)} />
+        </label>
+        {renderTriggerFields(id, cfg)}
+      </div>
+    );
+  }
+
+  function getPreviewDispatchers() {
+    return {
+      popup: {
+        enabled: popupEnabled,
+        auto_dismiss_seconds: Number(autoDismiss),
+      },
+      sound: {
+        enabled: soundEnabled,
+        volume: Number(volume),
+        repeat_count: current.dispatchers.sound.repeat_count,
+      },
+      marquee: {
+        enabled: marqueeEnabled,
+        min_severity: current.dispatchers.marquee.min_severity,
+        speed: current.dispatchers.marquee.speed,
+        show_duration_seconds: current.dispatchers.marquee.show_duration_seconds,
+      },
+    };
+  }
+
   return (
     <div className="alert-settings-overlay" onClick={onClose}>
       <div className="alert-settings-modal" onClick={(e) => e.stopPropagation()}>
@@ -298,14 +468,49 @@ export default function Settings({
             {activeTab === "alert" && (
               <>
                 <fieldset className="alert-settings-section">
-                  <legend>전역 설정</legend>
+                  {renderAlertSectionHeader("method", ALERT_USER_SECTIONS[0].title, ALERT_USER_SECTIONS[0].description)}
                   <label className="alert-settings-row">
                     <span>알림 사용</span>
                     <input type="checkbox" checked={globalEnabled} onChange={(e) => setGlobalEnabled(e.target.checked)} />
                   </label>
                   <label className="alert-settings-row">
-                    <span>쿨다운(초)</span>
-                    <input type="number" min={0} max={3600} value={cooldown} onChange={(e) => setCooldown(e.target.value)} />
+                    <span>팝업 사용</span>
+                    <span className="alert-settings-inline-actions">
+                      <button
+                        type="button"
+                        className="alert-settings-preview-btn"
+                        onClick={() => onPreviewAlert?.("popup", getPreviewDispatchers())}
+                      >
+                        예시
+                      </button>
+                      <input type="checkbox" checked={popupEnabled} onChange={(e) => setPopupEnabled(e.target.checked)} />
+                    </span>
+                  </label>
+                  <label className="alert-settings-row">
+                    <span>소리 사용</span>
+                    <span className="alert-settings-inline-actions">
+                      <button
+                        type="button"
+                        className="alert-settings-preview-btn"
+                        onClick={() => onPreviewAlert?.("sound", getPreviewDispatchers())}
+                      >
+                        예시
+                      </button>
+                      <input type="checkbox" checked={soundEnabled} onChange={(e) => setSoundEnabled(e.target.checked)} />
+                    </span>
+                  </label>
+                  <label className="alert-settings-row">
+                    <span>하단 알림 바 표시</span>
+                    <span className="alert-settings-inline-actions">
+                      <button
+                        type="button"
+                        className="alert-settings-preview-btn"
+                        onClick={() => onPreviewAlert?.("marquee", getPreviewDispatchers())}
+                      >
+                        예시
+                      </button>
+                      <input type="checkbox" checked={marqueeEnabled} onChange={(e) => setMarqueeEnabled(e.target.checked)} />
+                    </span>
                   </label>
                   <label className="alert-settings-row">
                     <span>야간 시작</span>
@@ -315,105 +520,32 @@ export default function Settings({
                     <span>야간 종료</span>
                     <input type="time" value={quietEnd} onChange={(e) => setQuietEnd(e.target.value)} />
                   </label>
-                </fieldset>
-
-                <fieldset className="alert-settings-section">
-                  <legend>전달 채널</legend>
-                  <label className="alert-settings-row">
-                    <span>팝업</span>
-                    <input type="checkbox" checked={popupEnabled} onChange={(e) => setPopupEnabled(e.target.checked)} />
-                  </label>
-                  <label className="alert-settings-row">
-                    <span>자동 닫힘(초)</span>
-                    <input type="number" min={0} max={60} value={autoDismiss} onChange={(e) => setAutoDismiss(e.target.value)} />
-                  </label>
-                  <label className="alert-settings-row">
-                    <span>사운드</span>
-                    <input type="checkbox" checked={soundEnabled} onChange={(e) => setSoundEnabled(e.target.checked)} />
-                  </label>
                   <label className="alert-settings-row">
                     <span>볼륨 ({volume}%)</span>
                     <input type="range" min={0} max={100} value={volume} onChange={(e) => setVolume(Number(e.target.value))} />
                   </label>
-                  <label className="alert-settings-row">
-                    <span>마키</span>
-                    <input type="checkbox" checked={marqueeEnabled} onChange={(e) => setMarqueeEnabled(e.target.checked)} />
-                  </label>
                 </fieldset>
 
                 <fieldset className="alert-settings-section">
-                  <legend>트리거 설정</legend>
-                  {Object.entries(triggers).map(([id, cfg]) => (
-                    <div key={id} className="alert-settings-trigger">
-                      <label className="alert-settings-row">
-                        <span>{TRIGGER_LABELS[id] || id}</span>
-                        <input type="checkbox" checked={cfg.enabled} onChange={() => toggleTrigger(id)} />
-                      </label>
-                      {cfg.enabled && id === "low_visibility" && (
-                        <label className="alert-settings-row alert-settings-sub">
-                          <span>시정 임계치(m)</span>
-                          <input
-                            type="number"
-                            min={100}
-                            max={10000}
-                            step={100}
-                            value={cfg.params.threshold}
-                            onChange={(e) => updateTriggerParam(id, "threshold", Number(e.target.value))}
-                          />
-                        </label>
-                      )}
-                      {cfg.enabled && id === "high_wind" && (
-                        <>
-                          <label className="alert-settings-row alert-settings-sub">
-                            <span>풍속 임계치(kt)</span>
-                            <input
-                              type="number"
-                              min={10}
-                              max={100}
-                              value={cfg.params.speed_threshold}
-                              onChange={(e) => updateTriggerParam(id, "speed_threshold", Number(e.target.value))}
-                            />
-                          </label>
-                          <label className="alert-settings-row alert-settings-sub">
-                            <span>돌풍 임계치(kt)</span>
-                            <input
-                              type="number"
-                              min={10}
-                              max={100}
-                              value={cfg.params.gust_threshold}
-                              onChange={(e) => updateTriggerParam(id, "gust_threshold", Number(e.target.value))}
-                            />
-                          </label>
-                        </>
-                      )}
-                      {cfg.enabled && id === "low_ceiling" && (
-                        <label className="alert-settings-row alert-settings-sub">
-                          <span>운고 임계치(ft)</span>
-                          <input
-                            type="number"
-                            min={100}
-                            max={5000}
-                            step={100}
-                            value={cfg.params.threshold}
-                            onChange={(e) => updateTriggerParam(id, "threshold", Number(e.target.value))}
-                          />
-                        </label>
-                      )}
-                      {cfg.enabled && id === "taf_adverse_weather" && (
-                        <label className="alert-settings-row alert-settings-sub">
-                          <span>TAF 시정 임계치(m)</span>
-                          <input
-                            type="number"
-                            min={500}
-                            max={10000}
-                            step={500}
-                            value={cfg.params.vis_threshold}
-                            onChange={(e) => updateTriggerParam(id, "vis_threshold", Number(e.target.value))}
-                          />
-                        </label>
-                      )}
-                    </div>
-                  ))}
+                  {renderAlertSectionHeader("current-risk", ALERT_USER_SECTIONS[1].title, ALERT_USER_SECTIONS[1].description)}
+                  {ALERT_USER_SECTIONS[1].triggerIds.map((id) => renderTriggerToggle(id))}
+                </fieldset>
+
+                <fieldset className="alert-settings-section">
+                  {renderAlertSectionHeader("forecast-official", ALERT_USER_SECTIONS[2].title, ALERT_USER_SECTIONS[2].description)}
+                  {ALERT_USER_SECTIONS[2].triggerIds.map((id) => renderTriggerToggle(id))}
+                </fieldset>
+
+                <fieldset className="alert-settings-section">
+                  {renderAlertSectionHeader("repeat", ALERT_USER_SECTIONS[3].title, ALERT_USER_SECTIONS[3].description)}
+                  <label className="alert-settings-row">
+                    <span>같은 상태가 이어질 때 다시 알리는 간격(초)</span>
+                    <input type="number" min={0} max={3600} value={cooldown} onChange={(e) => setCooldown(e.target.value)} />
+                  </label>
+                  <label className="alert-settings-row">
+                    <span>팝업이 화면에 머무는 시간(초)</span>
+                    <input type="number" min={0} max={60} value={autoDismiss} onChange={(e) => setAutoDismiss(e.target.value)} />
+                  </label>
                 </fieldset>
               </>
             )}

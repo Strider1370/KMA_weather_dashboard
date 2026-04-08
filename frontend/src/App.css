@@ -3133,6 +3133,7 @@ body {
   box-shadow: 0 16px 48px rgba(0,0,0,0.2);
   width: 90%;
   max-width: 640px;
+  height: min(85vh, 720px);
   max-height: 85vh;
   display: flex;
   flex-direction: column;
@@ -3160,6 +3161,7 @@ body {
   padding: 16px 10px;
   border-right: 1px solid var(--line);
   min-width: 80px;
+  overflow-y: auto;
 }
 .alert-settings-tab-btn {
   background: none;
@@ -3185,6 +3187,7 @@ body {
   padding: 16px 20px;
   overflow-y: auto;
   flex: 1;
+  min-height: 0;
 }
 .alert-settings-section {
   border: 1px solid var(--line);
@@ -4440,4 +4443,66 @@ tr.row-danger td { background: #ffe9e7; }
 @keyframes forecastFadeOut {
   from { opacity: 1; }
   to   { opacity: 0; }
+}
+
+.alert-settings-section-head {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.alert-settings-info-btn {
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--panel) 88%, #ffffff);
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 800;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+.alert-settings-info-btn:hover,
+.alert-settings-info-btn.is-open {
+  background: color-mix(in srgb, var(--accent) 14%, #ffffff);
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--line));
+  color: var(--accent);
+}
+
+.alert-settings-help {
+  margin: 8px 0 0;
+  color: var(--muted);
+  font-size: 0.9rem;
+  line-height: 1.45;
+}
+
+.alert-settings-inline-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.alert-settings-preview-btn {
+  padding: 6px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--panel) 90%, #ffffff);
+  color: var(--ink);
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, transform 0.1s ease;
+}
+
+.alert-settings-preview-btn:hover {
+  background: color-mix(in srgb, var(--accent) 12%, #ffffff);
+  border-color: color-mix(in srgb, var(--accent) 42%, var(--line));
+  transform: translateY(-1px);
 }
