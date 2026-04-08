@@ -98,6 +98,13 @@ function formatTime(iso) {
   return `${day}일 ${hour}시`;
 }
 
+function formatHourOnly(iso) {
+  if (!iso) return "";
+  const d = new Date(iso);
+  const kst = new Date(d.getTime() + 9 * 60 * 60 * 1000);
+  return `${String(kst.getUTCHours()).padStart(2, "0")}시`;
+}
+
 export default function TafForecastView({ tafData, icao, tz = "UTC" }) {
   const target = tafData?.airports?.[icao];
   const rawTimeline = target?.timeline || [];
@@ -120,6 +127,34 @@ export default function TafForecastView({ tafData, icao, tz = "UTC" }) {
   const totalStart = timeline.length > 0 ? new Date(timeline[0].time).getTime() : 0;
   const totalEnd = timeline.length > 0 ? new Date(timeline[timeline.length - 1].time).getTime() + 3600 * 1000 : 0;
   const totalDuration = totalEnd - totalStart;
+  const timelineScale = useMemo(() => {
+    if (timeline.length === 0 || totalDuration <= 0) return [];
+
+    const step = timeline.length > 18 ? 3 : timeline.length > 10 ? 2 : 1;
+    const ticks = [];
+
+    for (let i = 0; i < timeline.length; i += step) {
+      const slot = timeline[i];
+      const slotTime = new Date(slot.time).getTime();
+      ticks.push({
+        key: `${slot.time}-${i}`,
+        label: formatHourOnly(slot.time),
+        left: ((slotTime - totalStart) / totalDuration) * 100,
+      });
+    }
+
+    const lastSlot = timeline[timeline.length - 1];
+    const lastHourLabel = formatHourOnly(lastSlot?.time);
+    if (ticks[ticks.length - 1]?.label !== lastHourLabel) {
+      ticks.push({
+        key: `${lastSlot.time}-last`,
+        label: lastHourLabel,
+        left: ((new Date(lastSlot.time).getTime() - totalStart) / totalDuration) * 100,
+      });
+    }
+
+    return ticks;
+  }, [timeline, totalStart, totalDuration]);
 
   // Find which segment a given progress (0..1) falls into
   const getSegmentAtProgress = useCallback((progress) => {
@@ -244,42 +279,54 @@ export default function TafForecastView({ tafData, icao, tz = "UTC" }) {
           )}
         </button>
         <span className="taf-forecast-slider-label">{formatTime(validStartIso)}</span>
-        <div className="taf-forecast-track">
-          {segments.map((seg, i) => {
-            const segStart = new Date(seg.startTime).getTime();
-            const segEnd = new Date(seg.endTime).getTime() + 3600 * 1000;
-            const left = totalDuration > 0 ? ((segStart - totalStart) / totalDuration) * 100 : 0;
-            const width = totalDuration > 0 ? ((segEnd - segStart) / totalDuration) * 100 : 100;
+        <div className="taf-forecast-track-shell">
+          <div className="taf-forecast-scale">
+            {timelineScale.map((tick) => (
+              <span
+                key={tick.key}
+                className="taf-forecast-scale-tick"
+                style={{ left: `${tick.left}%` }}
+              >
+                {tick.label}
+              </span>
+            ))}
+          </div>
+          <div className="taf-forecast-track">
+            {segments.map((seg, i) => {
+              const segStart = new Date(seg.startTime).getTime();
+              const segEnd = new Date(seg.endTime).getTime() + 3600 * 1000;
+              const left = totalDuration > 0 ? ((segStart - totalStart) / totalDuration) * 100 : 0;
+              const width = totalDuration > 0 ? ((segEnd - segStart) / totalDuration) * 100 : 100;
 
-            return (
-              <button
-                key={i}
-                type="button"
-                className={`taf-forecast-seg ${i === selectedIndex ? "active" : ""} taf-forecast-seg--${seg.period}`}
-                style={{ left: `${left}%`, width: `${Math.max(width, 2)}%` }}
-                onClick={() => handleSegmentClick(i)}
-                title={`${formatTime(seg.startTime)} ~ ${formatTime(seg.endTime)}\n${WEATHER_LABELS[seg.weatherKey] || seg.weatherKey}`}
-              />
-            );
-          })}
-          <div
-            className="taf-forecast-playhead"
-            style={{ left: `${playProgress * 100}%` }}
-          />
+              return (
+                <button
+                  key={i}
+                  type="button"
+                  className={`taf-forecast-seg ${i === selectedIndex ? "active" : ""} taf-forecast-seg--${seg.period}`}
+                  style={{ left: `${left}%`, width: `${Math.max(width, 2)}%` }}
+                  onClick={() => handleSegmentClick(i)}
+                  title={`${formatTime(seg.startTime)} ~ ${formatTime(seg.endTime)}\n${WEATHER_LABELS[seg.weatherKey] || seg.weatherKey}`}
+                />
+              );
+            })}
+            <div
+              className="taf-forecast-playhead"
+              style={{ left: `${playProgress * 100}%` }}
+            />
+          </div>
         </div>
         <span className="taf-forecast-slider-label">{formatTime(validEndIso)}</span>
       </div>
 
-      <div className="taf-forecast-info">
-        <div className="taf-forecast-time">
-          {formatTime(activeSegment.startTime)}
-          {activeSegment.startTime !== activeSegment.endTime && ` ~ ${formatTime(activeSegment.endTime)}`}
-        </div>
-        <div className="taf-forecast-weather-label">{weatherLabel}</div>
-        <div className="taf-forecast-detail">{formatTafDisplay(activeSegment.slot)}</div>
-      </div>
-
       <div className="taf-forecast-image-wrap">
+        <div className="taf-forecast-image-overlay">
+          <div className="taf-forecast-time">
+            {formatTime(activeSegment.startTime)}
+            {activeSegment.startTime !== activeSegment.endTime && ` ~ ${formatTime(activeSegment.endTime)}`}
+          </div>
+          <div className="taf-forecast-weather-label">{weatherLabel}</div>
+          <div className="taf-forecast-detail">{formatTafDisplay(activeSegment.slot)}</div>
+        </div>
         {fadingOut && prevImageRef.current && (
           <img
             className="taf-forecast-image taf-forecast-image--fade-out"

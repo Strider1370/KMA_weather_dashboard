@@ -4289,15 +4289,42 @@ tr.row-danger td { background: #ffe9e7; }
   color: var(--muted);
   white-space: nowrap;
   min-width: 52px;
+  font-weight: 600;
+}
+
+.taf-forecast-track-shell {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.taf-forecast-scale {
+  position: relative;
+  height: 14px;
+}
+
+.taf-forecast-scale-tick {
+  position: absolute;
+  top: 0;
+  transform: translateX(-50%);
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--muted);
+  white-space: nowrap;
+  letter-spacing: 0;
+  pointer-events: none;
 }
 
 .taf-forecast-track {
-  flex: 1;
   position: relative;
+  width: 100%;
   height: 28px;
   background: var(--card-bg);
   border-radius: 6px;
   overflow: hidden;
+  box-shadow: inset 0 0 0 1px var(--line);
 }
 
 .taf-forecast-seg {
@@ -4326,32 +4353,26 @@ tr.row-danger td { background: #ffe9e7; }
 .taf-forecast-seg--day    { background: #3b82f6; }
 .taf-forecast-seg--night  { background: #4b5563; }
 
-.taf-forecast-info {
-  display: flex;
-  align-items: baseline;
-  gap: 12px;
-  padding: 4px 6px;
-  flex-shrink: 0;
-  flex-wrap: wrap;
-}
-
 .taf-forecast-time {
-  font-size: 13px;
+  font-size: 15px;
   font-weight: 700;
-  color: var(--ink);
+  color: #ffffff;
   white-space: nowrap;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
 }
 
 .taf-forecast-weather-label {
-  font-size: 13px;
+  font-size: 15px;
   font-weight: 600;
-  color: var(--accent);
+  color: #fef08a;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
 }
 
 .taf-forecast-detail {
-  font-size: 11.5px;
-  color: var(--muted);
+  font-size: 13.5px;
+  color: rgba(255, 255, 255, 0.88);
   line-height: 1.4;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
 }
 
 .taf-forecast-image-wrap {
@@ -4366,10 +4387,29 @@ tr.row-danger td { background: #ffe9e7; }
   position: relative;
 }
 
+.taf-forecast-image-overlay {
+  position: absolute;
+  top: 18px;
+  left: 14px;
+  right: 14px;
+  z-index: 3;
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  flex-wrap: wrap;
+  pointer-events: none;
+}
+
+.taf-forecast-image-overlay .taf-forecast-detail {
+  max-width: min(100%, 520px);
+}
+
 .taf-forecast-image {
   max-width: 100%;
   max-height: 100%;
-  object-fit: contain;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
   border-radius: 8px;
   position: absolute;
   inset: 0;
