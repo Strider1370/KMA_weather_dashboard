@@ -298,6 +298,10 @@ function isFrameAsset(filePath) {
   return /[\\/](radar[\\/]echo_korea_\d{12}\.png|satellite[\\/]sat_korea_\d{12}\.webp)$/.test(filePath);
 }
 
+function isAirportWeatherAsset(filePath) {
+  return /[\\/]airport_weather[\\/].+\.(?:png|webp|jpe?g)$/.test(filePath);
+}
+
 function pruneFrameAssetCache(now = Date.now()) {
   for (const [key, entry] of frameAssetCache.entries()) {
     if ((now - entry.cachedAt) > FRAME_CACHE_TTL_MS) {
@@ -386,7 +390,9 @@ function serveStatic(req, res) {
   const versionedGeoPattern = /[\\/]geo[\\/].+\.v\d+\.(?:geo|topo)json$/;
   const cacheControl = versionedGeoPattern.test(filePath)
     ? "public, max-age=31536000, immutable"
-    : "no-cache";
+    : isAirportWeatherAsset(filePath)
+      ? "public, max-age=86400"
+      : "no-cache";
   res.writeHead(200, {
     ...buildBaseHeaders(req),
     "Content-Type": contentTypeFor(filePath),

@@ -4320,7 +4320,7 @@ tr.row-danger td { background: #ffe9e7; }
 .taf-forecast-track {
   position: relative;
   width: 100%;
-  height: 28px;
+  height: 42px;
   background: var(--card-bg);
   border-radius: 6px;
   overflow: hidden;
@@ -4331,6 +4331,9 @@ tr.row-danger td { background: #ffe9e7; }
   position: absolute;
   top: 2px;
   bottom: 2px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   border: none;
   border-radius: 4px;
   cursor: pointer;
@@ -4349,9 +4352,42 @@ tr.row-danger td { background: #ffe9e7; }
   z-index: 1;
 }
 
-.taf-forecast-seg--golden { background: #f59e0b; }
 .taf-forecast-seg--day    { background: #3b82f6; }
 .taf-forecast-seg--night  { background: #4b5563; }
+
+.taf-forecast-seg-content {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  height: 100%;
+  padding: 0 8px;
+  pointer-events: none;
+}
+
+.taf-forecast-seg-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+}
+
+.taf-forecast-seg-icon .weather-icon-wrapper {
+  width: 24px;
+  height: 24px;
+}
+
+.taf-forecast-seg-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.96);
+  text-shadow: 0 1px 2px rgba(15, 23, 42, 0.35);
+}
 
 .taf-forecast-time {
   font-size: 15px;

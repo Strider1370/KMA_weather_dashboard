@@ -204,6 +204,9 @@ Derived from `.editorconfig` + existing source files.
 - `/ground` "예보" tab renders `TafForecastView` instead of the map. It shows the TAF timeline as a clickable segmented slider with a sweeping playhead animation (40s loop), TAF detail text, and a crossfading AI-generated airport weather image matched to the current TAF segment's weather condition and time of day.
 - Airport weather images are pre-generated per airport using `scripts/generate-airport-weather-images.js` (Gemini API, `gemini-3.1-flash-image-preview`). 30 images per airport (3 time periods × 10 weather types) stored at `frontend/public/airport_weather/{ICAO}/{period}_{weather}.png`. Prompts are documented in `AIRPORT_AI_IMAGE_PROMPTS.md`.
 - Switching the selected airport clears all active alert popups and the marquee banner immediately.
+- `/ops` and `/ground` share the same selected-airport `localStorage` key (`selected_airport`). `/test` keeps its own separate key.
+- `TafForecastView` timeline segments now render the same weather icons used by the main TAF timeline, plus a short condition label. Segment color is time-of-day only (`day` / `night`); the old `golden` variant is no longer used.
+- Airport weather images are preloaded client-side for the active TAF segment set, and `/airport_weather/*` static responses use `Cache-Control: public, max-age=86400`.
 - LIFR (airport-minima-breach) thresholds are now user-configurable in Settings > `MINIMA`; thresholds are persisted in `localStorage` key `airport_minima_settings` and must be passed into METAR/TAF category + visibility/ceiling tint classification helpers.
 - Nationwide radar echo currently uses `cmp=hsr`, converts `dBZ` to `mm/h`, and reprojects to full radar-domain bounds before writing `/data/radar/echo_korea_<tm>.png`.
 - In Korea mode, InteractiveMap draws a unioned KMA radar-coverage boundary from site radius metadata and can dim only the area outside that union boundary.

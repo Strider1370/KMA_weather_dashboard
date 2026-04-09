@@ -121,10 +121,11 @@ export default function WarningList({ warningData, groundOverviewData, icao, war
   }, [list, tz, warningTypes]);
 
   useEffect(() => {
+    setPages([]);
     setPageIndex(0);
     setNextPageIndex(0);
     setIsAnimating(false);
-  }, [pages.length, icao]);
+  }, [icao, list]);
 
   useEffect(() => {
     if (pages.length <= 1) {
@@ -153,6 +154,10 @@ export default function WarningList({ warningData, groundOverviewData, icao, war
   }, [isAnimating, nextPageIndex]);
 
   function renderWarningItem(item, keyPrefix, i) {
+      if (!item) {
+        return null;
+      }
+
       const meta = warningMeta(item.wrng_type, warningTypes || {}) || {};
       const key = item.wrng_type_key === "UNKNOWN" && meta.key ? meta.key : item.wrng_type_key;
       const name = WARNING_NAME_KO[key] || safe(item.wrng_type_name) || "미확인경보";
@@ -170,12 +175,19 @@ export default function WarningList({ warningData, groundOverviewData, icao, war
   }
 
   function renderWarningPage(page, keyPrefix) {
-    return page.map((itemIndex, i) => renderWarningItem(list[itemIndex], keyPrefix, i));
+    return page
+      .map((itemIndex, i) => renderWarningItem(list[itemIndex], keyPrefix, i))
+      .filter(Boolean);
   }
 
-  const displayPages = pages.length > 0 ? pages : [list.map((_, index) => index)];
-  const activePage = displayPages[pageIndex] || [];
-  const incomingPage = displayPages[nextPageIndex] || activePage;
+  const displayPages = (pages.length > 0 ? pages : [list.map((_, index) => index)])
+    .map((page) => page.filter((itemIndex) => itemIndex >= 0 && itemIndex < list.length))
+    .filter((page) => page.length > 0);
+  const normalizedPages = displayPages.length > 0 ? displayPages : [list.map((_, index) => index)];
+  const activePageIndex = Math.min(pageIndex, normalizedPages.length - 1);
+  const incomingPageIndex = Math.min(nextPageIndex, normalizedPages.length - 1);
+  const activePage = normalizedPages[activePageIndex] || [];
+  const incomingPage = normalizedPages[incomingPageIndex] || activePage;
 
   if (list.length === 0) {
     if (dashboardMode === "ground" && overview?.summary) {

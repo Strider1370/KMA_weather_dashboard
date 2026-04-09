@@ -1,4 +1,6 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from "react";
+import WeatherIcon from "./WeatherIcon";
+import { resolveWeatherVisual } from "../utils/weather-visual-resolver";
 
 const WEATHER_LABELS = {
   clear: "맑음",
@@ -14,6 +16,7 @@ const WEATHER_LABELS = {
 };
 
 const PLAYBACK_DURATION_MS = 40000; // full sweep in 40 seconds
+const preloadedForecastImages = new Set();
 
 function getTimePeriod(isoString) {
   if (!isoString) return "day";
@@ -155,6 +158,43 @@ export default function TafForecastView({ tafData, icao, tz = "UTC" }) {
 
     return ticks;
   }, [timeline, totalStart, totalDuration]);
+  const segmentSignature = useMemo(
+    () => segments.map((segment) => `${segment.startTime}:${segment.endTime}:${segment.imageKey}`).join("|"),
+    [segments]
+  );
+  const preloadImagePaths = useMemo(
+    () => Array.from(new Set(
+      segments.map((segment) => `/airport_weather/${icao}/${segment.imageKey}.png`)
+    )),
+    [icao, segments]
+  );
+
+  useEffect(() => {
+    if (rafRef.current) {
+      cancelAnimationFrame(rafRef.current);
+      rafRef.current = null;
+    }
+    setIsPlaying(false);
+    setSelectedIndex(0);
+    setPlayProgress(0);
+    setFadingOut(false);
+    setDisplayImage(null);
+    startTimeRef.current = null;
+    startProgressRef.current = 0;
+    prevImageRef.current = null;
+  }, [icao, segmentSignature]);
+
+  useEffect(() => {
+    preloadImagePaths.forEach((imagePath) => {
+      if (!imagePath || preloadedForecastImages.has(imagePath)) {
+        return;
+      }
+      const img = new Image();
+      img.decoding = "async";
+      img.src = imagePath;
+      preloadedForecastImages.add(imagePath);
+    });
+  }, [preloadImagePaths]);
 
   // Find which segment a given progress (0..1) falls into
   const getSegmentAtProgress = useCallback((progress) => {
@@ -306,7 +346,20 @@ export default function TafForecastView({ tafData, icao, tz = "UTC" }) {
                   style={{ left: `${left}%`, width: `${Math.max(width, 2)}%` }}
                   onClick={() => handleSegmentClick(i)}
                   title={`${formatTime(seg.startTime)} ~ ${formatTime(seg.endTime)}\n${WEATHER_LABELS[seg.weatherKey] || seg.weatherKey}`}
-                />
+                >
+                  <span className="taf-forecast-seg-content">
+                    <span className="taf-forecast-seg-icon" aria-hidden="true">
+                      <WeatherIcon
+                        visual={{ ...resolveWeatherVisual(seg.slot, seg.slot.time), intensityOverlay: null }}
+                        className="mini"
+                        alt=""
+                      />
+                    </span>
+                    <span className="taf-forecast-seg-label">
+                      {WEATHER_LABELS[seg.weatherKey] || seg.weatherKey}
+                    </span>
+                  </span>
+                </button>
               );
             })}
             <div

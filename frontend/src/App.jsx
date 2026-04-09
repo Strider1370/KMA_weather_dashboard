@@ -59,9 +59,7 @@ export default function App() {
   const [dashboardMode, setDashboardMode] = useState(initialRoute.dashboardMode);
   const selectedAirportKey = isTestPage
     ? "selected_airport_test"
-    : dashboardMode === "ground"
-      ? "selected_airport_ground"
-      : "selected_airport_ops";
+    : "selected_airport";
   const defaultAirport = "RKSI";
 
   const [data, setData] = useState({});
@@ -603,6 +601,7 @@ export default function App() {
           <div className="map-panel-wrap">
             <div className="map-panel-title">기상 레이더</div>
               <InteractiveMap
+                key={`interactive-map-${dashboardMode}`}
                 lightningData={data.lightning}
                 sigwxLowData={data.sigwxLow}
                 sigwxLowHistoryData={data.sigwxLowHistory}

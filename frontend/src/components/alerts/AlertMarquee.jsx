@@ -13,6 +13,9 @@ export default function AlertMarquee({ alerts, settings }) {
 
   const minLevel = SEVERITY_ORDER[minSeverity] ?? 1;
   const filtered = alerts.filter((a) => (SEVERITY_ORDER[a.severity] ?? 2) <= minLevel);
+  const alertSignature = filtered
+    .map((alert) => `${alert.id}:${alert.severity}:${alert.icao}:${alert.title}`)
+    .join("|");
 
   // auto-hide after show_duration_seconds
   useEffect(() => {
@@ -28,7 +31,7 @@ export default function AlertMarquee({ alerts, settings }) {
     return () => {
       if (timerRef.current) clearTimeout(timerRef.current);
     };
-  }, [filtered.length, showDuration]);
+  }, [alertSignature, showDuration]);
 
   if (!settings?.enabled || filtered.length === 0 || !visible) return null;
 
