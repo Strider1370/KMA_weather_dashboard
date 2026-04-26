@@ -42,6 +42,12 @@ import AlertMarquee from "./components/alerts/AlertMarquee";
 import Settings from "./components/alerts/Settings";
 import "./App.css";
 
+const MOBILE_OPS_BREAKPOINT = 768;
+const MOBILE_TAB_ORDER = ["meta", "taf", "map"];
+const MOBILE_TAB_SWIPE_THRESHOLD = 92;
+const MOBILE_REFRESH_HINT_THRESHOLD = 56;
+const MOBILE_REFRESH_SWIPE_THRESHOLD = 132;
+
 const AIRPORT_NAME_KO = {
   RKSI: "인천국제공항",
   RKSS: "김포국제공항",
@@ -114,6 +120,23 @@ export default function App() {
     }
   });
   const [advisoryFilter, setAdvisoryFilter] = useState(() => loadAdvisoryFilterSettings());
+  const [isMobileViewport, setIsMobileViewport] = useState(() => (
+    typeof window !== "undefined" ? window.innerWidth <= MOBILE_OPS_BREAKPOINT : false
+  ));
+  const [activeMobileTab, setActiveMobileTab] = useState(() => localStorage.getItem("mobile_ops_tab") || "meta");
+  const [mobileTafView, setMobileTafView] = useState(() => localStorage.getItem("mobile_ops_taf_view") || "table");
+  const [mobileMapActivationKey, setMobileMapActivationKey] = useState(0);
+  const [mobilePullHint, setMobilePullHint] = useState("idle");
+  const [mobileTabAnimation, setMobileTabAnimation] = useState({ key: "meta", direction: "none", nonce: 0 });
+  const mobileGestureRef = useRef({
+    startX: 0,
+    startY: 0,
+    scrollTop: 0,
+    locked: false,
+    allowSwipe: false,
+    allowRefresh: false,
+  });
+  const previousMobileTabRef = useRef(activeMobileTab);
 
   useEffect(() => {
     localStorage.setItem("time_zone", timeZone);
@@ -139,6 +162,38 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem("airport_minima_settings", JSON.stringify(airportMinimaSettings));
   }, [airportMinimaSettings]);
+
+  useEffect(() => {
+    function handleResize() {
+      setIsMobileViewport(window.innerWidth <= MOBILE_OPS_BREAKPOINT);
+    }
+
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
+
+  useEffect(() => {
+    localStorage.setItem("mobile_ops_tab", activeMobileTab);
+  }, [activeMobileTab]);
+
+  useEffect(() => {
+    localStorage.setItem("mobile_ops_taf_view", mobileTafView);
+  }, [mobileTafView]);
+
+  useEffect(() => {
+    const previous = previousMobileTabRef.current;
+    if (previous === activeMobileTab) return;
+
+    const previousIndex = MOBILE_TAB_ORDER.indexOf(previous);
+    const nextIndex = MOBILE_TAB_ORDER.indexOf(activeMobileTab);
+    const direction = nextIndex > previousIndex ? "forward" : "backward";
+    setMobileTabAnimation((prev) => ({
+      key: activeMobileTab,
+      direction,
+      nonce: prev.nonce + 1,
+    }));
+    previousMobileTabRef.current = activeMobileTab;
+  }, [activeMobileTab]);
 
   useEffect(() => {
     if (selectedAirport) {
@@ -470,6 +525,184 @@ export default function App() {
     const airportName = AIRPORT_NAME_KO[icao] || selectedAirportMeta?.name || metarTarget?.header?.airport_name || icao;
     return `${airportName}(${icao})`;
   })();
+  const isMobileOpsLayout = !isTestPage && dashboardMode === "ops" && isMobileViewport;
+
+  function moveMobileTab(direction) {
+    const currentIndex = MOBILE_TAB_ORDER.indexOf(activeMobileTab);
+    if (currentIndex === -1) return;
+    const nextIndex = currentIndex + direction;
+    if (nextIndex < 0 || nextIndex >= MOBILE_TAB_ORDER.length) return;
+    setActiveMobileTab(MOBILE_TAB_ORDER[nextIndex]);
+  }
+
+  function handleMobileTouchStart(event) {
+    if (!isMobileOpsLayout) return;
+    const touch = event.touches?.[0];
+    const currentTarget = event.currentTarget;
+    const target = event.target;
+    if (!touch || !(currentTarget instanceof HTMLElement)) return;
+
+    const blocked = target instanceof Element && (
+      target.closest(".interactive-map-panel")
+      || target.closest(".radar-timeline")
+      || target.closest("button")
+      || target.closest("input")
+      || target.closest("select")
+      || target.closest("label")
+    );
+
+    mobileGestureRef.current = {
+      startX: touch.clientX,
+      startY: touch.clientY,
+      scrollTop: currentTarget.scrollTop,
+      locked: false,
+      allowSwipe: !blocked,
+      allowRefresh: !blocked && activeMobileTab !== "map",
+    };
+  }
+
+  function handleMobileTouchMove(event) {
+    if (!isMobileOpsLayout) return;
+    const touch = event.touches?.[0];
+    if (!touch) return;
+
+    const gesture = mobileGestureRef.current;
+    if (!gesture.allowSwipe && !gesture.allowRefresh) return;
+
+    const dx = touch.clientX - gesture.startX;
+    const dy = touch.clientY - gesture.startY;
+    if (gesture.allowRefresh && gesture.scrollTop <= 0 && dy > 0 && Math.abs(dx) < dy * 0.9) {
+      setMobilePullHint(dy >= MOBILE_REFRESH_SWIPE_THRESHOLD ? "release" : (dy >= MOBILE_REFRESH_HINT_THRESHOLD ? "pull" : "idle"));
+    } else if (mobilePullHint !== "idle") {
+      setMobilePullHint("idle");
+    }
+    if (Math.abs(dx) > 10 || Math.abs(dy) > 10) {
+      gesture.locked = true;
+    }
+  }
+
+  function handleMobileTouchEnd(event) {
+    if (!isMobileOpsLayout) return;
+    const touch = event.changedTouches?.[0];
+    if (!touch) return;
+
+    const gesture = mobileGestureRef.current;
+    const dx = touch.clientX - gesture.startX;
+    const dy = touch.clientY - gesture.startY;
+    const absDx = Math.abs(dx);
+    const absDy = Math.abs(dy);
+
+    if (gesture.allowRefresh && gesture.scrollTop <= 0 && dy > MOBILE_REFRESH_SWIPE_THRESHOLD && absDy > absDx * 1.3) {
+      setMobilePullHint("idle");
+      window.location.reload();
+      return;
+    }
+
+    if (mobilePullHint !== "idle") {
+      setMobilePullHint("idle");
+    }
+
+    if (!gesture.allowSwipe) return;
+    if (absDx < MOBILE_TAB_SWIPE_THRESHOLD) return;
+    if (absDx <= absDy * 1.15) return;
+
+    if (dx < 0) {
+      moveMobileTab(1);
+      return;
+    }
+    moveMobileTab(-1);
+  }
+
+  useEffect(() => {
+    if (isMobileOpsLayout && activeMobileTab === "map") {
+      setMobileMapActivationKey((prev) => prev + 1);
+    }
+  }, [activeMobileTab, isMobileOpsLayout]);
+
+  const warningPanel = (
+    <WarningList
+      warningData={data.warning}
+      groundOverviewData={data.groundOverview}
+      icao={selectedAirport}
+      warningTypes={data.warningTypes}
+      dashboardMode={dashboardMode}
+      tz={timeZone}
+    />
+  );
+  const metarPanel = dashboardMode === "ground" ? (
+    <GroundCurrentWeatherCard
+      metarData={data.metar}
+      groundForecastData={data.groundForecast}
+      environmentData={data.environment}
+      amosData={data.amos}
+      icao={selectedAirport}
+      airportMeta={selectedAirportMeta}
+      tz={timeZone}
+    />
+  ) : (
+    <MetarCard
+      metarData={data.metar}
+      amosData={data.amos}
+      icao={selectedAirport}
+      minimaSettings={airportMinimaSettings}
+      airportMeta={selectedAirportMeta}
+      metarTime={metarTime}
+      version={metarVersion}
+      tz={timeZone}
+      mobileLayout={isMobileOpsLayout}
+    />
+  );
+  const tafPanel = dashboardMode === "ground" ? (
+    <GroundForecastPanel
+      groundForecastData={data.groundForecast}
+      icao={selectedAirport}
+    />
+  ) : (
+    <TafTimeline
+      tafData={data.taf}
+      icao={selectedAirport}
+      minimaSettings={airportMinimaSettings}
+      version={isMobileOpsLayout ? mobileTafView : tafVersion}
+      onVersionToggle={isMobileOpsLayout ? setMobileTafView : setTafVersion}
+      tz={timeZone}
+      mobileLayout={isMobileOpsLayout}
+    />
+  );
+  const mapPanel = (
+    <>
+      <div className="map-panel-title">기상 레이더</div>
+      <InteractiveMap
+        lightningData={data.lightning}
+        sigwxLowData={data.sigwxLow}
+        sigwxLowHistoryData={data.sigwxLowHistory}
+        sigwxLowFrontsData={data.sigwxLowFronts}
+        sigwxLowCloudsData={data.sigwxLowClouds}
+        sigmetData={data.sigmet}
+        airmetData={data.airmet}
+        adsbData={data.adsb}
+        selectedAirport={selectedAirport}
+        airports={data.airports}
+        windDir={(() => {
+          const w = data.metar?.airports?.[selectedAirport]?.observation?.wind;
+          if (!w || w.calm || w.variable) return null;
+          return w.direction;
+        })()}
+        echoMeta={data.echoMeta}
+        satMeta={data.satMeta}
+        radarOpacity={radarOpacity}
+        mapTheme={mapTheme}
+        tz={timeZone}
+        trafficCallsignFilter={trafficCallsignFilter}
+        trafficAltitudeBands={trafficAltitudeBands}
+        dashboardMode={dashboardMode}
+        tafData={data.taf}
+        advisoryFilter={advisoryFilter}
+        isVisible={!isMobileOpsLayout || activeMobileTab === "map"}
+        mobileLayout={isMobileOpsLayout}
+        mapActivationKey={mobileMapActivationKey}
+      />
+    </>
+  );
 
   return (
     <>
@@ -504,7 +737,92 @@ export default function App() {
         </div>
       )}
 
-      {data.metar && (
+      {data.metar && isMobileOpsLayout && (
+        <div className="dashboard-root dashboard-root--mobile-ops" data-dashboard-mode={dashboardMode}>
+          <div className="mobile-ops-top">
+            <div className="mobile-ops-header-row">
+              <Header
+                airports={airportOptions}
+                selectedAirport={selectedAirport}
+                onAirportChange={setSelectedAirport}
+                airportLabel={airportLabel}
+              />
+              <button
+                className="settings-icon-btn mobile-ops-settings-btn"
+                onClick={() => setShowSettings(true)}
+                title="설정"
+                aria-label="설정"
+              >
+                &#8943;
+              </button>
+            </div>
+          </div>
+
+          <div
+            className="mobile-ops-body"
+            onTouchStart={handleMobileTouchStart}
+            onTouchMove={handleMobileTouchMove}
+            onTouchEnd={handleMobileTouchEnd}
+            onTouchCancel={() => setMobilePullHint("idle")}
+          >
+            {mobilePullHint !== "idle" && (
+              <div className={`mobile-ops-pull-hint mobile-ops-pull-hint--${mobilePullHint}`}>
+                {mobilePullHint === "release" ? "놓으면 새로고침" : "당겨서 새로고침"}
+              </div>
+            )}
+            <section
+              className={`mobile-ops-panel ${activeMobileTab === "meta" ? "is-active" : "is-hidden"}${activeMobileTab === "meta" && mobileTabAnimation.key === "meta" ? ` mobile-ops-panel--animate mobile-ops-panel--${mobileTabAnimation.direction}` : ""}`}
+              aria-hidden={activeMobileTab !== "meta"}
+              key={`meta-${activeMobileTab === "meta" ? mobileTabAnimation.nonce : "idle"}`}
+            >
+              <div className="mobile-ops-warning mobile-ops-warning--panel">{warningPanel}</div>
+              {metarPanel}
+            </section>
+            <section
+              className={`mobile-ops-panel ${activeMobileTab === "taf" ? "is-active" : "is-hidden"}${activeMobileTab === "taf" && mobileTabAnimation.key === "taf" ? ` mobile-ops-panel--animate mobile-ops-panel--${mobileTabAnimation.direction}` : ""}`}
+              aria-hidden={activeMobileTab !== "taf"}
+              key={`taf-${activeMobileTab === "taf" ? mobileTabAnimation.nonce : "idle"}`}
+            >
+              {tafPanel}
+            </section>
+            <section
+              className={`mobile-ops-panel mobile-ops-panel--map ${activeMobileTab === "map" ? "is-active" : "is-hidden"}${activeMobileTab === "map" && mobileTabAnimation.key === "map" ? ` mobile-ops-panel--animate mobile-ops-panel--${mobileTabAnimation.direction}` : ""}`}
+              aria-hidden={activeMobileTab !== "map"}
+              key={`map-${activeMobileTab === "map" ? mobileTabAnimation.nonce : "idle"}`}
+            >
+              <div className="map-panel-wrap map-panel-wrap--mobile">
+                {mapPanel}
+              </div>
+            </section>
+          </div>
+
+          <nav className="mobile-ops-tabbar" aria-label="모바일 운항 탭">
+            <button
+              type="button"
+              className={`mobile-ops-tabbtn ${activeMobileTab === "meta" ? "active" : ""}`}
+              onClick={() => setActiveMobileTab("meta")}
+            >
+              현재날씨
+            </button>
+            <button
+              type="button"
+              className={`mobile-ops-tabbtn ${activeMobileTab === "taf" ? "active" : ""}`}
+              onClick={() => setActiveMobileTab("taf")}
+            >
+              예보
+            </button>
+            <button
+              type="button"
+              className={`mobile-ops-tabbtn ${activeMobileTab === "map" ? "active" : ""}`}
+              onClick={() => setActiveMobileTab("map")}
+            >
+              지도
+            </button>
+          </nav>
+        </div>
+      )}
+
+      {data.metar && !isMobileOpsLayout && (
         <div className="dashboard-root" data-dashboard-mode={dashboardMode}>
           {/* Row 1 left: Header */}
           <div className="left-panel-header">
@@ -548,86 +866,14 @@ export default function App() {
 
           {/* Row 2 left: Warning + Metrics + TAF */}
           <div className="left-panel-body">
-            <WarningList
-              warningData={data.warning}
-              groundOverviewData={data.groundOverview}
-              icao={selectedAirport}
-              warningTypes={data.warningTypes}
-              dashboardMode={dashboardMode}
-              tz={timeZone}
-            />
-
-            {dashboardMode === "ground" ? (
-              <GroundCurrentWeatherCard
-                metarData={data.metar}
-                groundForecastData={data.groundForecast}
-                environmentData={data.environment}
-                amosData={data.amos}
-                icao={selectedAirport}
-                airportMeta={selectedAirportMeta}
-                tz={timeZone}
-              />
-            ) : (
-              <MetarCard
-                metarData={data.metar}
-                amosData={data.amos}
-                icao={selectedAirport}
-                minimaSettings={airportMinimaSettings}
-                airportMeta={selectedAirportMeta}
-                metarTime={metarTime}
-                version={metarVersion}
-                tz={timeZone}
-              />
-            )}
-
-            {dashboardMode === "ground" ? (
-              <GroundForecastPanel
-                groundForecastData={data.groundForecast}
-                icao={selectedAirport}
-              />
-            ) : (
-              <TafTimeline
-                tafData={data.taf}
-                icao={selectedAirport}
-                minimaSettings={airportMinimaSettings}
-                version={tafVersion}
-                onVersionToggle={setTafVersion}
-                tz={timeZone}
-              />
-            )}
+            {warningPanel}
+            {metarPanel}
+            {tafPanel}
           </div>
 
           {/* Row 2 right: Map panel */}
           <div className="map-panel-wrap">
-            <div className="map-panel-title">기상 레이더</div>
-              <InteractiveMap
-                key={`interactive-map-${dashboardMode}`}
-                lightningData={data.lightning}
-                sigwxLowData={data.sigwxLow}
-                sigwxLowHistoryData={data.sigwxLowHistory}
-                sigwxLowFrontsData={data.sigwxLowFronts}
-                sigwxLowCloudsData={data.sigwxLowClouds}
-                sigmetData={data.sigmet}
-                airmetData={data.airmet}
-                adsbData={data.adsb}
-              selectedAirport={selectedAirport}
-              airports={data.airports}
-              windDir={(() => {
-                const w = data.metar?.airports?.[selectedAirport]?.observation?.wind;
-                if (!w || w.calm || w.variable) return null;
-                return w.direction;
-              })()}
-              echoMeta={data.echoMeta}
-              satMeta={data.satMeta}
-              radarOpacity={radarOpacity}
-              mapTheme={mapTheme}
-              tz={timeZone}
-              trafficCallsignFilter={trafficCallsignFilter}
-              trafficAltitudeBands={trafficAltitudeBands}
-              dashboardMode={dashboardMode}
-              tafData={data.taf}
-              advisoryFilter={advisoryFilter}
-            />
+            {mapPanel}
           </div>
         </div>
       )}

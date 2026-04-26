@@ -5,6 +5,7 @@ import {
   getSeverityLevel,
   getDisplayDate,
   getFlightCategory,
+  FLIGHT_CATEGORY_META,
   classifyVisibilityCategory,
   classifyCeilingCategory,
   isDarkTheme,
@@ -259,38 +260,7 @@ function formatTafRange(start, end, tz) {
   return `${startDay}일 ${startHour}시 ~${endDayLabel} ${endHourExclusive}시`;
 }
 
-function TafViewToggle({ activeVersion, onVersionToggle }) {
-  return (
-    <div className="taf-view-toggle" role="tablist" aria-label="TAF view mode">
-      <button
-        type="button"
-        className={`taf-view-toggle-btn${activeVersion === "v2" ? " active" : ""}`}
-        onClick={() => onVersionToggle?.("v2")}
-        aria-pressed={activeVersion === "v2"}
-      >
-        타임라인
-      </button>
-      <button
-        type="button"
-        className={`taf-view-toggle-btn${activeVersion === "table" ? " active" : ""}`}
-        onClick={() => onVersionToggle?.("table")}
-        aria-pressed={activeVersion === "table"}
-      >
-        테이블
-      </button>
-      <button
-        type="button"
-        className={`taf-view-toggle-btn${activeVersion === "v3" ? " active" : ""}`}
-        onClick={() => onVersionToggle?.("v3")}
-        aria-pressed={activeVersion === "v3"}
-      >
-        그리드
-      </button>
-    </div>
-  );
-}
-
-export default function TafTimeline({ tafData, icao, minimaSettings = null, version = "v2", onVersionToggle, tz = "UTC" }) {
+export default function TafTimeline({ tafData, icao, minimaSettings = null, version = "v2", onVersionToggle, tz = "UTC", mobileLayout = false }) {
   const target = tafData?.airports?.[icao];
   const rawTimeline = target?.timeline || [];
   const now = Date.now();
@@ -301,6 +271,9 @@ export default function TafTimeline({ tafData, icao, minimaSettings = null, vers
       (slot) => new Date(slot.time).getTime() + 3600 * 1000 > now
     );
   const displaySlots = buildTafDisplaySlots(timeline, icao, minimaSettings);
+  const effectiveVersion = mobileLayout ? (version === "v3" ? "v3" : "table") : version;
+  const isTimelineView = effectiveVersion === "v2";
+  const isTableView = effectiveVersion === "table";
   const tableSegments = buildTafTableSegments(displaySlots);
   const lastEnd = target?.header?.valid_end;
   const tafTime = formatUtc(target?.header?.valid_start, tz);
@@ -323,7 +296,38 @@ export default function TafTimeline({ tafData, icao, minimaSettings = null, vers
     );
   }
 
-  if (version === "v2") {
+  const viewToggle = (
+    <div className="taf-view-toggle" role="tablist" aria-label="TAF view mode">
+      {!mobileLayout && (
+        <button
+          type="button"
+          className={`taf-view-toggle-btn${isTimelineView ? " active" : ""}`}
+          onClick={() => onVersionToggle?.("v2")}
+          aria-pressed={isTimelineView}
+        >
+          타임라인
+        </button>
+      )}
+      <button
+        type="button"
+        className={`taf-view-toggle-btn${isTableView ? " active" : ""}`}
+        onClick={() => onVersionToggle?.("table")}
+        aria-pressed={isTableView}
+      >
+        카드
+      </button>
+      <button
+        type="button"
+        className={`taf-view-toggle-btn${effectiveVersion === "v3" ? " active" : ""}`}
+        onClick={() => onVersionToggle?.("v3")}
+        aria-pressed={effectiveVersion === "v3"}
+      >
+        표
+      </button>
+    </div>
+  );
+
+  if (effectiveVersion === "v2") {
     const flightCatGroups = groupElementsByValue(displaySlots, (displaySlot) => displaySlot.flightCategory);
     const weatherGroups = groupElementsByValue(displaySlots, (displaySlot) => {
       const baseIconId = String(displaySlot.weatherVisual?.iconId || "unknown").replace(/-(day|night)$/, "");
@@ -343,7 +347,7 @@ export default function TafTimeline({ tafData, icao, minimaSettings = null, vers
             <span className="panel-kind-badge">{tafBadgeText}</span>
             <span>{tafTimeText}</span>
           </span>
-          <TafViewToggle activeVersion={version} onVersionToggle={onVersionToggle} />
+          {viewToggle}
         </div>
         <div className="taf-new-container">
           <div className="taf-new-row time-row">
@@ -492,7 +496,72 @@ export default function TafTimeline({ tafData, icao, minimaSettings = null, vers
     );
   }
 
-  if (version === "v3") {
+  if (effectiveVersion === "v3") {
+    if (mobileLayout) {
+      return (
+        <section className="panel taf-mobile-v3-panel">
+          <div className="taf-legacy-header taf-legacy-header--mobile-v3">
+            <span className="taf-new-validity">
+              <span className="panel-kind-badge">{tafBadgeText}</span>
+              <span>{tafTimeText}</span>
+            </span>
+            {viewToggle}
+          </div>
+          <div className="taf-mobile-v3-table" role="table" aria-label="TAF 카드형 표">
+            <div className="taf-mobile-v3-head" role="row">
+              <div className="taf-mobile-v3-head-cell" role="columnheader">시간</div>
+              <div className="taf-mobile-v3-head-cell" role="columnheader">날씨</div>
+              <div className="taf-mobile-v3-head-cell" role="columnheader">바람</div>
+              <div className="taf-mobile-v3-head-cell" role="columnheader">운고</div>
+              <div className="taf-mobile-v3-head-cell" role="columnheader">시정</div>
+            </div>
+            <div className="taf-mobile-v3-body" role="rowgroup">
+              {timeline.map((slot, i) => {
+                const displayDate = getDisplayDate(slot.time, tz);
+                const prevDisplayDate = i > 0 ? getDisplayDate(timeline[i - 1].time, tz) : null;
+                const showDateLabel = i === 0 || !prevDisplayDate
+                  || displayDate.getUTCMonth() !== prevDisplayDate.getUTCMonth()
+                  || displayDate.getUTCDate() !== prevDisplayDate.getUTCDate();
+                const weatherVisual = resolveWeatherVisual(slot, slot.time);
+                const wind = slot.wind;
+                const visibilityValue = slot.visibility?.value ?? null;
+                const ceiling = getCeiling(slot);
+                const visibilityStyle = getTintStyle(classifyVisibilityCategory(visibilityValue, icao, minimaSettings).category);
+                const ceilingStyle = getTintStyle(classifyCeilingCategory(ceiling, icao, minimaSettings).category);
+                const isSpecialWeather = hasSpecialWeather(slot);
+                const hasPrecipitation = hasPrecipitationWeather(slot);
+                const highWind = hasAlertWind(slot);
+                const rotation = (wind?.direction || 0) + 180;
+                const windText = `${wind?.speed}${wind?.gust ? `G${wind.gust}` : ""}kt`;
+                return (
+                  <div key={i} className="taf-mobile-v3-row" role="row">
+                    <div className="taf-mobile-v3-cell taf-mobile-v3-cell--time" role="cell">
+                      {showDateLabel ? (
+                        <span className="taf-mobile-v3-date">{displayDate.getUTCMonth() + 1}/{displayDate.getUTCDate()}</span>
+                      ) : null}
+                      <span className="taf-mobile-v3-hour">{displayDate.getUTCHours()}시</span>
+                    </div>
+                    <div
+                      className={`taf-mobile-v3-cell taf-mobile-v3-cell--icon${isSpecialWeather ? " taf-mobile-v3-cell--special" : ""}${hasPrecipitation ? " taf-mobile-v3-cell--precip" : ""}`}
+                      role="cell"
+                    >
+                      <WeatherIcon visual={weatherVisual} />
+                    </div>
+                    <div className={`taf-mobile-v3-cell taf-mobile-v3-cell--wind${highWind ? " taf-mobile-v3-cell--alert" : ""}`} role="cell">
+                      <span className="wind-arrow-inline" style={{ transform: `rotate(${rotation}deg)` }}>↑</span>
+                      {windText}
+                    </div>
+                    <div className="taf-mobile-v3-cell taf-mobile-v3-cell--ceil" style={ceilingStyle} role="cell">{formatCeiling(ceiling)}</div>
+                    <div className="taf-mobile-v3-cell taf-mobile-v3-cell--vis" style={visibilityStyle} role="cell">{formatVisibilityValue(visibilityValue, slot.display?.visibility)}</div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </section>
+      );
+    }
+
     return (
       <section className="taf-new-panel taf-new-panel--grid">
         <div className="taf-legacy-header">
@@ -500,7 +569,7 @@ export default function TafTimeline({ tafData, icao, minimaSettings = null, vers
             <span className="panel-kind-badge">{tafBadgeText}</span>
             <span>{tafTimeText}</span>
           </span>
-          <TafViewToggle activeVersion={version} onVersionToggle={onVersionToggle} />
+          {viewToggle}
         </div>
         <div className="taf-v3-layout">
           <div className="taf-v3-labels" aria-hidden="true">
@@ -556,6 +625,117 @@ export default function TafTimeline({ tafData, icao, minimaSettings = null, vers
     );
   }
 
+  if (mobileLayout) {
+    const mobileTimelineSegments = tableSegments.map((segment) => {
+      const visibilityValue = segment.displaySlot.visibilityValue ?? null;
+      const ceiling = segment.displaySlot.ceiling;
+      const flightCategoryMeta = getFlightCategory(visibilityValue, ceiling, icao, minimaSettings);
+      const startMs = new Date(segment.start).getTime();
+      const endMs = new Date(segment.end).getTime();
+      const durationMs = Number.isFinite(startMs) && Number.isFinite(endMs) && endMs > startMs
+        ? endMs - startMs
+        : 60 * 60 * 1000;
+      return {
+        start: segment.start,
+        end: segment.end,
+        durationMs,
+        flightCategoryMeta,
+      };
+    });
+    const totalTimelineDurationMs = mobileTimelineSegments.reduce((sum, item) => sum + item.durationMs, 0) || 1;
+
+    return (
+      <section className="taf-new-panel taf-new-panel--mobile-table">
+        <div className="taf-legacy-header taf-legacy-header--mobile-table">
+          <span className="taf-new-validity">
+            <span className="panel-kind-badge">{tafBadgeText}</span>
+            <span>{tafTimeText}</span>
+          </span>
+          {viewToggle}
+        </div>
+        <div className="taf-mobile-table-layout">
+          <div className="taf-mobile-timeline-bar" aria-hidden="true">
+            {mobileTimelineSegments.map((segment, i) => {
+              const startDate = getDisplayDate(segment.start, tz);
+              const prevStartDate = i > 0 ? getDisplayDate(mobileTimelineSegments[i - 1].start, tz) : null;
+              const showDateLabel = i === 0 || !prevStartDate
+                || startDate.getUTCMonth() !== prevStartDate.getUTCMonth()
+                || startDate.getUTCDate() !== prevStartDate.getUTCDate();
+              const startLabel = `${startDate.getUTCHours()}시`;
+              const color = segment.flightCategoryMeta?.color || FC_COLORS[segment.flightCategoryMeta?.category] || FC_COLORS.VFR;
+              return (
+                <div key={`timeline-${i}`} className="taf-mobile-timeline-segment" style={{ flex: `${segment.durationMs} 0 0` }}>
+                  <span className="taf-mobile-timeline-label">
+                    {showDateLabel ? <span className="taf-mobile-timeline-date">{startDate.getUTCMonth() + 1}/{startDate.getUTCDate()}</span> : null}
+                    <span className="taf-mobile-timeline-hour">{startLabel}</span>
+                  </span>
+                  <span className="taf-mobile-timeline-track">
+                    <span
+                      className="taf-mobile-timeline-fill"
+                      style={{
+                        height: "100%",
+                        backgroundColor: color,
+                      }}
+                    />
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+          <div className="taf-mobile-table-list">
+          {tableSegments.map((segment, i) => {
+            const displaySlot = segment.displaySlot;
+            const slot = displaySlot.slot;
+            const visibilityValue = displaySlot.visibilityValue ?? null;
+            const ceiling = displaySlot.ceiling;
+            const flightCategoryMeta = getFlightCategory(visibilityValue, ceiling, icao, minimaSettings);
+            const flightCategory = flightCategoryMeta.category;
+            const visibilityStyle = displaySlot.visibilityStyle;
+            const ceilingStyle = displaySlot.ceilingStyle;
+            const weatherLabel = displaySlot.weatherLabel;
+            const isSpecialWeather = displaySlot.isSpecialWeather;
+            const hasPrecipitation = displaySlot.hasPrecipitation;
+            const highWind = displaySlot.highWind;
+
+            return (
+              <article key={i} className="taf-mobile-card">
+                <div className="taf-mobile-card-top">
+                  <div className="taf-mobile-card-time">{formatTafRange(segment.start, segment.end, tz)}</div>
+                </div>
+                <div className="taf-mobile-card-grid">
+                  <article
+                    className="taf-mobile-card-status taf-mobile-card-status--panel flight-category-panel"
+                    style={{ backgroundColor: flightCategoryMeta?.color || FLIGHT_CATEGORY_META[flightCategory]?.color || FC_COLORS[flightCategory] || FC_COLORS.VFR }}
+                  >
+                    <span className="flight-category-panel-code taf-mobile-card-status-code">{flightCategory}</span>
+                    <span className="flight-category-panel-label taf-mobile-card-status-label">{flightCategoryMeta?.labelKo || FLIGHT_CATEGORY_META[flightCategory]?.labelKo || flightCategory}</span>
+                  </article>
+                  <div className="taf-mobile-card-cell" style={visibilityStyle}>
+                    <span className="taf-mobile-card-label">시정</span>
+                    <span className="taf-mobile-card-value">{formatVisibilityValue(visibilityValue, slot.display?.visibility)}</span>
+                  </div>
+                  <div className={`taf-mobile-card-cell taf-mobile-card-cell--wind${highWind ? " taf-mobile-card-cell--alert" : ""}`}>
+                    <span className="taf-mobile-card-label">바람</span>
+                    <span className="taf-mobile-card-value">{safe(slot.display?.wind)}</span>
+                  </div>
+                  <div className="taf-mobile-card-cell" style={ceilingStyle}>
+                    <span className="taf-mobile-card-label">운고</span>
+                    <span className="taf-mobile-card-value">{formatCeiling(ceiling)}</span>
+                  </div>
+                  <div className={`taf-mobile-card-cell taf-mobile-card-cell--weather${isSpecialWeather ? " taf-mobile-card-cell--special" : ""}${hasPrecipitation ? " taf-mobile-card-cell--precip" : ""}`}>
+                    <span className="taf-mobile-card-label">날씨</span>
+                    <span className="taf-mobile-card-value">{weatherLabel}</span>
+                  </div>
+                </div>
+              </article>
+            );
+          })}
+          </div>
+        </div>
+      </section>
+    );
+  }
+
   return (
     <section className="taf-new-panel taf-new-panel--table">
       <div className="taf-legacy-header">
@@ -563,7 +743,7 @@ export default function TafTimeline({ tafData, icao, minimaSettings = null, vers
           <span className="panel-kind-badge">{tafBadgeText}</span>
           <span>{tafTimeText}</span>
         </span>
-        <TafViewToggle activeVersion={version} onVersionToggle={onVersionToggle} />
+        {viewToggle}
       </div>
       <div className="table-wrap">
         <table className="taf-compact-table">

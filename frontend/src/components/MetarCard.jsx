@@ -43,6 +43,93 @@ const SEASONAL_CLEAR_TITLE_IMAGES = {
 };
 const CHRISTMAS_CLEAR_TITLE_IMAGE = "/gisang-i/clear_christmas.png";
 
+function toLocalDateParts(date, tz) {
+  const timeZone = tz === "KST" ? "Asia/Seoul" : "UTC";
+  const formatter = new Intl.DateTimeFormat("en-CA", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  });
+  const parts = formatter.formatToParts(date);
+  const year = Number(parts.find((part) => part.type === "year")?.value);
+  const month = Number(parts.find((part) => part.type === "month")?.value);
+  const day = Number(parts.find((part) => part.type === "day")?.value);
+  return { year, month, day };
+}
+
+function dayOfYear(year, month, day) {
+  const start = Date.UTC(year, 0, 0);
+  const current = Date.UTC(year, month - 1, day);
+  return Math.floor((current - start) / 86400000);
+}
+
+function normalizeDegrees(value) {
+  return ((value % 360) + 360) % 360;
+}
+
+function formatClockFromMinutes(totalMinutes) {
+  if (!Number.isFinite(totalMinutes)) return "-";
+  const normalized = ((Math.round(totalMinutes) % 1440) + 1440) % 1440;
+  const hours = Math.floor(normalized / 60);
+  const minutes = normalized % 60;
+  return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
+}
+
+function computeSunTimes(lat, lon, date, tz) {
+  if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
+    return { sunrise: "-", sunset: "-" };
+  }
+
+  const { year, month, day } = toLocalDateParts(date, tz);
+  const n = dayOfYear(year, month, day);
+  const lngHour = lon / 15;
+  const zenith = 90.833;
+  const degToRad = (deg) => (deg * Math.PI) / 180;
+  const radToDeg = (rad) => (rad * 180) / Math.PI;
+
+  function calculate(isSunrise) {
+    const t = n + ((isSunrise ? 6 : 18) - lngHour) / 24;
+    const M = (0.9856 * t) - 3.289;
+    let L = M + (1.916 * Math.sin(degToRad(M))) + (0.02 * Math.sin(2 * degToRad(M))) + 282.634;
+    L = normalizeDegrees(L);
+
+    let RA = radToDeg(Math.atan(0.91764 * Math.tan(degToRad(L))));
+    RA = normalizeDegrees(RA);
+
+    const Lquadrant = Math.floor(L / 90) * 90;
+    const RAquadrant = Math.floor(RA / 90) * 90;
+    RA = (RA + (Lquadrant - RAquadrant)) / 15;
+
+    const sinDec = 0.39782 * Math.sin(degToRad(L));
+    const cosDec = Math.cos(Math.asin(sinDec));
+    const cosH = (Math.cos(degToRad(zenith)) - (sinDec * Math.sin(degToRad(lat)))) / (cosDec * Math.cos(degToRad(lat)));
+
+    if (cosH < -1 || cosH > 1) return null;
+
+    let H = isSunrise ? 360 - radToDeg(Math.acos(cosH)) : radToDeg(Math.acos(cosH));
+    H /= 15;
+
+    const T = H + RA - (0.06571 * t) - 6.622;
+    const UT = normalizeDegrees((T - lngHour) * 15) / 15;
+    const localOffsetHours = tz === "KST" ? 9 : 0;
+    return (UT + localOffsetHours) * 60;
+  }
+
+  return {
+    sunrise: formatClockFromMinutes(calculate(true)),
+    sunset: formatClockFromMinutes(calculate(false)),
+  };
+}
+
+function formatQnhDisplay(value) {
+  const raw = String(value || "").trim();
+  if (!raw) return "-";
+  const match = raw.match(/^Q?\s*(\d{3,4}(?:\.\d+)?)$/i);
+  if (match) return `${match[1]}hPa`;
+  return raw;
+}
+
 function getCurrentWeatherTitleImage(observation, tz = "UTC") {
   const rawWeather = String(observation?.display?.weather || "").toUpperCase().trim();
   const normalized = rawWeather.replace(/\s+/g, " ");
@@ -204,6 +291,7 @@ export default function MetarCard({
   version = "v2",
   onVersionToggle,
   tz = "UTC",
+  mobileLayout = false,
 }) {
   const target = metarData?.airports?.[icao];
   const amosTarget = amosData?.airports?.[icao] || null;
@@ -234,6 +322,7 @@ export default function MetarCard({
   const tempC = target.observation?.temperature?.air;
   const dewpointC = target.observation?.temperature?.dewpoint;
   const rh = computeRelativeHumidity(tempC, dewpointC);
+  const qnhDisplay = formatQnhDisplay(target.observation?.display?.qnh);
   const tempDisplay = Number.isFinite(tempC) ? `${Math.round(tempC)}°C` : "-";
   const feelsLikeText = feelsLike.value == null ? null : `체감온도 ${feelsLike.value.toFixed(1)}°C`;
   const rhDisplay = Number.isFinite(rh) ? `${Math.round(rh)}%` : "-";
@@ -329,6 +418,128 @@ export default function MetarCard({
       ? { backgroundColor: "rgba(14, 116, 144, 0.34)", borderColor: "rgba(125, 211, 252, 0.5)" }
       : { backgroundColor: "rgba(186, 230, 253, 0.72)", borderColor: "rgba(125, 211, 252, 0.9)" })
     : null;
+  const sunTimes = computeSunTimes(airportMeta?.lat, airportMeta?.lon, new Date(), tz);
+
+  if (mobileLayout) {
+    return (
+      <section className="metar-panel metar-panel--mobile">
+        <div className="metar-section-head metar-section-head--mobile">
+          <div className="metar-mobile-head-row">
+            <div className="metar-section-time">
+              <span className="panel-kind-badge">{metarBadgeText}</span>
+              <span>{metarTimeText}</span>
+            </div>
+            <div className="metar-mobile-suntime">☀ 일출 {sunTimes.sunrise} / 일몰 {sunTimes.sunset}</div>
+          </div>
+        </div>
+
+        <article className="flight-category-panel metar-mobile-flight-category" style={{ backgroundColor: flightCategory.color }}>
+          <div className="flight-category-panel-code">{flightCategory.category}</div>
+          <div className="flight-category-panel-label">{flightCategory.labelKo}</div>
+        </article>
+
+        <div className="metar-mobile-grid">
+          <article
+            className="metar-mobile-card"
+            style={{
+              backgroundColor: catColors(visibilityCategory).bg,
+              borderLeft: `3px solid ${visibilityCategory.border}`,
+              borderTop: `0.5px solid ${catColors(visibilityCategory).borderSoft}`,
+              borderRight: `0.5px solid ${catColors(visibilityCategory).borderSoft}`,
+              borderBottom: `0.5px solid ${catColors(visibilityCategory).borderSoft}`,
+            }}
+          >
+            <div className="metar-mobile-card-title">시정</div>
+            <div className="metar-mobile-card-value" style={{ color: catColors(visibilityCategory).valueColor }}>{visibilityValue}</div>
+            {minimumVisibilityDetail ? <div className="metar-mobile-card-sub">{minimumVisibilityDetail}</div> : null}
+          </article>
+
+          <article
+            className="metar-mobile-card"
+            style={{
+              backgroundColor: catColors(ceilingCategory).bg,
+              borderLeft: `3px solid ${ceilingCategory.border}`,
+              borderTop: `0.5px solid ${catColors(ceilingCategory).borderSoft}`,
+              borderRight: `0.5px solid ${catColors(ceilingCategory).borderSoft}`,
+              borderBottom: `0.5px solid ${catColors(ceilingCategory).borderSoft}`,
+            }}
+          >
+            <div className="metar-mobile-card-title">운고</div>
+            <div className="metar-mobile-card-value" style={{ color: catColors(ceilingCategory).valueColor }}>{ceilingValue}</div>
+          </article>
+
+          <article className={`metar-mobile-card${highWind ? " metar-card--alert-outline" : ""}`}>
+            <div className="metar-mobile-card-title">바람</div>
+            <div className="metar-mobile-card-value">{`${windDirectionText}/${windSpeedText}kt`}</div>
+            {windGustText ? <div className="metar-mobile-card-sub">{windGustText}</div> : null}
+          </article>
+
+          <article className={`metar-mobile-card${crosswindAlert ? " metar-card--alert-outline" : ""}`}>
+            <div className="metar-mobile-card-title">측풍</div>
+            <div className="metar-mobile-card-value">{crosswindValue}</div>
+          </article>
+
+          <article
+            className={`metar-mobile-card${specialWeather ? " metar-card--special-weather" : ""}${precipitationWeather ? " metar-card--precip-weather" : ""}`}
+            style={precipitationCardStyle || undefined}
+          >
+            <div className="metar-mobile-card-title">현재 날씨</div>
+            <div className="metar-mobile-card-weather">
+              <WeatherIcon visual={weatherVisual} className="mini" />
+              <div className="metar-mobile-card-value">{weatherKorean}</div>
+            </div>
+          </article>
+
+          <article className="metar-mobile-card">
+            <div className="metar-mobile-card-title">온도</div>
+            <div className="metar-mobile-card-value">{tempDisplay}</div>
+            <div className="metar-mobile-card-sub">습도 {rhDisplay}{feelsLikeText ? ` / ${feelsLikeText}` : ""}</div>
+          </article>
+
+          <article className="metar-mobile-card">
+            <div className="metar-mobile-card-title">일강수량</div>
+            <div className="metar-mobile-card-value">{rainText || "-"}</div>
+          </article>
+
+          <article className="metar-mobile-card">
+            <div className="metar-mobile-card-title">QNH</div>
+            <div className="metar-mobile-card-value">{qnhDisplay}</div>
+          </article>
+        </div>
+
+        {hasRvrDetails && (
+          <article
+            className="metar-mobile-card metar-mobile-card--rvr"
+            style={{
+              backgroundColor: catColors(rvrPanelCategory).bg,
+              borderLeft: `3px solid ${rvrPanelCategory.border}`,
+              borderTop: `0.5px solid ${catColors(rvrPanelCategory).borderSoft}`,
+              borderRight: `0.5px solid ${catColors(rvrPanelCategory).borderSoft}`,
+              borderBottom: `0.5px solid ${catColors(rvrPanelCategory).borderSoft}`,
+            }}
+          >
+            <div className="metar-mobile-card-title">RVR</div>
+            <div className="rvr-panel-values rvr-panel-values--mobile">
+              <div
+                className="rvr-panel-grid"
+                style={{ gridTemplateColumns: `repeat(${Math.min(rvrEntries.length, 2)}, minmax(0, 1fr))` }}
+              >
+                {rvrEntries.slice(0, 4).map(({ runway, value, cat }, idx) => {
+                  const cs = getRvrEntryStyle(cat);
+                  return (
+                    <div key={`${runway}-${idx}`} className="rvr-panel-entry" style={{ backgroundColor: cs.bg }}>
+                      <div className="rvr-panel-entry-runway" style={{ color: cs.labelColor }}>{runway}</div>
+                      <div className="rvr-panel-entry-value" style={{ color: cs.valueColor }}>{value}</div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </article>
+        )}
+      </section>
+    );
+  }
 
   return (
     <section className="metar-panel">

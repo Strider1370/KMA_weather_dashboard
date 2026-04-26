@@ -93,6 +93,7 @@ const DEFAULT_CENTER = [36.5, 127.5];
 const DEFAULT_ZOOM = 10;
 const NATIONWIDE_CENTER = [36.2, 127.8];
 const NATIONWIDE_ZOOM = 6;
+const MAP_BOUNDS_PADDING = [4, 4];
 const BOUNDARY_ZOOM_THRESHOLD = 9;
 
 const RADAR_SITES = [
@@ -252,18 +253,37 @@ function bboxToLeafletBounds(bbox) {
   ];
 }
 
+function isValidLatLngPair(value) {
+  return Array.isArray(value) && value.length >= 2 && value.every((item) => Number.isFinite(item));
+}
+
+function isValidLeafletLatLng(value) {
+  return value && Number.isFinite(value.lat) && Number.isFinite(value.lng);
+}
+
+function areValidLeafletBounds(bounds) {
+  return Array.isArray(bounds)
+    && bounds.length === 2
+    && bounds.every((pair) => isValidLatLngPair(pair));
+}
+
 function MapRecenter({ center, zoom, bounds, boundsPadding = [24, 24], zoomOffset = 0, recenterKey }) {
   const map = useMap();
   useEffect(() => {
-    if (bounds) {
+    if (areValidLeafletBounds(bounds)) {
       const latLngBounds = L.latLngBounds(bounds);
       const paddingPoint = L.point(boundsPadding[0], boundsPadding[1]);
       const computedZoom = map.getBoundsZoom(latLngBounds, false, paddingPoint) + zoomOffset;
-      map.setView(latLngBounds.getCenter(), computedZoom);
+      const nextCenter = latLngBounds.getCenter();
+      if (isValidLeafletLatLng(nextCenter) && Number.isFinite(computedZoom)) {
+        map.setView(nextCenter, computedZoom);
+      }
       return;
     }
-    if (center) map.setView(center, zoom);
-  }, [map, recenterKey]);
+    if (isValidLatLngPair(center) && Number.isFinite(zoom)) {
+      map.setView(center, zoom);
+    }
+  }, [map, center, zoom, bounds, boundsPadding, zoomOffset, recenterKey]);
   return null;
 }
 
@@ -279,6 +299,33 @@ function ZoomBoundaryController({ onBoundaryChange }) {
     map.on("zoomend", handleZoom);
     return () => { map.off("zoomend", handleZoom); };
   }, [map, onBoundaryChange]);
+  return null;
+}
+
+function MapVisibilitySync({ isVisible, activationKey }) {
+  const map = useMap();
+
+  useEffect(() => {
+    if (!isVisible) return undefined;
+
+    const runSync = () => {
+      map.invalidateSize(true);
+      const center = map.getCenter();
+      const zoom = map.getZoom();
+      if (isValidLeafletLatLng(center) && Number.isFinite(zoom)) {
+        map.setView(center, zoom, { animate: false });
+      }
+    };
+
+    const timerA = window.setTimeout(runSync, 0);
+    const timerB = window.setTimeout(runSync, 120);
+
+    return () => {
+      window.clearTimeout(timerA);
+      window.clearTimeout(timerB);
+    };
+  }, [map, isVisible, activationKey]);
+
   return null;
 }
 
@@ -1132,6 +1179,9 @@ export default function InteractiveMap({
   dashboardMode = "ops",
   tafData = null,
   advisoryFilter = null,
+  isVisible = true,
+  mobileLayout = false,
+  mapActivationKey = 0,
 }) {
   const isGround = dashboardMode === "ground";
   const [mapScope, setMapScope] = useState("nationwide");
@@ -1296,6 +1346,12 @@ export default function InteractiveMap({
   useEffect(() => {
     setRecenterKey((prev) => prev + 1);
   }, [selectedAirport]);
+
+  useEffect(() => {
+    if (!isVisible) return;
+    setMapScope("nationwide");
+    setRecenterKey((prev) => prev + 1);
+  }, [isVisible, mapActivationKey]);
 
   const strokeProfile = useMemo(() => {
     if (currentZoom < 7) {
@@ -1485,7 +1541,6 @@ export default function InteractiveMap({
       return true;
     });
   }, [hiddenAdvisoryKeys.airmet, airmetItems, advisoryFilter]);
-
   useEffect(() => {
     if (openAdvisoryPanel === "sigwxLow" && !showSigwxLow) setOpenAdvisoryPanel(null);
     if (openAdvisoryPanel === "sigmet" && !showSigmet) setOpenAdvisoryPanel(null);
@@ -1841,6 +1896,49 @@ export default function InteractiveMap({
       label: formatReferenceTimeLabel(lightningReferenceTimeMs - band.max * 60 * 1000),
     }))
   ), [lightningReferenceTimeMs]);
+  const legends = ((showEcho && echoInfo) || showLightning) ? (
+    <div className="map-right-legends">
+      {showEcho && echoInfo && (
+        <div className="rainrate-legend" aria-label="Radar rain rate legend">
+          <div className="rainrate-legend-title">mm/h</div>
+          <div className="rainrate-legend-scale">
+            {RAINRATE_LEGEND.map((entry) => (
+              <div key={entry.label} className="rainrate-legend-row">
+                <span className="rainrate-legend-label">{entry.label}</span>
+                <span
+                  className="rainrate-legend-swatch"
+                  style={{ backgroundColor: entry.color }}
+                  aria-hidden="true"
+                />
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+      {showLightning && (
+        <div
+          className="lightning-time-legend"
+          aria-label="Lightning time legend"
+        >
+          <div className="lightning-time-legend-title">LIGHTNING</div>
+          <div className="lightning-time-legend-sub">10 MIN</div>
+          <div className="lightning-time-legend-current">{formatReferenceTimeLabel(lightningReferenceTimeMs)}</div>
+          <div className="lightning-time-legend-scale">
+            {lightningLegendEntries.map((entry) => (
+              <div key={`${entry.min}-${entry.max}`} className="lightning-time-legend-row">
+                <span className="lightning-time-legend-label">{entry.label}</span>
+                <span
+                  className="lightning-time-legend-swatch"
+                  style={{ backgroundColor: entry.color }}
+                  aria-hidden="true"
+                />
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  ) : null;
 
   // Zone counts from per-airport data in airport mode; total always from nationwide
   const summary = useMemo(() => {
@@ -1906,8 +2004,10 @@ export default function InteractiveMap({
   const radarCoverageBounds = useMemo(() => (
     radarCoverageBoundary ? bboxToLeafletBounds(turfBbox(radarCoverageBoundary)) : null
   ), [radarCoverageBoundary]);
-  const mapBounds = isNationwide ? radarCoverageBounds : airportFocusBounds;
-  const mapBoundsPadding = isNationwide ? [4, 4] : [4, 4];
+  const mapBounds = isNationwide
+    ? (mobileLayout ? null : radarCoverageBounds)
+    : airportFocusBounds;
+  const mapBoundsPadding = MAP_BOUNDS_PADDING;
   const mapZoomOffset = isNationwide ? 0.05 : 0.08;
 
   return (
@@ -2076,49 +2176,7 @@ export default function InteractiveMap({
                 </div>
               </div>
             )}
-            {(showEcho && echoInfo) || showLightning ? (
-              <div className="map-right-legends">
-                {showEcho && echoInfo && (
-                  <div className="rainrate-legend" aria-label="Radar rain rate legend">
-                    <div className="rainrate-legend-title">mm/h</div>
-                    <div className="rainrate-legend-scale">
-                      {RAINRATE_LEGEND.map((entry) => (
-                        <div key={entry.label} className="rainrate-legend-row">
-                          <span className="rainrate-legend-label">{entry.label}</span>
-                          <span
-                            className="rainrate-legend-swatch"
-                            style={{ backgroundColor: entry.color }}
-                            aria-hidden="true"
-                          />
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-                {showLightning && (
-                  <div
-                    className="lightning-time-legend"
-                    aria-label="Lightning time legend"
-                  >
-                    <div className="lightning-time-legend-title">LIGHTNING</div>
-                    <div className="lightning-time-legend-sub">10 MIN</div>
-                    <div className="lightning-time-legend-current">{formatReferenceTimeLabel(lightningReferenceTimeMs)}</div>
-                    <div className="lightning-time-legend-scale">
-                      {lightningLegendEntries.map((entry) => (
-                        <div key={`${entry.min}-${entry.max}`} className="lightning-time-legend-row">
-                          <span className="lightning-time-legend-label">{entry.label}</span>
-                          <span
-                            className="lightning-time-legend-swatch"
-                            style={{ backgroundColor: entry.color }}
-                            aria-hidden="true"
-                          />
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-            ) : null}
+            {legends}
               <MapContainer
                 key={`interactive-map-${mapTheme}-${mapScope}`}
                 center={center}
@@ -2138,6 +2196,7 @@ export default function InteractiveMap({
                 zoomOffset={mapZoomOffset}
                 recenterKey={recenterKey}
               />
+              <MapVisibilitySync isVisible={isVisible} activationKey={mapActivationKey} />
               <ZoomBoundaryController onBoundaryChange={handleBoundaryChange} />
 
             {!showEcho && !showSatellite && (
