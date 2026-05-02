@@ -1,5 +1,5 @@
 /**
- * Visualization.md 설계에 따른 시각화 유틸리티
+ * weather-parsing.md 기준의 기상 시각화 유틸리티
  */
 
 export function isDaytime(isoString) {

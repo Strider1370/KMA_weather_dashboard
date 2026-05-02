@@ -1,5 +1,7 @@
 # TAF 시간별 분해 알고리즘 설계문서
 
+Status: Detailed parser appendix, pending full re-verification as of 2026-05-02. If this document conflicts with `weather-parsing.md` or current parser code, prefer current code and `weather-parsing.md`.
+
 ## 1. 개요
 
 ### 1.1 목적

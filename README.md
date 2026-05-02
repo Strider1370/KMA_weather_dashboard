@@ -101,7 +101,10 @@ frontend/src (React 대시보드)
 │   └── test/
 │       └── run-once.js
 ├── docs/
-│   └── ads-b.md
+│   ├── README.md
+│   ├── architecture.md
+│   ├── backend-collectors.md
+│   └── archive/
 ├── frontend/
 │   ├── public/geo/
 │   ├── src/
