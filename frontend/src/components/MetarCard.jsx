@@ -311,7 +311,8 @@ export default function MetarCard({
   const issueTime = target.header?.issue_time || target.header?.observation_time;
   const obsTime = target.header?.observation_time || issueTime;
   const dailyRain = amosTarget?.daily_rainfall || null;
-  const rainText = dailyRain?.mm == null || dailyRain.mm <= 0 ? null : `일강수량 ${dailyRain.mm.toFixed(1)} mm`;
+  const rainValueText = dailyRain?.mm == null || dailyRain.mm <= 0 ? null : `${dailyRain.mm.toFixed(1)} mm`;
+  const rainText = rainValueText ? `일강수량 ${rainValueText}` : null;
   const feelsLike = computeFeelsLikeC({
     tempC: target.observation?.temperature?.air,
     dewpointC: target.observation?.temperature?.dewpoint,
@@ -449,7 +450,10 @@ export default function MetarCard({
               borderBottom: `0.5px solid ${catColors(visibilityCategory).borderSoft}`,
             }}
           >
-            <div className="metar-mobile-card-title">시정</div>
+            <div className="metar-mobile-card-head">
+              <div className="metar-mobile-card-title">시정</div>
+              <div className="metar-mobile-card-icon metar-mobile-card-icon--placeholder" aria-hidden="true" />
+            </div>
             <div className="metar-mobile-card-value" style={{ color: catColors(visibilityCategory).valueColor }}>{visibilityValue}</div>
             {minimumVisibilityDetail ? <div className="metar-mobile-card-sub">{minimumVisibilityDetail}</div> : null}
           </article>
@@ -464,18 +468,31 @@ export default function MetarCard({
               borderBottom: `0.5px solid ${catColors(ceilingCategory).borderSoft}`,
             }}
           >
-            <div className="metar-mobile-card-title">운고</div>
+            <div className="metar-mobile-card-head">
+              <div className="metar-mobile-card-title">운고</div>
+              <div className="metar-mobile-card-icon metar-mobile-card-icon--placeholder" aria-hidden="true" />
+            </div>
             <div className="metar-mobile-card-value" style={{ color: catColors(ceilingCategory).valueColor }}>{ceilingValue}</div>
           </article>
 
           <article className={`metar-mobile-card${highWind ? " metar-card--alert-outline" : ""}`}>
-            <div className="metar-mobile-card-title">바람</div>
+            <div className="metar-mobile-card-head">
+              <div className="metar-mobile-card-title">바람</div>
+              <div className="metar-mobile-card-icon metar-mobile-card-icon--wind" aria-hidden="true">
+                <span className="wind-arrow-inline" style={{ transform: `rotate(${windDirectionRotation}deg)` }}>↑</span>
+              </div>
+            </div>
             <div className="metar-mobile-card-value">{`${windDirectionText}/${windSpeedText}kt`}</div>
             {windGustText ? <div className="metar-mobile-card-sub">{windGustText}</div> : null}
           </article>
 
           <article className={`metar-mobile-card${crosswindAlert ? " metar-card--alert-outline" : ""}`}>
-            <div className="metar-mobile-card-title">측풍</div>
+            <div className="metar-mobile-card-head">
+              <div className="metar-mobile-card-title">측풍</div>
+              <div className="metar-mobile-card-icon metar-mobile-card-icon--crosswind" aria-hidden="true">
+                <span className="metar-direction-arrow">{crosswindArrow}</span>
+              </div>
+            </div>
             <div className="metar-mobile-card-value">{crosswindValue}</div>
           </article>
 
@@ -483,26 +500,39 @@ export default function MetarCard({
             className={`metar-mobile-card${specialWeather ? " metar-card--special-weather" : ""}${precipitationWeather ? " metar-card--precip-weather" : ""}`}
             style={precipitationCardStyle || undefined}
           >
-            <div className="metar-mobile-card-title">현재 날씨</div>
-            <div className="metar-mobile-card-weather">
-              <WeatherIcon visual={weatherVisual} className="mini" />
-              <div className="metar-mobile-card-value">{weatherKorean}</div>
+            <div className="metar-mobile-card-head">
+              <div className="metar-mobile-card-title">현재 날씨</div>
+              <div className="metar-mobile-card-icon metar-mobile-card-icon--weather" aria-hidden="true">
+                <WeatherIcon visual={weatherVisual} className="mini" />
+              </div>
             </div>
+            <div className="metar-mobile-card-value">{weatherKorean}</div>
           </article>
 
           <article className="metar-mobile-card">
-            <div className="metar-mobile-card-title">온도</div>
+            <div className="metar-mobile-card-head">
+              <div className="metar-mobile-card-title">온도</div>
+              <div className="metar-mobile-card-icon metar-mobile-card-icon--temp" aria-hidden="true">
+                <img src="/temp_icon.png" alt="" aria-hidden="true" />
+              </div>
+            </div>
             <div className="metar-mobile-card-value">{tempDisplay}</div>
             <div className="metar-mobile-card-sub">습도 {rhDisplay}{feelsLikeText ? ` / ${feelsLikeText}` : ""}</div>
           </article>
 
           <article className="metar-mobile-card">
-            <div className="metar-mobile-card-title">일강수량</div>
-            <div className="metar-mobile-card-value">{rainText || "-"}</div>
+            <div className="metar-mobile-card-head">
+              <div className="metar-mobile-card-title">일강수량</div>
+              <div className="metar-mobile-card-icon metar-mobile-card-icon--placeholder" aria-hidden="true" />
+            </div>
+            <div className="metar-mobile-card-value">{rainValueText || "-"}</div>
           </article>
 
           <article className="metar-mobile-card">
-            <div className="metar-mobile-card-title">QNH</div>
+            <div className="metar-mobile-card-head">
+              <div className="metar-mobile-card-title">QNH</div>
+              <div className="metar-mobile-card-icon metar-mobile-card-icon--placeholder" aria-hidden="true" />
+            </div>
             <div className="metar-mobile-card-value">{qnhDisplay}</div>
           </article>
         </div>
@@ -518,7 +548,10 @@ export default function MetarCard({
               borderBottom: `0.5px solid ${catColors(rvrPanelCategory).borderSoft}`,
             }}
           >
-            <div className="metar-mobile-card-title">RVR</div>
+            <div className="metar-mobile-card-head">
+              <div className="metar-mobile-card-title">RVR</div>
+              <div className="metar-mobile-card-icon metar-mobile-card-icon--placeholder" aria-hidden="true" />
+            </div>
             <div className="rvr-panel-values rvr-panel-values--mobile">
               <div
                 className="rvr-panel-grid"

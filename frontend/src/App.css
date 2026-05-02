@@ -4495,6 +4495,10 @@ tr.row-danger td { background: #ffe9e7; }
   gap: 6px;
 }
 
+.metar-section-head--mobile .metar-section-time {
+  font-size: 13px;
+}
+
 .metar-mobile-head-row {
   width: 100%;
   display: flex;
@@ -4504,7 +4508,7 @@ tr.row-danger td { background: #ffe9e7; }
 }
 
 .metar-mobile-suntime {
-  font-size: 13px;
+  font-size: 11px;
   font-weight: 700;
   line-height: 1.2;
   color: var(--muted);
@@ -4518,7 +4522,7 @@ tr.row-danger td { background: #ffe9e7; }
 }
 
 .metar-mobile-flight-category {
-  min-height: 132px;
+  min-height: 128px;
 }
 
 .metar-mobile-grid {
@@ -4531,10 +4535,10 @@ tr.row-danger td { background: #ffe9e7; }
   background: var(--card-bg);
   border: 0.5px solid var(--line);
   border-radius: 12px;
-  min-height: 118px;
-  padding: 14px;
+  min-height: 114px;
+  padding: 11px 14px 14px;
   display: grid;
-  gap: 8px;
+  gap: 6px;
   min-width: 0;
 }
 
@@ -4543,6 +4547,48 @@ tr.row-danger td { background: #ffe9e7; }
   font-weight: 900;
   letter-spacing: 0.01em;
   color: var(--muted);
+}
+
+.metar-mobile-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 34px;
+}
+
+.metar-mobile-card-icon {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 59px;
+  min-height: 59px;
+  color: var(--muted);
+}
+
+.metar-mobile-card-icon--placeholder {
+  opacity: 0;
+}
+
+.metar-mobile-card-icon--wind .wind-arrow-inline {
+  font-size: 49px;
+}
+
+.metar-mobile-card-icon--crosswind .metar-direction-arrow {
+  font-size: 49px;
+}
+
+.metar-mobile-card-icon--weather .weather-icon-wrapper {
+  width: 59px;
+  height: 59px;
+}
+
+.metar-mobile-card-icon--temp img {
+  display: block;
+  width: 59px;
+  height: 59px;
+  object-fit: contain;
 }
 
 .metar-mobile-card-value {
@@ -4557,13 +4603,6 @@ tr.row-danger td { background: #ffe9e7; }
   font-size: 14px;
   line-height: 1.35;
   color: var(--muted);
-}
-
-.metar-mobile-card-weather {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-width: 0;
 }
 
 .metar-mobile-card--rvr {
@@ -4632,6 +4671,64 @@ tr.row-danger td { background: #ffe9e7; }
 
   .mobile-ops-warning .warning-banner {
     margin: 0;
+  }
+
+  .mobile-ops-warning--panel .warning-banner {
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: center;
+    gap: 10px;
+    min-height: 0;
+    padding: 10px 12px;
+    font-size: 14px;
+  }
+
+  .mobile-ops-warning--panel .warning-banner-side {
+    padding: 0;
+    border-bottom: none;
+    gap: 6px;
+  }
+
+  .mobile-ops-warning--panel .warning-banner-icon {
+    font-size: 16px;
+  }
+
+  .mobile-ops-warning--panel .warning-banner-label {
+    font-size: 15px;
+    line-height: 1.1;
+  }
+
+  .mobile-ops-warning--panel .warning-banner-text {
+    padding: 0;
+    height: var(--warning-page-height);
+    min-height: var(--warning-page-height);
+  }
+
+  .mobile-ops-warning--panel .warning-banner-group {
+    gap: 8px;
+    height: var(--warning-page-height);
+    white-space: nowrap;
+  }
+
+  .mobile-ops-warning--panel .warning-banner-entry {
+    flex-direction: row;
+    align-items: center;
+    gap: 6px;
+    padding-left: 8px;
+  }
+
+  .mobile-ops-warning--panel .warning-banner-name,
+  .mobile-ops-warning--panel .warning-banner-time {
+    font-size: 14px;
+    line-height: 1.1;
+  }
+
+  .mobile-ops-warning--panel .warning-banner-overview-copy {
+    padding-left: 8px;
+  }
+
+  .mobile-ops-warning--panel .warning-banner-overview-summary {
+    font-size: 15px;
+    line-height: 1.15;
   }
 
   .mobile-ops-body {

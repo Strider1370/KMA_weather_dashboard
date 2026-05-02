@@ -223,6 +223,7 @@ Derived from `.editorconfig` + existing source files.
 - In PowerShell, Korean UTF-8 files may render incorrectly with plain `Get-Content`.
 - When reading Korean text files, prefer explicit UTF-8 decoding:
   - `[Console]::OutputEncoding = [System.Text.Encoding]::UTF8`
+  - `[Console]::OutputEncoding = [System.Text.Encoding]::UTF8; Get-Content -Raw -Encoding UTF8 "PATH"`
   - `[System.IO.File]::ReadAllText("PATH", [System.Text.Encoding]::UTF8)`
 
 ## Quick Checklist Before Finalizing
